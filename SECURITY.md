@@ -4,9 +4,9 @@ PalmDesk is an experimental remote-control client. There is no stable release or
 
 ## Reporting a Vulnerability
 
-Use the repository's **Security > Report a vulnerability** entry when available. The maintainer must enable private vulnerability reporting when creating the public repository. If the entry is unavailable, open an issue requesting a private contact without disclosing the vulnerability details.
+Use [Security > Report a vulnerability](https://github.com/Abreto/palmdesk/security/advisories/new) to send a private report. If the entry is unavailable, open an issue requesting a private contact without disclosing the vulnerability details.
 
-Include the affected commit, environment, reproduction steps and impact in the private report. Do not attach real device passwords, TURN credentials, private screenshots or session data.
+Include the affected commit, environment, reproduction steps and impact in the private report. Do not attach real device passwords, TURN credentials, unredacted connection links or QR codes, private screenshots or session data.
 
 ## Current Boundaries
 
