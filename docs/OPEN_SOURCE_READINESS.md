@@ -1,6 +1,6 @@
 # 开源准备记录
 
-检查日期：2026-09-07。目标仓库：`Abreto/palmdesk`。本轮公开范围为实验项目源码；稳定安装包与公共服务另行验收。README 保留实验状态、独立后端要求和已知限制。
+检查日期：2026-09-07。仓库：[`Abreto/palmdesk`](https://github.com/Abreto/palmdesk)，已公开并验证匿名可访问。本轮公开范围为实验项目源码；稳定安装包与公共服务另行验收。README 保留实验状态、独立后端要求和已知限制。
 
 ## 源码公开准备
 
@@ -15,7 +15,7 @@
 - [x] 公开前现有 5 次 GitHub Actions 运行日志完成 Gitleaks 扫描，未发现凭据；仓库没有 Actions 附件。
 - [x] 首次准备时在干净目录按锁文件安装并验证源码检查；配置允许的安装脚本后完成普通安装，核对 Electron 运行时、esbuild 和 Vue 3 兼容层。本机 Electron 下载需要显式代理。此检查复用了本机 pnpm 缓存，网络下载可用性以无缓存 CI 为准。
 - [x] 最新代码 `f31382a` 的 Linux、macOS CI 全部通过：无缓存安装、65 项测试、类型检查、网页构建，以及 macOS 原生辅助程序编译，详见 [CI 运行记录](https://github.com/Abreto/palmdesk/actions/runs/34064178053)。
-- [ ] 切换为公开仓库时启用 private vulnerability reporting。
+- [x] 已启用 [private vulnerability reporting](https://github.com/Abreto/palmdesk/security/advisories/new)，并通过 GitHub API 核实。
 
 本地 `build:desktop` 已生成未签名的 `PalmDesk.app`，核对 bundle ID 为 `io.github.abreto.palmdesk`，包内包含项目许可证与归属说明。Playwright 在 1280×900 和 390×844 视口检查了名称、项目/上游链接、设置页宽度和旧入口的冷启动跳转，未出现页面异常；这不替代真实 iOS Safari 或远控验收。
 
