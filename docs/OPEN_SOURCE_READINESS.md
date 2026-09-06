@@ -14,7 +14,7 @@
 - [x] 整理后的当前源码快照完成 Gitleaks 扫描，未发现凭据。
 - [x] 整理后的 40 项单元测试、类型检查、网页构建和 macOS 原生辅助程序编译通过。
 - [x] 干净目录按锁文件安装并验证源码检查；配置允许的安装脚本后完成普通安装，核对 Electron 运行时、esbuild 和 Vue 3 兼容层。本机 Electron 下载需要显式代理。此检查复用了本机 pnpm 缓存，网络下载可用性以无缓存 CI 为准。
-- [ ] 确认 CI 在 GitHub 上通过。
+- [x] GitHub 的 Linux、macOS CI 全部通过：无缓存安装、40 项测试、类型检查、网页构建，以及 macOS 原生辅助程序编译。首次 CI 暴露的旧 `@nut-tree` 包下载失败已通过移除未使用依赖解决，详见 [CI 运行记录](https://github.com/Abreto/palmdesk/actions/runs/34054178406)。
 - [ ] 切换为公开仓库时启用 private vulnerability reporting。
 
 本地 `build:desktop` 已生成未签名的 `PalmDesk.app`，核对 bundle ID 为 `io.github.abreto.palmdesk`，包内包含项目许可证与归属说明。Playwright 在 1280×900 和 390×844 视口检查了名称、项目/上游链接、设置页宽度和旧入口的冷启动跳转，未出现页面异常；这不替代真实 iOS Safari 或远控验收。
