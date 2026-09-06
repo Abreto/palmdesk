@@ -3,10 +3,14 @@ import { createRequire } from 'node:module';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+import { exerciseQrConnection } from './qr-connection.mjs';
+
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const base = process.env.SMOKE_CLIENT_URL || 'http://localhost:5173';
-const artifacts = path.resolve('docs/smoke-artifacts');
+const artifacts = path.resolve(
+  process.env.SMOKE_ARTIFACT_DIR || 'docs/smoke-artifacts'
+);
 await mkdir(artifacts, { recursive: true });
 const browser = await chromium.launch({
   executablePath:
@@ -66,7 +70,7 @@ try {
           if (channel === 'beginCapture') {
             if (!state.sources || data.sourceId !== source.id)
               return { code: 1, msg: 'Fixture window unavailable' };
-            state.sessionId = crypto.randomUUID();
+            state.sessionId = `fixture-${state.streams.length}-${Date.now()}`;
             result = {
               source,
               sessionId: state.sessionId,
@@ -92,6 +96,12 @@ try {
         },
       },
     };
+    if (!navigator.mediaDevices) {
+      Object.defineProperty(navigator, 'mediaDevices', {
+        value: {},
+        configurable: true,
+      });
+    }
     navigator.mediaDevices.getUserMedia = async (constraints) => {
       if (constraints.video.mandatory.chromeMediaSourceId !== source.id)
         throw new Error('Unexpected capture source');
@@ -211,6 +221,9 @@ try {
       { timeout: 25000 }
     );
     await phone.getByLabel('发送文字', { exact: true }).waitFor();
+  }
+  if (process.env.SMOKE_QR === 'true') {
+    await exerciseQrConnection({ host, phone, device, base, artifacts, pass });
   }
   await connectPhone();
   assert.ok(!phone.url().includes('Password'));

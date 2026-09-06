@@ -4,10 +4,14 @@
     <div class="content">
       <div class="top">
         <div class="title">连接密码</div>
-        <div
+        <button
           class="close"
+          type="button"
+          aria-label="关闭密码输入"
+          title="关闭密码输入"
+          :disabled="busy"
           @click="emits('close')"
-        ></div>
+        ></button>
       </div>
       <div class="uuid">设备代码：{{ uuid }}</div>
       <div class="err-msg">{{ errMsg }}</div>
@@ -20,6 +24,7 @@
           maxlength="12"
           placeholder="请输入连接密码"
           aria-label="连接密码"
+          :disabled="busy"
           @keydown.enter="handleConfirm"
         />
         <div
@@ -28,12 +33,14 @@
           @click="hidePwd = !hidePwd"
         ></div>
       </div>
-      <div
+      <button
         class="btn"
+        type="button"
+        :disabled="busy"
         @click="handleConfirm"
       >
-        确定
-      </div>
+        {{ busy ? '连接中' : '确定' }}
+      </button>
     </div>
   </div>
 </template>
@@ -50,11 +57,13 @@ const props = withDefaults(
     uuid?: string;
     pwd?: string;
     errMsg: string;
+    busy?: boolean;
   }>(),
   {
     uuid: '',
     pwd: '',
     errMsg: '',
+    busy: false,
   }
 );
 
@@ -66,6 +75,7 @@ onMounted(() => {
 });
 
 function handleConfirm() {
+  if (props.busy) return;
   if (
     password.value &&
     password.value.length >= 6 &&
@@ -108,6 +118,9 @@ function handleConfirm() {
         font-size: 16px;
       }
       .close {
+        padding: 0;
+        border: 0;
+        background: transparent;
         width: 14px;
         height: 14px;
         cursor: pointer;
@@ -165,6 +178,9 @@ function handleConfirm() {
       }
     }
     .btn {
+      display: block;
+      padding: 0;
+      border: 0;
       margin-top: 15px;
       margin-left: auto;
       width: 80px;
@@ -178,6 +194,10 @@ function handleConfirm() {
       cursor: pointer;
       &:hover {
         opacity: 0.7;
+      }
+      &:disabled {
+        opacity: 0.5;
+        cursor: default;
       }
     }
   }

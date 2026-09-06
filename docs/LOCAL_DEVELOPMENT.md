@@ -59,6 +59,24 @@ NODE_PATH=/Users/abreto/.cache/codex-runtimes/codex-primary-runtime/dependencies
 node test/smoke/business-flow.mjs
 ```
 
+扫码流程使用同一个烟测入口，指定可达的局域网地址（不要用回环地址）：
+
+```bash
+npm run dev:web:lan -- --port 5187
+```
+
+另一个终端运行：
+
+```bash
+NODE_PATH=/Users/abreto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
+SMOKE_CLIENT_URL=http://192.168.1.10:5187 \
+SMOKE_QR=true \
+SMOKE_ARTIFACT_DIR=.local/qr-artifacts \
+node test/smoke/business-flow.mjs
+```
+
+将 IP 替换为本机地址。该测试实际渲染和解码 host 二维码，运行本地 API、Socket.IO 和 WebRTC，覆盖链接直达、图片识码、相机帧识码、密码变更、无效码、设备离线、失败重试和相机释放。相机视频、原生窗口捕获和系统输入使用测试替身，不操作真实应用窗口，也不代表手机相机或微信已实机验收。
+
 Electron 外壳测试还要求 `electron-dist/` 已构建、独立开发 Electron 已由 `npm run dev:desktop` 生成，并且没有另一个 Codex Remote 实例占用单实例锁：
 
 ```bash

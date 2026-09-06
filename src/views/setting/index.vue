@@ -14,6 +14,10 @@
         </button>
       </header>
       <dl>
+        <template v-if="ipcRenderer">
+          <dt>手机网页地址</dt>
+          <dd>{{ getClientUrl() || '未配置' }}</dd>
+        </template>
         <dt>服务地址</dt>
         <dd>{{ getAxiosBaseUrl() || AXIOS_BASEURL }}</dd>
         <dt>信令地址</dt>
@@ -65,6 +69,7 @@ import { usePiniaCacheStore } from '@/store/cache';
 import { ipcRenderer } from '@/utils';
 import {
   getAxiosBaseUrl,
+  getClientUrl,
   getCoturnUrl,
   getWssUrl,
 } from '@/utils/localStorage/app';

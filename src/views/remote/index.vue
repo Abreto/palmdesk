@@ -63,8 +63,32 @@
           </div>
         </div>
       </div>
+      <ConnectionQr
+        v-if="ipcRenderer"
+        :device="cacheStore.deskUserUuid"
+        :password="cacheStore.deskUserPassword"
+        :ready="
+          deviceReady &&
+          connectStatus === WsConnectStatusEnum.connect &&
+          !updatingPassword
+        "
+        @settings="showUrlModal = true"
+      />
       <div class="remote-device">
-        <div class="label">连接电脑</div>
+        <div class="connection-heading">
+          <div class="label">连接电脑</div>
+          <button
+            v-if="!ipcRenderer"
+            class="scan-button"
+            type="button"
+            title="扫码连接"
+            aria-label="扫码连接"
+            :disabled="loading || !!pendingInvite"
+            @click="showScanModal = true"
+          >
+            <ScanOutline />
+          </button>
+        </div>
         <div class="info">
           <div
             v-on-click-outside="handleClickOutside"
@@ -85,7 +109,8 @@
                 autocapitalize="none"
                 :spellcheck="false"
                 autocomplete="off"
-                @keydown.enter="startRemote"
+                :disabled="loading || !!pendingInvite"
+                @keydown.enter="startRemote()"
               />
               <div
                 class="arrow-down"
@@ -128,10 +153,11 @@
             :class="{ gray: !cacheStore.remoteDeskUserUuid.length, loading }"
             :disabled="
               loading ||
-              !cacheStore.deskUserUuid ||
+              !deviceReady ||
+              !!pendingInvite ||
               !cacheStore.remoteDeskUserUuid.length
             "
-            @click="startRemote"
+            @click="startRemote()"
           >
             <div v-if="!loading">连接</div>
             <div
@@ -140,6 +166,38 @@
             ></div>
           </button>
         </div>
+        <p
+          v-if="pendingInvite"
+          class="invite-status"
+          role="status"
+        >
+          正在连接设备 {{ pendingInvite.device }}
+        </p>
+        <p
+          v-if="connectionError"
+          class="connection-error"
+          role="alert"
+        >
+          {{ connectionError }}
+        </p>
+        <button
+          v-if="connectionError && receivedInvite"
+          class="retry-service"
+          type="button"
+          title="复制连接链接"
+          aria-label="复制连接链接"
+          @click="handleCopy(receivedInvite.url)"
+        >
+          <CopyOutline />
+        </button>
+        <button
+          v-if="initializationFailed"
+          class="retry-service"
+          type="button"
+          @click="windowReload"
+        >
+          <RefreshOutline />重新连接服务
+        </button>
       </div>
 
       <div
@@ -401,11 +459,21 @@
       </div>
     </div>
 
+    <UrlModal
+      v-if="showUrlModal"
+      @close="showUrlModal = false"
+    />
+    <ScanModal
+      v-if="showScanModal"
+      @close="showScanModal = false"
+      @connect="handleScannedInvite"
+    />
     <PwdModalCpt
       v-if="showPwdModalCpt"
       :uuid="cacheStore.remoteDeskUserUuid"
       :pwd="pwd"
-      :err-msg="errMsg"
+      :err-msg="errMsg || connectionError"
+      :busy="verifyingPassword"
       @close="handleClose"
       @confirm="handleConfirm"
     ></PwdModalCpt>
@@ -413,6 +481,7 @@
 </template>
 
 <script lang="ts" setup>
+import { CopyOutline, RefreshOutline, ScanOutline } from '@vicons/ionicons5';
 import { vOnClickOutside } from '@vueuse/components';
 import { copyToClipBoard, getRandomString, windowReload } from 'billd-utils';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -461,8 +530,15 @@ import {
   setVideoTrackContentHints,
 } from '@/utils';
 import { CaptureLifecycle } from '@/utils/capture-lifecycle';
+import {
+  type ConnectionInvite,
+  parseConnectionInvite,
+} from '@/utils/connection-invite';
 import { WebRTCClass } from '@/utils/network/webRTC';
+import ConnectionQr from '@/views/remote/connectionQr.vue';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
+import ScanModal from '@/views/remote/scanModal.vue';
+import UrlModal from '@/views/setting/urlModal.vue';
 
 const route = useRoute();
 const appStore = useAppStore();
@@ -494,6 +570,16 @@ const anchorStream = ref<MediaStream>();
 /** 是否控制别人 */
 const isControlOther = ref(false);
 const loading = ref(false);
+const deviceReady = ref(false);
+const initializationFailed = ref(false);
+const connectionError = ref('');
+const pendingInvite = ref<ConnectionInvite>();
+const receivedInvite = ref<ConnectionInvite>();
+const showScanModal = ref(false);
+const showUrlModal = ref(false);
+const verifyingPassword = ref(false);
+const updatingPassword = ref(false);
+let disposed = false;
 const showPwdModalCpt = ref(false);
 const showLinkDeviceList = ref(false);
 const arrowDownRef = ref();
@@ -530,16 +616,71 @@ const selectedCaptureSource = computed(() => {
 });
 
 onUnmounted(() => {
+  disposed = true;
+  pendingInvite.value = undefined;
   clearInterval(loopBilldDeskUpdateUserTimer.value);
   clearInterval(captureRefreshTimer.value);
   stopCaptureStream();
 });
 
 onMounted(() => {
-  console.log('home页面');
-  console.log('route.query', route.query);
-  handleInit();
+  void handleInit();
 });
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (!Object.prototype.hasOwnProperty.call(route.query, 'connect')) return;
+    let invite: ConnectionInvite | undefined;
+    try {
+      invite = parseConnectionInvite(window.location.href);
+    } catch (cause) {
+      connectionError.value = (cause as Error).message;
+    }
+    // Consume even malformed invitations without keeping credentials in history.
+    void router.replace({ name: routerName.remote, query: {} });
+    if (invite && !ipcRenderer && !loading.value) {
+      queueInvite(invite);
+    }
+  },
+  { immediate: true }
+);
+
+watch([deviceReady, connectStatus, pendingInvite], () => {
+  if (
+    !disposed &&
+    deviceReady.value &&
+    connectStatus.value === WsConnectStatusEnum.connect &&
+    pendingInvite.value &&
+    !loading.value
+  ) {
+    const invite = pendingInvite.value;
+    pendingInvite.value = undefined;
+    cacheStore.remoteDeskUserUuid = invite.device;
+    void startRemote(invite.password);
+  }
+});
+
+function queueInvite(invite: ConnectionInvite) {
+  connectionError.value = '';
+  showLinkDeviceList.value = false;
+  cacheStore.remoteDeskUserUuid = invite.device;
+  receivedInvite.value = invite;
+  pendingInvite.value = invite;
+}
+
+function handleScannedInvite(invite: ConnectionInvite) {
+  showScanModal.value = false;
+  const target = new URL(invite.url);
+  if (
+    target.origin !== location.origin ||
+    target.pathname !== location.pathname
+  ) {
+    window.location.assign(invite.url);
+    return;
+  }
+  queueInvite(invite);
+}
 
 const handleClickOutside: any = [
   () => {
@@ -740,6 +881,13 @@ async function handleInit() {
   await handleInitIpcRendererSend();
   await refreshCaptureSources();
   await initDeskUser();
+  if (disposed) return;
+  if (!roomId.value) {
+    initializationFailed.value = true;
+    connectionError.value = '无法连接服务，请检查服务地址后重试';
+    return;
+  }
+  deviceReady.value = true;
   deskUserUuid.value = cacheStore.deskUserUuid;
   deskUserPassword.value = cacheStore.deskUserPassword;
   handleLoopBilldDeskUpdateUserTimer();
@@ -926,26 +1074,27 @@ async function initDeskUser() {
 }
 
 async function handleUpdatePassword() {
+  if (updatingPassword.value || !deviceReady.value) return;
+  updatingPassword.value = true;
   try {
-    cacheStore.deskUserPassword = getRandomString(8);
-    // if (cacheStore.deskUserPassword === originalPassword.value) return;
-    if (
-      cacheStore.deskUserPassword &&
-      cacheStore.deskUserPassword.length > 6 &&
-      cacheStore.deskUserPassword.length < 12
-    ) {
-      await fetchDeskUserUpdateByUuid({
-        uuid: cacheStore.deskUserUuid!,
-        password: originalPassword.value,
-        new_password: cacheStore.deskUserPassword!,
-      });
-      originalPassword.value = cacheStore.deskUserPassword;
+    const password = getRandomString(8);
+    const result = await fetchDeskUserUpdateByUuid({
+      uuid: cacheStore.deskUserUuid!,
+      password: originalPassword.value,
+      new_password: password,
+    });
+    if (result.code === 200) {
+      cacheStore.deskUserPassword = password;
+      deskUserPassword.value = password;
+      originalPassword.value = password;
       window.$message.success('更新临时密码成功！');
     } else {
-      window.$message.warning('临时密码长度要求6-12位！');
+      window.$message.error(result.message || '更新临时密码失败');
     }
-  } catch (error) {
-    console.log(error);
+  } catch {
+    window.$message.error('更新临时密码失败，请重试');
+  } finally {
+    updatingPassword.value = false;
   }
 }
 
@@ -1103,6 +1252,8 @@ function changeDebugUrl() {
 }
 
 async function handleResetDeskuuid() {
+  if (updatingPassword.value || !deviceReady.value) return;
+  deviceReady.value = false;
   cacheStore.deskUserUuid = '';
   cacheStore.deskUserPassword = '';
   await initDeskUser();
@@ -1115,17 +1266,23 @@ function handleCopy(str) {
 }
 
 function handleClose() {
+  if (verifyingPassword.value) return;
   showPwdModalCpt.value = false;
   loading.value = false;
 }
 
 async function handleConfirm(pwd: string) {
+  if (verifyingPassword.value || disposed) return;
+  verifyingPassword.value = true;
+  loading.value = true;
   errMsg.value = '';
+  connectionError.value = '';
   try {
     const res = await fetchDeskUserLinkVerify({
       uuid: cacheStore.remoteDeskUserUuid,
       password: pwd,
     });
+    if (disposed) return;
     if (res.code == 200) {
       if (res.data.code === 1) {
         isControlOther.value = true;
@@ -1137,9 +1294,6 @@ async function handleConfirm(pwd: string) {
           remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
           remoteDeskUserPassword: pwd,
         });
-        setTimeout(() => {
-          loading.value = false;
-        }, 300);
         if (ipcRenderer) {
           ipcRendererSend({
             windowId: 0,
@@ -1202,14 +1356,18 @@ async function handleConfirm(pwd: string) {
         errMsg.value = '密码错误，请重新输入';
       }
     } else {
-      window.$message.error(res.message);
+      connectionError.value = res.message || '连接失败，请重试';
     }
-  } catch (error) {
-    console.log(error);
+  } catch {
+    if (!disposed) connectionError.value = '连接失败，请检查网络后重试';
+  } finally {
+    verifyingPassword.value = false;
+    loading.value = showPwdModalCpt.value;
   }
 }
 
 function changeRemoteDeskUserUuid(item) {
+  if (loading.value || pendingInvite.value) return;
   const res = cacheStore.linkDeviceList.find(
     (v) => v.remoteDeskUserUuid === item.remoteDeskUserUuid
   );
@@ -1225,9 +1383,20 @@ function handleDelLinkDeviceList(item) {
   );
 }
 
-async function startRemote() {
-  if (loading.value || !cacheStore.deskUserUuid) return;
+async function startRemote(invitePassword?: string) {
+  if (loading.value || !deviceReady.value || disposed) return;
+  connectionError.value = '';
+  if (!ipcRenderer && typeof window.RTCPeerConnection !== 'function') {
+    connectionError.value =
+      '当前浏览器不支持远程连接，请用系统浏览器打开连接链接';
+    return;
+  }
   cacheStore.remoteDeskUserUuid = cacheStore.remoteDeskUserUuid.trim();
+  const connectionPassword =
+    invitePassword ??
+    (receivedInvite.value?.device === cacheStore.remoteDeskUserUuid
+      ? receivedInvite.value.password
+      : undefined);
   if (cacheStore.remoteDeskUserUuid === '') {
     window.$message.warning('请输入远程设备代码！');
     return;
@@ -1239,35 +1408,33 @@ async function startRemote() {
   try {
     loading.value = true;
     const res = await fetchFindReceiverByUuid(cacheStore.remoteDeskUserUuid);
+    if (disposed) return;
     if (res.code === 200) {
-      if (res.data.receiver !== '') {
+      if (res.data.receiver) {
+        receiverId.value = res.data.receiver;
         const old = cacheStore.linkDeviceList.find(
           (v) => v.remoteDeskUserUuid === cacheStore.remoteDeskUserUuid
         );
-        if (old) {
+        if (connectionPassword !== undefined) {
+          pwd.value = connectionPassword;
+          await handleConfirm(connectionPassword);
+        } else if (old) {
           pwd.value = old.remoteDeskUserPassword;
-          handleConfirm(pwd.value);
+          await handleConfirm(pwd.value);
         } else {
           pwd.value = '';
           showPwdModalCpt.value = true;
         }
       } else {
-        window.$message.info('该设备不在线');
-        setTimeout(() => {
-          loading.value = false;
-        }, 300);
+        connectionError.value = '该设备不在线，请确认电脑已连接服务';
       }
     } else {
-      setTimeout(() => {
-        loading.value = false;
-      }, 300);
-      window.$message.error(res.message);
+      connectionError.value = res.message || '连接失败，请重试';
     }
-  } catch (error) {
-    setTimeout(() => {
-      loading.value = false;
-    }, 300);
-    console.log(error);
+  } catch {
+    if (!disposed) connectionError.value = '连接失败，请检查网络后重试';
+  } finally {
+    loading.value = showPwdModalCpt.value;
   }
 }
 
@@ -1286,6 +1453,51 @@ function handleDel(sender) {
 
 <style lang="scss" scoped>
 .remote-wrap {
+  .connection-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+  }
+  .scan-button,
+  .retry-service {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 40px;
+    padding: 8px;
+    border: 1px solid #d7ddda;
+    border-radius: 4px;
+    background: white;
+    color: #167c65;
+    cursor: pointer;
+  }
+  .scan-button {
+    width: 40px;
+    flex-shrink: 0;
+  }
+  .scan-button:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .scan-button svg,
+  .retry-service svg {
+    width: 20px;
+    height: 20px;
+  }
+  .invite-status,
+  .connection-error {
+    font-size: 13px;
+    overflow-wrap: anywhere;
+  }
+  .invite-status {
+    color: #60726a;
+  }
+  .connection-error {
+    color: #b43e4e;
+  }
   .page-heading {
     display: flex;
     flex-wrap: wrap;

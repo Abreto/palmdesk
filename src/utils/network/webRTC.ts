@@ -467,6 +467,8 @@ export class WebRTCClass {
           if (this.maxBitrate !== -1) {
             this.setMaxBitrate(this.maxBitrate);
           }
+          // Native connection state can change after the DataChannel opens.
+          if (!this.closed) this.update();
         }
         if (connectionState === 'disconnected') {
           // 表示至少有一个 ICE 连接处于 disconnected 状态，并且没有连接处于 failed、connecting 或 checking 状态。

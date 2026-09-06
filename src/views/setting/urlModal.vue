@@ -21,6 +21,13 @@
           <CloseOutline />
         </button>
       </header>
+      <label v-if="ipcRenderer"
+        >手机网页地址<input
+          v-model="clientUrl"
+          placeholder="https://remote.example.com/"
+          autocapitalize="none"
+          :spellcheck="false"
+      /></label>
       <label
         >服务地址<input
           ref="firstInput"
@@ -80,13 +87,17 @@ import { CloseOutline, SaveOutline } from '@vicons/ionicons5';
 import { onMounted, ref } from 'vue';
 
 import { AXIOS_BASEURL, COTURN_URL, WEBSOCKET_URL } from '@/constant';
+import { ipcRenderer } from '@/utils';
+import { normalizeClientUrl } from '@/utils/connection-invite';
 import {
   getAxiosBaseUrl,
+  getClientUrl,
   getCoturnCredential,
   getCoturnUrl,
   getCoturnUsername,
   getWssUrl,
   setAxiosBaseUrl,
+  setClientUrl,
   setCoturnCredential,
   setCoturnUrl,
   setCoturnUsername,
@@ -95,6 +106,7 @@ import {
 
 const emit = defineEmits(['close']);
 const apiUrl = ref(getAxiosBaseUrl() || AXIOS_BASEURL);
+const clientUrl = ref(getClientUrl());
 const signalingUrl = ref(getWssUrl() || WEBSOCKET_URL);
 const turnUrl = ref(getCoturnUrl() || COTURN_URL);
 const turnUsername = ref(
@@ -120,6 +132,15 @@ function save() {
   const api = apiUrl.value.trim();
   const signaling = signalingUrl.value.trim();
   const turn = turnUrl.value.trim();
+  let client = clientUrl.value.trim();
+  if (ipcRenderer && client) {
+    try {
+      client = normalizeClientUrl(client);
+    } catch (cause) {
+      error.value = (cause as Error).message;
+      return;
+    }
+  }
   if (
     !validUrl(api, ['http:', 'https:'], true) ||
     !validUrl(signaling, ['http:', 'https:', 'ws:', 'wss:'])
@@ -136,6 +157,7 @@ function save() {
   setCoturnUrl(turn);
   setCoturnUsername(turnUsername.value.trim());
   setCoturnCredential(turnCredential.value);
+  if (ipcRenderer) setClientUrl(client);
   window.location.reload();
 }
 </script>

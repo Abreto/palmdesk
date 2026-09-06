@@ -174,4 +174,5 @@ export const LS_KEY = {
   coturnUrl: 'coturnUrl',
   coturnUsername: 'coturnUsername',
   coturnCredential: 'coturnCredential',
+  clientUrl: 'clientUrl',
 };
