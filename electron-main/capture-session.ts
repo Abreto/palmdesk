@@ -27,6 +27,8 @@ export interface InputDriver {
   validKey: (key: number) => boolean;
 }
 
+export class InputUnavailableError extends Error {}
+
 export function normalizedPoint(
   source: ICaptureSource,
   x: unknown,
@@ -61,7 +63,7 @@ export function normalizedPoint(
 export class CaptureSession {
   private generation = 0;
   private serial: Promise<unknown> = Promise.resolve();
-  private active?: { id: string; source: ICaptureSource };
+  private active?: { id: string; source: ICaptureSource; inputError?: string };
   private keys = new Set<number>();
   private buttons = new Set<'left' | 'right'>();
 
@@ -181,6 +183,8 @@ export class CaptureSession {
         await this.release();
         return;
       }
+      if (active.inputError && input.action !== 'resume')
+        throw new InputUnavailableError(active.inputError);
       try {
         const source = await this.focus(active.source);
         if (this.active !== active) throw new Error('目标窗口已失效');
@@ -188,6 +192,10 @@ export class CaptureSession {
           throw new Error('目标窗口身份已变化');
         if (!source.isOnScreen) throw new Error('目标窗口当前不可见');
         active.source = source;
+        if (input.action === 'resume') {
+          active.inputError = undefined;
+          return;
+        }
         if (
           [
             'move',
@@ -266,8 +274,12 @@ export class CaptureSession {
         }
       } catch (error) {
         if (this.active === active) {
-          this.active = undefined;
-          this.generation += 1;
+          if (error instanceof InputUnavailableError)
+            active.inputError = error.message;
+          else {
+            this.active = undefined;
+            this.generation += 1;
+          }
         }
         await this.release();
         throw error;

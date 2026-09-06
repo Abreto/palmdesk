@@ -17,8 +17,12 @@ import {
 import { IPC_EVENT } from '../src/event';
 import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
-import { CaptureSession } from './capture-session';
-import { NativeWindowBridge, matchCaptureSources } from './native-window';
+import { CaptureSession, InputUnavailableError } from './capture-session';
+import {
+  NativeWindowBridge,
+  NativeWindowError,
+  matchCaptureSources,
+} from './native-window';
 
 import type { NativeWindow } from './native-window';
 import type { nutjsTs } from './types';
@@ -118,14 +122,27 @@ const captureSession = new CaptureSession(
   listCaptureSources,
   async (source) => {
     if (!systemPreferences.isTrustedAccessibilityClient(false)) {
-      throw new Error('请为 PalmDesk 开启辅助功能权限');
+      throw new InputUnavailableError('请为 PalmDesk 开启辅助功能权限');
     }
-    const refreshed = await nativeWindows.request<NativeWindow>('focus', {
-      nativeId: source.nativeId,
-      ownerPid: source.ownerPid,
-      bundleId: source.bundleId,
-    });
-    return { ...source, ...refreshed };
+    try {
+      const refreshed = await nativeWindows.request<NativeWindow>('focus', {
+        nativeId: source.nativeId,
+        ownerPid: source.ownerPid,
+        bundleId: source.bundleId,
+      });
+      return { ...source, ...refreshed };
+    } catch (error) {
+      const inputErrors: Record<string, string> = {
+        permission:
+          '原生窗口服务没有辅助功能权限，请在电脑上重新授权 PalmDesk 并重启',
+        ambiguous:
+          '无法识别选定窗口的辅助功能信息，请在电脑上打开该窗口后重试控制',
+        focus: '无法聚焦选定窗口，请在电脑上将该窗口切到前台后重试控制',
+      };
+      if (error instanceof NativeWindowError && inputErrors[error.code])
+        throw new InputUnavailableError(inputErrors[error.code]);
+      throw error;
+    }
   }
 );
 
@@ -665,10 +682,15 @@ function main() {
           data: await action(request.data || {}),
         };
       } catch (error) {
+        console.warn('[PalmDesk] capture request failed', {
+          channel,
+          action: request.data?.input?.action,
+          message: error instanceof Error ? error.message : String(error),
+        });
         return {
           code: 1,
           requestId: request.requestId,
-          data: {},
+          data: { inputBlocked: error instanceof InputUnavailableError },
           msg: error instanceof Error ? error.message : String(error),
         };
       }
@@ -685,6 +707,10 @@ function main() {
     captureSession.input(data.sessionId, data.input)
   );
   captureHandler(IPC_EVENT.capturePermissions, async () => {
+    const nativePermissions =
+      platform === 'darwin'
+        ? await nativeWindows.request<{ accessibility: boolean }>('permissions')
+        : { accessibility: false };
     const diagnostics =
       platform === 'darwin'
         ? await nativeWindows.request<{ applications: { bundleId: string }[] }>(
@@ -698,7 +724,8 @@ function main() {
           : 'unsupported',
       accessibility:
         platform === 'darwin' &&
-        systemPreferences.isTrustedAccessibilityClient(false),
+        systemPreferences.isTrustedAccessibilityClient(false) &&
+        nativePermissions.accessibility,
       appName: app.getName(),
       packaged: app.isPackaged,
       targetApps: diagnostics.applications.map(

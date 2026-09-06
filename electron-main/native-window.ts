@@ -15,6 +15,15 @@ export interface NativeWindow {
 
 export const TARGET_BUNDLES = new Set(['com.openai.codex', 'com.openai.chat']);
 
+export class NativeWindowError extends Error {
+  constructor(
+    message: string,
+    readonly code: string
+  ) {
+    super(message);
+  }
+}
+
 export function matchCaptureSources(
   sources: Electron.DesktopCapturerSource[],
   owners: NativeWindow[]
@@ -81,7 +90,13 @@ export class NativeWindowBridge {
           if (!pending) return;
           clearTimeout(pending.timer);
           this.pending.delete(message.requestId);
-          if (message.error) pending.reject(new Error(message.error));
+          if (message.error)
+            pending.reject(
+              new NativeWindowError(
+                message.error,
+                message.errorCode || 'unknown'
+              )
+            );
           else pending.resolve(message.data);
         } catch {
           this.close();

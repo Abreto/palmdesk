@@ -91,6 +91,7 @@ export enum WsMsgTypeEnum {
   remoteWindowsResult = 'remoteWindowsResult',
   remoteWindowSelect = 'remoteWindowSelect',
   remoteWindowSelected = 'remoteWindowSelected',
+  remoteInputResult = 'remoteInputResult',
   billdDeskOffer = 'billdDeskOffer',
   billdDeskAnswer = 'billdDeskAnswer',
   billdDeskCandidate = 'billdDeskCandidate',
@@ -342,6 +343,7 @@ export enum BilldDeskBehaviorEnum {
   keyboardPressKey,
   keyboardReleaseKey,
   releaseAll,
+  resumeInput,
 }
 
 export type WsBilldDeskStartRemote = IReqWsFormat<{

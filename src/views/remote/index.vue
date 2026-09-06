@@ -493,6 +493,7 @@ import { useAppStore } from '@/store/app';
 import { usePiniaCacheStore } from '@/store/cache';
 import { useNetworkStore } from '@/store/network';
 import {
+  BilldDeskBehaviorEnum,
   WsBilldDeskBehaviorType,
   WsBilldDeskStartRemote,
   WsBilldDeskStartRemoteResult,
@@ -767,13 +768,23 @@ watch(
               data,
               sessionId
             );
-            if (
-              captureSessionId.value === sessionId &&
-              result?.code !== 0 &&
-              result?.msg
-            ) {
-              captureError.value = result.msg;
-              handleCloseAll();
+            if (captureSessionId.value !== sessionId) return;
+            if (result?.code !== 0 && result?.msg) {
+              if (result.data?.inputBlocked) {
+                captureError.value = result.msg;
+                item.dataChannelSend({
+                  msgType: WsMsgTypeEnum.remoteInputResult,
+                  requestId: jsondata.requestId,
+                  data: { error: result.msg, inputBlocked: true },
+                });
+              } else endCaptureWithError(result.msg);
+            } else if (data.type === BilldDeskBehaviorEnum.resumeInput) {
+              captureError.value = '';
+              item.dataChannelSend({
+                msgType: WsMsgTypeEnum.remoteInputResult,
+                requestId: jsondata.requestId,
+                data: { inputBlocked: false },
+              });
             }
           }
         }
@@ -960,7 +971,6 @@ async function refreshCaptureSources() {
   if (!ipcRenderer || captureLoading.value) return;
   const generation = captureGeneration;
   captureLoading.value = true;
-  captureError.value = '';
   try {
     const permissionResult = await invokeCapture(IPC_EVENT.capturePermissions);
     if (permissionResult?.code === 0) permissions.value = permissionResult.data;
@@ -974,8 +984,7 @@ async function refreshCaptureSources() {
       captureSessionId.value &&
       res.data.sessionId !== captureSessionId.value
     ) {
-      captureError.value = '目标窗口已关闭或不可见，远程控制已结束';
-      handleCloseAll();
+      endCaptureWithError('目标窗口已关闭或不可见，远程控制已结束');
     }
     const retained = captureSources.value.some(
       (source) => source.id === selectedCaptureSourceId.value
@@ -985,8 +994,7 @@ async function refreshCaptureSources() {
   } catch (error) {
     if (generation !== captureGeneration) return;
     captureSources.value = [];
-    captureError.value = error instanceof Error ? error.message : String(error);
-    handleCloseAll();
+    endCaptureWithError(error instanceof Error ? error.message : String(error));
   } finally {
     captureLoading.value = false;
   }
@@ -1168,8 +1176,7 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
         'ended',
         () => {
           if (captureSessionId.value !== sessionId) return;
-          captureError.value = '窗口视频已结束';
-          handleCloseAll();
+          endCaptureWithError('窗口视频已结束');
         },
         { once: true }
       )
@@ -1484,6 +1491,29 @@ async function startRemote(invitePassword?: string) {
   } finally {
     loading.value = showPwdModalCpt.value;
   }
+}
+
+function endCaptureWithError(message: string) {
+  const peer = networkStore.rtcMap.get(captureOwner);
+  captureError.value = message;
+  stopCaptureStream();
+  if (!peer) {
+    handleCloseAll();
+    return;
+  }
+  peer.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteInputResult,
+    requestId: getRandomString(8),
+    data: { error: message, inputBlocked: false },
+  });
+  // Stop input/video immediately; allow the peer to receive the reason and close.
+  setTimeout(() => {
+    if (
+      networkStore.rtcMap.get(peer.receiver)?.cbDataChannel ===
+      peer.cbDataChannel
+    )
+      networkStore.removeRtc(peer.receiver);
+  }, 1000);
 }
 
 function handleCloseAll() {

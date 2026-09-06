@@ -58,6 +58,8 @@ export function remoteInput(
       return { action: 'keysUp', keys: data.key as number[] };
     case Behavior.releaseAll:
       return { action: 'releaseAll' };
+    case Behavior.resumeInput:
+      return { action: 'resume' };
     default:
       return null;
   }

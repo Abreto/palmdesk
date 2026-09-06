@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const load = require('./load-source.cjs');
-const { CaptureSession, normalizedPoint } = load(
+const { CaptureSession, InputUnavailableError, normalizedPoint } = load(
   'electron-main/capture-session.ts'
 );
 const { matchCaptureSources } = load('electron-main/native-window.ts');
@@ -408,6 +408,97 @@ test('focus denial blocks system input', async () => {
     h.session.input(sessionId, { action: 'move', x: 0, y: 0 })
   );
   assert.equal(h.events.length, 0);
+});
+test('recoverable focus failure preserves capture and blocks queued input until an explicit retry', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  h.focusError = new InputUnavailableError('Focus unavailable');
+  const rejected = [
+    h.session.input(sessionId, { action: 'click', x: 500, y: 500 }),
+    h.session.input(sessionId, {
+      action: 'text',
+      text: 'must not be replayed',
+    }),
+  ];
+  await Promise.all(
+    rejected.map((input) => assert.rejects(input, InputUnavailableError))
+  );
+  assert.equal((await h.session.refresh()).sessionId, sessionId);
+  assert.equal(h.focusCalls, 1);
+  assert.deepEqual(h.events, []);
+  h.focusError = undefined;
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'text', text: 'still blocked' }),
+    InputUnavailableError
+  );
+  await h.session.input(sessionId, { action: 'resume' });
+  assert.deepEqual(
+    h.events,
+    [],
+    'retry only verifies focus; it must not click or type'
+  );
+  await h.session.input(sessionId, { action: 'text', text: 'fresh input' });
+  assert.deepEqual(h.events, [['text', 'fresh input']]);
+});
+test('pausing input releases held keys and buttons, and a failed retry remains paused', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  await h.session.input(sessionId, { action: 'keysDown', keys: [1] });
+  await h.session.input(sessionId, { action: 'down', x: 0, y: 0 });
+  h.focusError = new InputUnavailableError('Permission revoked');
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'move', x: 50, y: 50 })
+  );
+  assert.deepEqual(h.events.slice(-2), [
+    ['keysUp', [1]],
+    ['up', 'left'],
+  ]);
+  await h.session.input(sessionId, { action: 'releaseAll' });
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'resume' }),
+    /Permission revoked/
+  );
+  assert.equal((await h.session.refresh()).sessionId, sessionId);
+});
+test('a paused capture still ends if its window disappears or changes identity', async () => {
+  for (const sources of [[], [source({ ownerPid: 99 })]]) {
+    const h = harness();
+    const { sessionId } = await h.session.begin('window:10:0');
+    h.focusError = new InputUnavailableError('Focus unavailable');
+    await assert.rejects(
+      h.session.input(sessionId, { action: 'click', x: 0, y: 0 })
+    );
+    h.sources = sources;
+    assert.equal((await h.session.refresh()).sessionId, '');
+    h.focusError = undefined;
+    await assert.rejects(
+      h.session.input(sessionId, { action: 'resume' }),
+      /会话已结束/
+    );
+    assert.deepEqual(h.events, []);
+  }
+});
+test('a retry must verify the original window identity and cannot survive disconnect', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  h.focusError = new InputUnavailableError('Focus unavailable');
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'click', x: 0, y: 0 })
+  );
+  h.focusError = undefined;
+  let release;
+  h.focusWait = new Promise((resolve) => {
+    release = resolve;
+  });
+  const retry = h.session.input(sessionId, { action: 'resume' });
+  const rejection = assert.rejects(retry, /目标窗口已失效/);
+  await tick();
+  const ended = h.session.end(sessionId);
+  release();
+  await rejection;
+  await ended;
+  assert.equal((await h.session.refresh()).sessionId, '');
+  assert.deepEqual(h.events, []);
 });
 test('disconnect invalidates input already awaiting focus', async () => {
   const h = harness();

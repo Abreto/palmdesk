@@ -44,6 +44,11 @@ try {
       activatedIds: [],
       delayCapture: false,
       captureWaiters: [],
+      inputError: '',
+      inputBlocked: false,
+      fatalInputError: '',
+      sourceReads: 0,
+      resumeAttempts: 0,
     };
     window.__smoke = state;
     const source = {
@@ -117,6 +122,7 @@ try {
               targetApps: ['com.openai.codex'],
             };
           if (channel === 'getCaptureSources') {
+            state.sourceReads += 1;
             if (state.listError) return { code: 1, msg: state.listError };
             if (!state.sources) state.sessionId = '';
             result = {
@@ -154,6 +160,28 @@ try {
           if (channel === 'remoteInput') {
             if (!state.sessionId || data.sessionId !== state.sessionId)
               return { code: 1, msg: 'Stale capture session' };
+            if (data.input.action !== 'releaseAll') {
+              if (state.fatalInputError) {
+                state.sessionId = '';
+                return {
+                  code: 1,
+                  msg: state.fatalInputError,
+                  data: { inputBlocked: false },
+                };
+              }
+              if (data.input.action === 'resume') {
+                state.resumeAttempts += 1;
+                if (!state.inputError) state.inputBlocked = false;
+              }
+              if (state.inputError || state.inputBlocked) {
+                state.inputBlocked = true;
+                return {
+                  code: 1,
+                  msg: state.inputError || 'Input paused',
+                  data: { inputBlocked: true },
+                };
+              }
+            }
             state.inputs.push(data.input);
           }
           if (channel === 'getPlatform') result = { platform: 'darwin' };
@@ -608,6 +636,86 @@ try {
   }
   pass('portrait phone, landscape phone and desktop fit their viewports');
 
+  const pausedSession = await host.evaluate(() => ({
+    id: window.__smoke.sessionId,
+    track: window.__smoke.streams.at(-1).getVideoTracks()[0].id,
+    reads: window.__smoke.sourceReads,
+  }));
+  await host.evaluate(() => {
+    window.__smoke.inputError =
+      '无法聚焦选定窗口，请在电脑上将该窗口切到前台后重试控制';
+  });
+  await phone.locator('video').tap({ position: { x: 50, y: 50 } });
+  await phone.locator('.input-error').waitFor();
+  assert.match(await phone.locator('.status').innerText(), /控制已暂停/);
+  assert.equal(
+    await phone.getByLabel('发送文字', { exact: true }).isDisabled(),
+    true
+  );
+  await host.waitForFunction(
+    (reads) => window.__smoke.sourceReads > reads,
+    pausedSession.reads
+  );
+  assert.match(await host.locator('.capture-error').innerText(), /无法聚焦/);
+  assert.equal(
+    await host.evaluate(() => window.__smoke.sessionId),
+    pausedSession.id
+  );
+  assert.equal(
+    await host.evaluate(
+      () => window.__smoke.streams.at(-1).getVideoTracks()[0].readyState
+    ),
+    'live'
+  );
+  for (const [name, size] of [
+    ['input-error-portrait', { width: 390, height: 844 }],
+    ['input-error-landscape', { width: 844, height: 390 }],
+  ]) {
+    await phone.setViewportSize(size);
+    const layout = await phone.locator('.input-error').evaluate((element) => {
+      const text = element.querySelector('span').getBoundingClientRect();
+      const button = element.querySelector('button').getBoundingClientRect();
+      return {
+        textRight: text.right,
+        buttonLeft: button.left,
+        scrollWidth: document.documentElement.scrollWidth,
+        width: innerWidth,
+      };
+    });
+    assert.ok(layout.textRight <= layout.buttonLeft);
+    assert.ok(layout.scrollWidth <= layout.width);
+    await phone.screenshot({ path: path.join(artifacts, `${name}.png`) });
+  }
+  await phone.getByRole('button', { name: '重试控制', exact: true }).click();
+  await host.waitForFunction(() => window.__smoke.resumeAttempts === 1);
+  await phone.getByRole('button', { name: '重试控制', exact: true }).waitFor();
+  assert.match(await phone.locator('.input-error').innerText(), /无法聚焦/);
+  await host.evaluate(() => {
+    window.__smoke.inputError = '';
+  });
+  await phone.getByRole('button', { name: '重试控制', exact: true }).click();
+  await phone.locator('.input-error').waitFor({ state: 'hidden' });
+  assert.equal(
+    await host.evaluate(() => window.__smoke.sessionId),
+    pausedSession.id
+  );
+  assert.equal(
+    await host.evaluate(
+      () => window.__smoke.streams.at(-1).getVideoTracks()[0].id
+    ),
+    pausedSession.track
+  );
+  await phone.getByLabel('发送到电脑的文字').fill('Resumed input');
+  await phone.getByLabel('发送文字', { exact: true }).click();
+  await host.waitForFunction(() =>
+    window.__smoke.inputs.some(
+      (input) => input.action === 'text' && input.text === 'Resumed input'
+    )
+  );
+  pass(
+    'focus errors preserve video, survive refresh, and allow explicit input retry on phone layouts'
+  );
+
   await phone.getByLabel('断开并重选窗口', { exact: true }).click();
   await phone
     .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
@@ -710,6 +818,32 @@ try {
   );
   assert.notEqual(firstTrack, secondTrack);
   pass('disconnect stops host tracks and reconnect captures a fresh stream');
+  await host.evaluate(() => {
+    window.__smoke.fatalInputError = 'Mouse driver unavailable';
+  });
+  await phone.locator('video').tap({ position: { x: 50, y: 50 } });
+  await phone.getByRole('button', { name: '重新连接', exact: true }).waitFor();
+  assert.match(
+    await phone.locator('.connection-message').innerText(),
+    /Mouse driver unavailable/
+  );
+  assert.match(await phone.locator('.status').innerText(), /已断开/);
+  await host.waitForFunction(() =>
+    window.__smoke.streams.every((stream) =>
+      stream.getTracks().every((track) => track.readyState === 'ended')
+    )
+  );
+  await host.evaluate(() => {
+    window.__smoke.fatalInputError = '';
+  });
+  await phone.getByRole('button', { name: '重新连接', exact: true }).click();
+  await phone
+    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .click();
+  await waitForVideo();
+  pass(
+    'fatal input errors reach the phone before disconnect and clear on reconnect'
+  );
   await host.evaluate(() => {
     window.__smoke.sources = false;
   });

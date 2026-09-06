@@ -57,7 +57,8 @@ export interface RemoteInput {
     | 'text'
     | 'keysDown'
     | 'keysUp'
-    | 'releaseAll';
+    | 'releaseAll'
+    | 'resume';
   x?: number;
   y?: number;
   amount?: number;

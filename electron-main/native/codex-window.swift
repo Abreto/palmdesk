@@ -21,16 +21,23 @@ struct TargetWindow: Codable {
 }
 
 enum WindowError: String, Error {
-    case unavailable = "Target window is no longer available"
-    case permission = "Accessibility permission is required for PalmDesk"
-    case ambiguous = "Cannot identify the exact accessibility window"
-    case focus = "The selected window could not be focused"
-    case space = "Could not switch to the selected window's desktop"
-    case spaceUnsupported = "Desktop switching is unavailable on this macOS version"
-    case spaceUnknown = "Cannot determine the selected window's desktop"
-    case spaceDisplay = "Cannot locate the display for the selected window"
-    case spaceControls = "Mission Control desktop controls are unavailable"
-    case invalid = "Invalid native window request"
+    case unavailable, permission, ambiguous, focus, invalid
+    case space, spaceUnsupported, spaceUnknown, spaceDisplay, spaceControls
+
+    var message: String {
+        switch self {
+        case .unavailable: return "Target window is no longer available"
+        case .permission: return "Accessibility permission is required for the PalmDesk native window helper"
+        case .ambiguous: return "Cannot identify the exact accessibility window"
+        case .focus: return "The selected window could not be focused"
+        case .space: return "Could not switch to the selected window's desktop"
+        case .spaceUnsupported: return "Desktop switching is unavailable on this macOS version"
+        case .spaceUnknown: return "Cannot determine the selected window's desktop"
+        case .spaceDisplay: return "Cannot locate the display for the selected window"
+        case .spaceControls: return "Mission Control desktop controls are unavailable"
+        case .invalid: return "Invalid native window request"
+        }
+    }
 }
 
 func windows() -> [TargetWindow] {
@@ -214,6 +221,20 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
     guard candidates.count == 1,
           appWindows.filter({ matches(candidates[0], $0) }).count == 1 else { throw WindowError.ambiguous }
     let window = candidates[0]
+    func focusedTarget() -> TargetWindow? {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+              let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
+              CFGetTypeID(focused) == AXUIElementGetTypeID(),
+              CFEqual(focused, window) else { return nil }
+        let refreshedWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
+        guard let refreshed = refreshedWindows.first(where: { $0.nativeId == id }),
+              refreshed.isOnScreen,
+              matches(window, refreshed),
+              refreshedWindows.filter({ matches(window, $0) }).count == 1 else { return nil }
+        return refreshed
+    }
+
+    if let refreshed = focusedTarget() { return refreshed }
     if attribute(window, kAXMinimizedAttribute as CFString) as? Bool == true {
         guard AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse) == .success else { throw WindowError.focus }
     }
@@ -222,23 +243,14 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
     _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
     if !target.isOnScreen { try activateOffscreenWindow(target) }
     _ = running.activate(options: [])
-    guard AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue) == .success,
-          AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success else { throw WindowError.focus }
+    // Apps can reject individual AX setters even when activation succeeds.
+    // Authorize input only from the verified foreground window below.
+    _ = AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue)
+    _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
     _ = AXUIElementSetAttributeValue(application, kAXFocusedWindowAttribute as CFString, window)
     let deadline = Date().addingTimeInterval(2)
     while Date() < deadline {
-        if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-           let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
-           CFGetTypeID(focused) == AXUIElementGetTypeID(),
-           CFEqual(focused, window) {
-            let refreshedWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
-            if let refreshed = refreshedWindows.first(where: { $0.nativeId == id }),
-               refreshed.isOnScreen,
-               matches(window, refreshed),
-               refreshedWindows.filter({ matches(window, $0) }).count == 1 {
-                return refreshed
-            }
-        }
+        if let refreshed = focusedTarget() { return refreshed }
         RunLoop.current.run(until: Date().addingTimeInterval(0.025))
     }
     throw WindowError.focus
@@ -291,8 +303,10 @@ while let line = readLine() {
             throw WindowError.invalid
         }
         response = ["requestId": requestId, "data": data]
+    } catch let error as WindowError {
+        response = ["requestId": requestId, "error": error.message, "errorCode": error.rawValue]
     } catch {
-        response = ["requestId": requestId, "error": (error as? WindowError)?.rawValue ?? error.localizedDescription]
+        response = ["requestId": requestId, "error": error.localizedDescription]
     }
     if let output = try? JSONSerialization.data(withJSONObject: response, options: [.sortedKeys]),
        let json = String(data: output, encoding: .utf8) {

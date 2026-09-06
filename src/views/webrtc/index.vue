@@ -19,14 +19,16 @@
         class="status"
         :class="{ online: controlling, ready: connected && !controlling }"
         >{{
-          controlling
-            ? '已连接'
-            : selectedWindow
-              ? '正在加载'
-              : connected
-                ? '选择窗口'
-                : error
-                  ? '已断开'
+          error
+            ? '已断开'
+            : controlling
+              ? inputError
+                ? '控制已暂停'
+                : '已连接'
+              : selectedWindow
+                ? '正在加载'
+                : connected
+                  ? '选择窗口'
                   : '正在连接'
         }}</span
       >
@@ -82,10 +84,25 @@
       @refresh="requestWindows"
       @select="selectWindow"
     />
+    <div
+      v-if="controlling && inputError"
+      class="input-error"
+      role="alert"
+    >
+      <span>{{ inputError }}</span>
+      <button
+        type="button"
+        :disabled="retryingInput"
+        @click="retryInput"
+      >
+        <RefreshOutline />{{ retryingInput ? '正在重试' : '重试控制' }}
+      </button>
+    </div>
     <RemoteViewport
       v-if="selectedWindow"
       :video="peer?.videoEl"
       :connected="controlling"
+      :input-blocked="!!inputError || retryingInput"
       @behavior="sendBehavior"
     />
     <div
@@ -117,6 +134,7 @@ import {
   ArrowBackOutline,
   BrowsersOutline,
   OptionsOutline,
+  RefreshOutline,
 } from '@vicons/ionicons5';
 import { getRandomString } from 'billd-utils';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -158,6 +176,10 @@ const receiverId = ref('');
 const quality = ref(1080);
 const frameRate = ref(30);
 const error = ref('');
+const inputError = ref('');
+const retryingInput = ref(false);
+let resumeRequest = '';
+let inputTimeout: ReturnType<typeof setTimeout>;
 const hasCredentials = ref(false);
 const windows = ref<IRemoteWindow[]>([]);
 const windowsLoading = ref(false);
@@ -228,6 +250,22 @@ function receiveWindowMessage(event: MessageEvent) {
   }
   if (!message?.data || typeof message.data !== 'object') return;
   const { data } = message;
+  if (
+    message.msgType === WsMsgTypeEnum.remoteInputResult &&
+    selectedWindow.value
+  ) {
+    if (typeof data.error === 'string' && data.error) {
+      if (data.inputBlocked === true) inputError.value = data.error;
+      else endConnection(data.error);
+    }
+    if (resumeRequest && message.requestId === resumeRequest) {
+      clearTimeout(inputTimeout);
+      resumeRequest = '';
+      retryingInput.value = false;
+      if (!data.error && data.inputBlocked === false) inputError.value = '';
+    }
+    return;
+  }
   if (
     message.msgType === WsMsgTypeEnum.remoteWindowsResult &&
     listRequest &&
@@ -301,6 +339,7 @@ watch([connected, () => peer.value?.cbDataChannel], ([ready, channel]) => {
 function endConnection(message: string) {
   clearTimeout(timeout);
   clearTimeout(requestTimer);
+  clearTimeout(inputTimeout);
   releaseInput();
   hadPeer = false;
   networkStore.removeAllWsAndRtc();
@@ -359,6 +398,10 @@ function connect() {
   if (!hasCredentials.value) return;
   clearTimeout(timeout);
   clearTimeout(requestTimer);
+  clearTimeout(inputTimeout);
+  resumeRequest = '';
+  inputError.value = '';
+  retryingInput.value = false;
   releaseInput();
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
@@ -379,10 +422,19 @@ function connect() {
       error.value = '连接超时，请检查电脑窗口、服务地址和网络';
   }, 20000);
 }
-function sendBehavior(data: Partial<WsBilldDeskBehaviorType['data']>) {
+function sendBehavior(
+  data: Partial<WsBilldDeskBehaviorType['data']>,
+  requestId = getRandomString(8)
+) {
   if (!controlling.value && data.type !== Behavior.releaseAll) return;
+  if (
+    (inputError.value || retryingInput.value) &&
+    data.type !== Behavior.releaseAll &&
+    data.type !== Behavior.resumeInput
+  )
+    return;
   peer.value?.dataChannelSend<WsBilldDeskBehaviorType['data']>({
-    requestId: getRandomString(8),
+    requestId,
     msgType: WsMsgTypeEnum.billdDeskBehavior,
     data: {
       roomId: roomId.value,
@@ -395,6 +447,17 @@ function sendBehavior(data: Partial<WsBilldDeskBehaviorType['data']>) {
       ...data,
     } as WsBilldDeskBehaviorType['data'],
   });
+}
+function retryInput() {
+  if (!controlling.value || retryingInput.value) return;
+  retryingInput.value = true;
+  resumeRequest = getRandomString(16);
+  sendBehavior({ type: Behavior.resumeInput }, resumeRequest);
+  inputTimeout = setTimeout(() => {
+    resumeRequest = '';
+    retryingInput.value = false;
+    inputError.value = '重试控制超时，请再次重试或重新连接';
+  }, 10000);
 }
 function releaseInput() {
   sendBehavior({ type: Behavior.releaseAll });
@@ -416,6 +479,7 @@ function updateQuality() {
 function disconnect() {
   leaving = true;
   clearTimeout(requestTimer);
+  clearTimeout(inputTimeout);
   releaseInput();
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
@@ -443,7 +507,7 @@ watch(
   () => networkStore.rtcMap.size,
   (size) => {
     if (!size && hadPeer && !leaving)
-      error.value = '连接已结束，目标窗口可能已关闭或不可用';
+      error.value ||= '连接已结束，目标窗口可能已关闭或不可用';
   }
 );
 onMounted(() => {
@@ -494,6 +558,7 @@ onUnmounted(() => {
   clearTimeout(timeout);
   clearTimeout(requestTimer);
   clearInterval(heartbeat);
+  clearTimeout(inputTimeout);
   releaseInput();
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
@@ -501,6 +566,44 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
+.input-error {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  color: #9e3046;
+  background: #fff3f5;
+  border-bottom: 1px solid #edcbd2;
+  font-size: 13px;
+  flex-shrink: 0;
+
+  span {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    background: white;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.5;
+  }
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
 .controller-page {
   position: relative;
   display: flex;

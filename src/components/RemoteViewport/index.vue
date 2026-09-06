@@ -143,7 +143,11 @@ import { BilldDeskBehaviorEnum as Behavior } from '@/types/websocket';
 import { createPointerController } from '@/utils/controller-input';
 import { videoPoint } from '@/utils/remote-input';
 
-const props = defineProps<{ video?: HTMLVideoElement; connected: boolean }>();
+const props = defineProps<{
+  video?: HTMLVideoElement;
+  connected: boolean;
+  inputBlocked?: boolean;
+}>();
 const emit = defineEmits<{
   behavior: [data: Partial<WsBilldDeskBehaviorType['data']>];
 }>();
@@ -155,7 +159,8 @@ const showKeyboard = ref(true);
 const draft = ref('');
 const hasFrame = ref(false);
 const canControl = computed(
-  () => props.connected && hasFrame.value && !watchOnly.value
+  () =>
+    props.connected && hasFrame.value && !watchOnly.value && !props.inputBlocked
 );
 const modes = [
   { value: 'tap' as const, label: '点击', icon: HandLeftOutline },
@@ -301,7 +306,10 @@ watch(
   },
   { immediate: true }
 );
-watch([watchOnly, touchMode, () => props.connected], releaseAll);
+watch(
+  [watchOnly, touchMode, () => props.connected, () => props.inputBlocked],
+  releaseAll
+);
 watch([zoom, showKeyboard], () => nextTick(resizeVideo));
 useResizeObserver(stage, resizeVideo);
 onMounted(() => {
