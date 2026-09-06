@@ -69,8 +69,9 @@ const windowMap = new Map<number, BrowserWindow>();
 const appName = app.getName();
 const nativeWindows = new NativeWindowBridge(
   path.join(
-    app.isPackaged ? process.resourcesPath : path.join(__dirname, '..'),
-    'native-bin',
+    app.isPackaged
+      ? path.join(process.resourcesPath, '..', 'MacOS')
+      : path.join(__dirname, '..', 'native-bin'),
     'codex-window'
   )
 );

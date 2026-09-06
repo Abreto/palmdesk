@@ -12,9 +12,8 @@
   },
   files: ['dist', 'electron-dist', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md'],
   mac: {
-    extraResources: [
-      { from: 'native-bin/codex-window', to: 'native-bin/codex-window' },
-    ],
+    sign: './scripts/sign-macos.cjs',
+    extraFiles: [{ from: 'native-bin/codex-window', to: 'MacOS/codex-window' }],
     target: ['dmg'],
     artifactName: '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
     icon: 'build/icons/icon.icns',
