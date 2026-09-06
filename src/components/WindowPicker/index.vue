@@ -69,7 +69,12 @@
               :src="source.appIcon"
               alt=""
             />{{ source.appName }}</span
-          ><span class="window-title">{{ source.name }}</span></span
+          ><span class="window-title">{{ source.name }}</span>
+          <span
+            v-if="!source.isOnScreen"
+            class="window-visibility"
+            >当前不可见</span
+          ></span
         >
         <ChevronForwardOutline
           class="window-arrow"
@@ -82,11 +87,7 @@
       class="picker-empty"
       role="status"
     >
-      {{
-        query.trim()
-          ? '没有匹配的窗口'
-          : '当前桌面没有可用窗口，窗口可能已最小化'
-      }}
+      {{ query.trim() ? '没有匹配的窗口' : '没有可用的应用窗口' }}
     </p>
   </section>
 </template>
@@ -187,6 +188,10 @@ const filtered = computed(() => {
 }
 .window-list {
   margin-top: 16px;
+}
+.window-visibility {
+  color: #66736c;
+  font-size: 12px;
 }
 .window-item {
   display: grid;

@@ -16,6 +16,7 @@ export class WindowCatalog {
         // One result per message stays below the DataChannel message limit.
         thumbnail: source.thumbnail.length <= 40000 ? source.thumbnail : '',
         appIcon: source.appIcon.length <= 8000 ? source.appIcon : '',
+        isOnScreen: source.isOnScreen,
       };
     });
   }

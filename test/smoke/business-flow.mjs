@@ -41,12 +41,15 @@ try {
       hiddenIds: [],
       listError: '',
       capturedIds: [],
+      activatedIds: [],
       delayCapture: false,
       captureWaiters: [],
     };
     window.__smoke = state;
     const source = {
       id: 'window:101:0',
+      captureId: 'window:101:0',
+      isOnScreen: true,
       nativeId: 101,
       ownerPid: 4242,
       bundleId: 'com.openai.codex',
@@ -64,6 +67,8 @@ try {
       {
         ...source,
         id: 'window:102:0',
+        captureId: undefined,
+        isOnScreen: false,
         nativeId: 102,
         bundleId: 'com.apple.Terminal',
         appName: 'Terminal',
@@ -73,6 +78,7 @@ try {
       {
         ...source,
         id: 'window:103:0',
+        captureId: 'window:103:0',
         nativeId: 103,
         bundleId: 'com.anthropic.claudefordesktop',
         appName: 'Claude',
@@ -81,6 +87,7 @@ try {
       },
     ];
     for (const [index, item] of sources.entries()) {
+      if (!item.isOnScreen) continue;
       const preview = document.createElement('canvas');
       preview.width = 320;
       preview.height = 180;
@@ -126,12 +133,17 @@ try {
             );
             if (!state.sources || !selected)
               return { code: 1, msg: 'Fixture window unavailable' };
+            if (!selected.isOnScreen) {
+              state.activatedIds.push(selected.id);
+              selected.isOnScreen = true;
+              selected.captureId = `window:${selected.nativeId}:7`;
+            }
             state.sessionId = `fixture-${state.streams.length}-${Date.now()}`;
             state.capturedIds.push(selected.id);
             result = {
               source: selected,
               sessionId: state.sessionId,
-              stream: { id: source.id },
+              stream: { id: selected.captureId },
             };
           }
           if (
@@ -163,7 +175,8 @@ try {
       if (state.delayCapture)
         await new Promise((resolve) => state.captureWaiters.push(resolve));
       const selected = sources.find(
-        (item) => item.id === constraints.video.mandatory.chromeMediaSourceId
+        (item) =>
+          item.captureId === constraints.video.mandatory.chromeMediaSourceId
       );
       if (!selected) throw new Error('Unexpected capture source');
       const canvas = document.createElement('canvas');
@@ -383,9 +396,7 @@ try {
     window.__smoke.sources = false;
   });
   await phone.getByLabel('刷新窗口列表', { exact: true }).click();
-  await phone
-    .getByText('当前桌面没有可用窗口，窗口可能已最小化', { exact: true })
-    .waitFor();
+  await phone.getByText('没有可用的应用窗口', { exact: true }).waitFor();
   await host.evaluate(() => {
     window.__smoke.sources = true;
     window.__smoke.hiddenIds = [];
@@ -608,6 +619,12 @@ try {
         stream.getTracks().every((track) => track.readyState === 'ended')
       )
   );
+  assert.match(
+    await phone
+      .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
+      .innerText(),
+    /当前不可见/
+  );
   await phone
     .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
     .click();
@@ -616,6 +633,9 @@ try {
     await host.evaluate(() => window.__smoke.capturedIds.at(-1)),
     'window:102:0'
   );
+  assert.deepEqual(await host.evaluate(() => window.__smoke.activatedIds), [
+    'window:102:0',
+  ]);
   const terminalPixel = await phone.locator('video').evaluate((video) => {
     const canvas = document.createElement('canvas');
     canvas.width = 960;

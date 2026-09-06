@@ -15,33 +15,43 @@ struct TargetWindow: Codable {
     let bundleId: String
     let appName: String
     let name: String
+    let title: String
+    let isOnScreen: Bool
     let bounds: Bounds
 }
 
 enum WindowError: String, Error {
-    case unavailable = "Target window is no longer visible"
+    case unavailable = "Target window is no longer available"
     case permission = "Accessibility permission is required for PalmDesk"
     case ambiguous = "Cannot identify the exact accessibility window"
     case focus = "The selected window could not be focused"
+    case space = "Could not switch to the selected window's desktop"
+    case spaceUnsupported = "Desktop switching is unavailable on this macOS version"
+    case spaceUnknown = "Cannot determine the selected window's desktop"
+    case spaceDisplay = "Cannot locate the display for the selected window"
+    case spaceControls = "Mission Control desktop controls are unavailable"
     case invalid = "Invalid native window request"
 }
 
 func windows() -> [TargetWindow] {
-    let entries = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+    let entries = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
     return entries.compactMap { entry in
         guard let id = entry[kCGWindowNumber as String] as? UInt32,
               let pid = entry[kCGWindowOwnerPID as String] as? Int32,
               entry[kCGWindowLayer as String] as? Int == 0,
+              (entry[kCGWindowAlpha as String] as? Double ?? 1) > 0,
               let app = NSRunningApplication(processIdentifier: pid),
               let bundle = app.bundleIdentifier,
               app.activationPolicy == .regular,
               let rawBounds = entry[kCGWindowBounds as String] as? [String: Any],
               let rect = CGRect(dictionaryRepresentation: rawBounds as CFDictionary),
-              rect.width > 0, rect.height > 0 else { return nil }
+              rect.width > 1, rect.height > 1 else { return nil }
         let title = entry[kCGWindowName as String] as? String ?? ""
         return TargetWindow(nativeId: id, ownerPid: pid, bundleId: bundle,
                             appName: app.localizedName ?? bundle,
                             name: title.isEmpty ? (app.localizedName ?? bundle) : title,
+                            title: title,
+                            isOnScreen: entry[kCGWindowIsOnscreen as String] as? Bool ?? false,
                             bounds: Bounds(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height))
     }
 }
@@ -52,11 +62,42 @@ func attribute(_ element: AXUIElement, _ name: CFString) -> CFTypeRef? {
     return value
 }
 
+func listedWindows() -> [TargetWindow] {
+    let all = windows()
+    var accessible: [Int32: [AXUIElement]] = [:]
+    if AXIsProcessTrusted() {
+        for pid in Set(all.filter { !$0.isOnScreen && $0.title.isEmpty }.map { $0.ownerPid }) {
+            let application = AXUIElementCreateApplication(pid)
+            AXUIElementSetMessagingTimeout(application, 0.1)
+            if let candidates = attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] {
+                accessible[pid] = candidates
+            }
+        }
+    }
+    return all.filter { target in
+        if target.isOnScreen || !target.title.isEmpty { return true }
+        // AX may omit other Spaces too. Use it only to admit real untitled windows.
+        if let candidates = accessible[target.ownerPid] {
+            return candidates.contains { matches($0, target) }
+        }
+        return false
+    }
+}
+
 func matches(_ element: AXUIElement, _ target: TargetWindow) -> Bool {
-    // AXWindowNumber is not exposed by every app; require a unique exact frame otherwise.
+    // Native IDs disambiguate same-title, same-frame windows even across Spaces.
     if let number = attribute(element, "AXWindowNumber" as CFString) as? NSNumber {
         return number.uint32Value == target.nativeId
     }
+    if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") {
+        typealias WindowNumber = @convention(c) (AXUIElement, UnsafeMutablePointer<UInt32>) -> Int32
+        let readNumber = unsafeBitCast(symbol, to: WindowNumber.self)
+        var number: UInt32 = 0
+        if readNumber(element, &number) == 0 && number != 0 { return number == target.nativeId }
+    }
+    // If native AX IDs are unavailable, callers require a unique title/frame match.
+    let title = attribute(element, kAXTitleAttribute as CFString) as? String ?? ""
+    if title != target.title { return false }
     guard let positionValue = attribute(element, kAXPositionAttribute as CFString),
           let sizeValue = attribute(element, kAXSizeAttribute as CFString),
           CFGetTypeID(positionValue) == AXValueGetTypeID(),
@@ -70,29 +111,135 @@ func matches(_ element: AXUIElement, _ target: TargetWindow) -> Bool {
         abs(size.width - b.width) < 2 && abs(size.height - b.height) < 2
 }
 
+func activateOffscreenWindow(_ target: TargetWindow) throws {
+    // AXWindows can omit unvisited Spaces. Read membership through optional SkyLight APIs,
+    // then select the desktop through Mission Control; no window is moved between Spaces.
+    // Dock AX hierarchy: https://www.hammerspoon.org/docs/hs.spaces.html#gotoSpace
+    guard let library = dlopen("/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight", RTLD_LAZY) else { throw WindowError.space }
+    defer { dlclose(library) }
+    guard let connectionSymbol = dlsym(library, "SLSMainConnectionID"),
+          let membershipSymbol = dlsym(library, "SLSCopySpacesForWindows"),
+          let displaysSymbol = dlsym(library, "SLSCopyManagedDisplaySpaces"),
+          let notificationSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CoreDockSendNotification") else { throw WindowError.spaceUnsupported }
+    typealias Connection = @convention(c) () -> Int32
+    typealias Membership = @convention(c) (Int32, Int32, CFArray) -> Unmanaged<CFArray>?
+    typealias Displays = @convention(c) (Int32) -> Unmanaged<CFArray>?
+    typealias Notification = @convention(c) (CFString, Int32) -> Int32
+    let connection = unsafeBitCast(connectionSymbol, to: Connection.self)()
+    let membership = unsafeBitCast(membershipSymbol, to: Membership.self)
+    let displays = unsafeBitCast(displaysSymbol, to: Displays.self)
+    let notifyDock = unsafeBitCast(notificationSymbol, to: Notification.self)
+    guard let spaces = membership(connection, 7, [NSNumber(value: target.nativeId)] as CFArray)?.takeRetainedValue() as? [NSNumber],
+          !spaces.isEmpty else { throw WindowError.spaceUnknown }
+    func location() -> (display: String, index: Int, count: Int, current: Bool)? {
+        let entries = displays(connection)?.takeRetainedValue() as? [[String: Any]] ?? []
+        for entry in entries {
+            guard let uuid = entry["Display Identifier"] as? String,
+                  let desktops = entry["Spaces"] as? [[String: Any]] else { continue }
+            let current = (entry["Current Space"] as? [String: Any])?["ManagedSpaceID"] as? NSNumber
+            if let current, spaces.contains(current) { return (uuid, 0, desktops.count, true) }
+            if let index = desktops.firstIndex(where: { desktop in
+                guard let id = desktop["ManagedSpaceID"] as? NSNumber else { return false }
+                return spaces.contains(id)
+            }) { return (uuid, index, desktops.count, false) }
+        }
+        return nil
+    }
+    guard let destination = location() else { throw WindowError.spaceUnknown }
+    if destination.current { return }
+    guard let screen = NSScreen.screens.first(where: { screen in
+        if destination.display == "Main" { return screen == NSScreen.screens.first }
+        guard let id = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(id)?.takeRetainedValue() else { return false }
+        return CFUUIDCreateString(nil, uuid) as String == destination.display
+    }), let displayId = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? UInt32,
+       let dockApp = NSRunningApplication.runningApplications(withBundleIdentifier: "com.apple.dock").first else { throw WindowError.spaceDisplay }
+    let dock = AXUIElementCreateApplication(dockApp.processIdentifier)
+    AXUIElementSetMessagingTimeout(dock, 0.2)
+    func children(_ element: AXUIElement) -> [AXUIElement] {
+        attribute(element, kAXChildrenAttribute as CFString) as? [AXUIElement] ?? []
+    }
+    func child(_ element: AXUIElement, _ identifier: String) -> AXUIElement? {
+        children(element).first { attribute($0, kAXIdentifierAttribute as CFString) as? String == identifier }
+    }
+    let opened = child(dock, "mc") == nil
+    if opened { _ = notifyDock("com.apple.expose.awake" as CFString, 0) }
+    defer {
+        if opened && child(dock, "mc") != nil { _ = notifyDock("com.apple.expose.awake" as CFString, 0) }
+    }
+    RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+    let deadline = Date().addingTimeInterval(2)
+    while Date() < deadline {
+        if let mc = child(dock, "mc"),
+           let display = children(mc).first(where: { attribute($0, "AXDisplayID" as CFString) as? UInt32 == displayId }),
+           let group = child(display, "mc.spaces"),
+           let list = child(group, "mc.spaces.list"),
+           let refreshed = location(), refreshed.display == destination.display {
+            let buttons = children(list)
+            if refreshed.current { return }
+            if buttons.count == refreshed.count, buttons.indices.contains(refreshed.index),
+               AXUIElementPerformAction(buttons[refreshed.index], kAXPressAction as CFString) == .success {
+                let transitionDeadline = Date().addingTimeInterval(2)
+                repeat {
+                    RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+                    if child(dock, "mc") == nil, location()?.current == true { return }
+                } while Date() < transitionDeadline
+                throw WindowError.space
+            }
+        }
+        RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+    }
+    throw WindowError.spaceControls
+}
+
 func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow {
     guard AXIsProcessTrusted() else { throw WindowError.permission }
-    guard let target = windows().first(where: { $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle }),
+    var appWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
+    guard var target = appWindows.first(where: { $0.nativeId == id }),
           let running = NSRunningApplication(processIdentifier: pid) else { throw WindowError.unavailable }
     let application = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(application, 0.5)
-    let candidates = (attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] ?? []).filter { matches($0, target) }
-    guard candidates.count == 1 else { throw WindowError.ambiguous }
+    var candidates = (attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] ?? []).filter { matches($0, target) }
+    if !target.isOnScreen && candidates.isEmpty {
+        try activateOffscreenWindow(target)
+        let deadline = Date().addingTimeInterval(2)
+        repeat {
+            RunLoop.current.run(until: Date().addingTimeInterval(0.05))
+            appWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
+            guard let refreshed = appWindows.first(where: { $0.nativeId == id }) else { throw WindowError.unavailable }
+            target = refreshed
+            candidates = (attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] ?? []).filter { matches($0, target) }
+        } while candidates.isEmpty && Date() < deadline
+    }
+    guard candidates.count == 1,
+          appWindows.filter({ matches(candidates[0], $0) }).count == 1 else { throw WindowError.ambiguous }
     let window = candidates[0]
+    if attribute(window, kAXMinimizedAttribute as CFString) as? Bool == true {
+        guard AXUIElementSetAttributeValue(window, kAXMinimizedAttribute as CFString, kCFBooleanFalse) == .success else { throw WindowError.focus }
+    }
+    // Choose the exact main window before activating an app with windows on multiple Spaces.
+    _ = AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+    _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    if !target.isOnScreen { try activateOffscreenWindow(target) }
     _ = running.activate(options: [])
     guard AXUIElementSetAttributeValue(application, kAXFrontmostAttribute as CFString, kCFBooleanTrue) == .success,
           AXUIElementPerformAction(window, kAXRaiseAction as CFString) == .success else { throw WindowError.focus }
     _ = AXUIElementSetAttributeValue(application, kAXFocusedWindowAttribute as CFString, window)
-    let deadline = Date().addingTimeInterval(0.35)
+    let deadline = Date().addingTimeInterval(2)
     while Date() < deadline {
         if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
            let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
            CFGetTypeID(focused) == AXUIElementGetTypeID(),
-           matches(focused as! AXUIElement, target),
-           let refreshed = windows().first(where: { $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle }) {
-            return refreshed
+           CFEqual(focused, window) {
+            let refreshedWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
+            if let refreshed = refreshedWindows.first(where: { $0.nativeId == id }),
+               refreshed.isOnScreen,
+               matches(window, refreshed),
+               refreshedWindows.filter({ matches(window, $0) }).count == 1 {
+                return refreshed
+            }
         }
-        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
     }
     throw WindowError.focus
 }
@@ -109,7 +256,7 @@ while let line = readLine() {
         let data: Any
         switch command {
         case "list":
-            data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(windows()))
+            data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(listedWindows()))
         case "focus":
             guard let id = request["nativeId"] as? UInt32,
                   let pid = request["ownerPid"] as? Int32,

@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { setTimeout as delay } from 'node:timers/promises';
 
 import type { ICaptureSource, RemoteInput } from '../src/pure-interface';
+
+function sameWindow(a: ICaptureSource, b: ICaptureSource) {
+  return (
+    a.id === b.id &&
+    a.nativeId === b.nativeId &&
+    a.ownerPid === b.ownerPid &&
+    a.bundleId === b.bundleId
+  );
+}
 
 export interface InputDriver {
   position: (point: { x: number; y: number }) => Promise<unknown>;
@@ -87,7 +97,7 @@ export class CaptureSession {
     this.active = undefined;
     return this.enqueue(async () => {
       await this.release();
-      const source = (await this.list()).find((item) => item.id === sourceId);
+      let source = (await this.list()).find((item) => item.id === sourceId);
       if (generation !== this.generation) throw new Error('捕获请求已取消');
       if (!source || source.boundsSource !== 'window' || !source.bounds)
         throw new Error('选定窗口已不可用');
@@ -97,8 +107,37 @@ export class CaptureSession {
           source.bundleId !== expectedSource.bundleId)
       )
         throw new Error('选定窗口身份已变化，请刷新窗口列表');
+      if (!source.isOnScreen || !source.captureId) {
+        const focused = await this.focus(source);
+        if (generation !== this.generation) throw new Error('捕获请求已取消');
+        if (!sameWindow(source, focused)) throw new Error('选定窗口身份已变化');
+        // Electron only exposes windows on an active Space. Wait for its catalog to catch up.
+        const deadline = Date.now() + 2000;
+        for (;;) {
+          const current = (await this.list()).find(
+            (item) => item.id === sourceId
+          );
+          if (generation !== this.generation) throw new Error('捕获请求已取消');
+          if (!current) throw new Error('选定窗口已不可用');
+          if (!sameWindow(source, current))
+            throw new Error('选定窗口身份已变化');
+          if (current.isOnScreen && current.captureId) {
+            source = current;
+            break;
+          }
+          if (Date.now() >= deadline)
+            throw new Error('窗口尚未出现在当前桌面，无法启动捕获');
+          await delay(100);
+          if (generation !== this.generation) throw new Error('捕获请求已取消');
+        }
+      }
+      normalizedPoint(source, 0, 0);
       this.active = { id: randomUUID(), source };
-      return { sessionId: this.active.id, source, stream: { id: source.id } };
+      return {
+        sessionId: this.active.id,
+        source,
+        stream: { id: source.captureId! },
+      };
     });
   }
 
@@ -118,9 +157,9 @@ export class CaptureSession {
         const previous = active.source;
         const retained = sources.find(
           (source) =>
-            source.id === previous.id &&
-            source.ownerPid === previous.ownerPid &&
-            source.bundleId === previous.bundleId
+            sameWindow(source, previous) &&
+            source.isOnScreen &&
+            source.captureId === previous.captureId
         );
         if (retained) active.source = retained;
         else await this.end(active.id);
@@ -145,12 +184,9 @@ export class CaptureSession {
       try {
         const source = await this.focus(active.source);
         if (this.active !== active) throw new Error('目标窗口已失效');
-        if (
-          source.id !== active.source.id ||
-          source.ownerPid !== active.source.ownerPid ||
-          source.bundleId !== active.source.bundleId
-        )
+        if (!sameWindow(source, active.source))
           throw new Error('目标窗口身份已变化');
+        if (!source.isOnScreen) throw new Error('目标窗口当前不可见');
         active.source = source;
         if (
           [

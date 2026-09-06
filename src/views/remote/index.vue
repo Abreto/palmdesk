@@ -244,6 +244,7 @@
             <span class="capture-source-name">{{ source.name }}</span>
             <span class="capture-source-meta">
               {{ source.appName || source.bundleId }}
+              {{ source.isOnScreen ? '' : ' · 当前不可见' }}
             </span>
           </button>
         </div>
@@ -251,7 +252,7 @@
           v-else
           class="capture-empty"
         >
-          当前桌面没有可用窗口，窗口可能已最小化
+          没有可用的应用窗口
         </div>
         <div
           v-if="captureError"
@@ -1129,7 +1130,11 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
       expectedSource: { ownerPid: source.ownerPid, bundleId: source.bundleId },
     });
     if (result?.code !== 0) throw new Error(result?.msg || '无法启动窗口捕获');
-    const { sessionId, source: capturedSource } = result.data;
+    const {
+      sessionId,
+      source: capturedSource,
+      stream: captureStream,
+    } = result.data;
     if (
       generation !== captureGeneration ||
       !appStore.remoteDesk.has(receiver)
@@ -1147,7 +1152,7 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
           // @ts-ignore
           mandatory: {
             chromeMediaSource: 'desktop',
-            chromeMediaSourceId: capturedSource.id,
+            chromeMediaSourceId: captureStream.id,
           },
         },
       })

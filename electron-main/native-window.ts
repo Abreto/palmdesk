@@ -9,6 +9,7 @@ export interface NativeWindow {
   bundleId: string;
   appName?: string;
   name: string;
+  isOnScreen: boolean;
   bounds: ICaptureBounds;
 }
 
@@ -18,24 +19,31 @@ export function matchCaptureSources(
   sources: Electron.DesktopCapturerSource[],
   owners: NativeWindow[]
 ): ICaptureSource[] {
-  const matched = sources.flatMap((source) => {
-    const match = /^window:(\d+):\d+$/.exec(source.id);
-    const owner = owners.find((item) => item.nativeId === Number(match?.[1]));
-    if (!match || !owner) return [];
-    return [
-      {
-        ...owner,
-        id: source.id,
-        name: source.name || owner.name,
-        displayId: source.display_id,
-        thumbnail: `data:image/jpeg;base64,${source.thumbnail.toJPEG(55).toString('base64')}`,
-        appIcon:
-          source.appIcon?.resize({ width: 32, height: 32 }).toDataURL() || '',
-        isCodex: TARGET_BUNDLES.has(owner.bundleId),
-        boundsSource: 'window' as const,
-        inputScale: 1,
-      },
-    ];
+  const available = new Map(
+    sources.flatMap((source) => {
+      const match = /^window:(\d+):\d+$/.exec(source.id);
+      return match ? [[Number(match[1]), source] as const] : [];
+    })
+  );
+  const matched = owners.map((owner) => {
+    const source = available.get(owner.nativeId);
+    return {
+      ...owner,
+      // Catalog identities remain stable when Electron omits an offscreen window.
+      id: `window:${owner.nativeId}:0`,
+      captureId: owner.isOnScreen ? source?.id : undefined,
+      name: source?.name || owner.name,
+      displayId: source?.display_id,
+      thumbnail:
+        source && !source.thumbnail.isEmpty()
+          ? `data:image/jpeg;base64,${source.thumbnail.toJPEG(55).toString('base64')}`
+          : '',
+      appIcon:
+        source?.appIcon?.resize({ width: 32, height: 32 }).toDataURL() || '',
+      isCodex: TARGET_BUNDLES.has(owner.bundleId),
+      boundsSource: 'window' as const,
+      inputScale: 1,
+    };
   });
   return matched.sort((a, b) => Number(b.isCodex) - Number(a.isCodex));
 }
@@ -91,7 +99,8 @@ export class NativeWindowBridge {
     return new Promise<T>((resolve, reject) => {
       this.sequence += 1;
       const requestId = this.sequence;
-      const timer = setTimeout(() => this.close(), 2500);
+      // Lists can queue behind AX activation and its Space transition in the helper.
+      const timer = setTimeout(() => this.close(), 12000);
       this.pending.set(requestId, { resolve, reject, timer });
       this.child!.stdin.write(
         `${JSON.stringify({ ...target, command, requestId })}\n`,

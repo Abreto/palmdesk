@@ -18,6 +18,9 @@ export type CaptureBoundsSource = 'window' | 'display' | 'unknown';
 
 export interface ICaptureSource {
   id: string;
+  /** Electron source ID, present only while the window is available for capture. */
+  captureId?: string;
+  isOnScreen: boolean;
   nativeId: number;
   ownerPid: number;
   bundleId: string;
@@ -39,6 +42,7 @@ export interface IRemoteWindow {
   appName: string;
   thumbnail: string;
   appIcon: string;
+  isOnScreen: boolean;
 }
 
 export interface RemoteInput {

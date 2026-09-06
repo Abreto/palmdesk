@@ -8,6 +8,8 @@ const { matchCaptureSources } = load('electron-main/native-window.ts');
 
 const source = (extra = {}) => ({
   id: 'window:10:0',
+  captureId: 'window:10:0',
+  isOnScreen: true,
   nativeId: 10,
   ownerPid: 42,
   bundleId: 'com.openai.codex',
@@ -43,12 +45,14 @@ function harness() {
     async () => {
       if (state.listError) throw state.listError;
       if (state.listWait) await state.listWait;
+      if (state.listSequence?.length) return state.listSequence.shift();
       return state.sources;
     },
     async (target) => {
       state.focusCalls += 1;
       if (state.focusWait) await state.focusWait;
       if (state.focusError) throw state.focusError;
+      if (state.focusResult) return state.focusResult;
       const current = state.sources.find((item) => item.id === target.id);
       if (!current) throw new Error('Window closed');
       return current;
@@ -61,7 +65,7 @@ const desktopSource = (id, name) => ({
   id,
   name,
   display_id: '1',
-  thumbnail: { toJPEG: () => Buffer.from('thumbnail') },
+  thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('thumbnail') },
   appIcon: null,
 });
 
@@ -92,6 +96,140 @@ test('ChatGPT is supported and windows without native identities are excluded', 
     matchCaptureSources([desktopSource('window:13:0', 'OpenAI')], []).length,
     0
   );
+});
+test('all-Spaces catalog includes windows Electron omits and keeps Codex first', () => {
+  const result = matchCaptureSources(
+    [
+      desktopSource('window:11:7', 'Terminal'),
+      desktopSource('window:99:0', 'No owner'),
+    ],
+    [
+      source({ nativeId: 11, bundleId: 'com.apple.Terminal' }),
+      source({ nativeId: 12, isOnScreen: false }),
+      source({ nativeId: 13, bundleId: 'com.openai.chat', isOnScreen: false }),
+      source({
+        nativeId: 14,
+        bundleId: 'com.anthropic.claudefordesktop',
+        isOnScreen: false,
+      }),
+    ]
+  );
+  assert.deepEqual(
+    result.map((item) => item.nativeId),
+    [12, 13, 11, 14]
+  );
+  assert.equal(result[0].id, 'window:12:0');
+  assert.equal(result[0].captureId, undefined);
+  assert.equal(result[0].thumbnail, '');
+  assert.equal(result[0].isOnScreen, false);
+  assert.equal(result[2].id, 'window:11:0');
+  assert.equal(result[2].captureId, 'window:11:7');
+});
+test('offscreen metadata and empty thumbnails do not create usable capture sources', () => {
+  const empty = desktopSource('window:10:0', 'Target');
+  empty.thumbnail.isEmpty = () => true;
+  const [result] = matchCaptureSources(
+    [empty],
+    [source({ isOnScreen: false })]
+  );
+  assert.equal(result.captureId, undefined);
+  assert.equal(result.thumbnail, '');
+});
+test('viewing an available window and refreshing the all-Spaces list do not change focus', async () => {
+  const h = harness();
+  h.sources.push(
+    source({
+      id: 'window:11:0',
+      nativeId: 11,
+      isOnScreen: false,
+      captureId: undefined,
+    })
+  );
+  await h.session.refresh();
+  await h.session.begin('window:10:0');
+  assert.equal(h.focusCalls, 0);
+});
+test('offscreen selection waits for activation and a verified Electron capture ID', async () => {
+  const h = harness();
+  const offscreen = source({ isOnScreen: false, captureId: undefined });
+  const visible = source({ captureId: 'window:10:7' });
+  h.sources = [offscreen];
+  h.listSequence = [[offscreen], [offscreen], [visible]];
+  const capture = await h.session.begin(offscreen.id, offscreen);
+  assert.equal(h.focusCalls, 1);
+  assert.equal(capture.source.id, offscreen.id);
+  assert.equal(capture.stream.id, visible.captureId);
+  assert.deepEqual(h.events, []);
+});
+test('closed windows or changed identities during activation cannot be captured', async () => {
+  for (const replacement of [
+    [],
+    [source({ ownerPid: 99 })],
+    [source({ nativeId: 99 })],
+  ]) {
+    const h = harness();
+    const offscreen = source({ isOnScreen: false, captureId: undefined });
+    h.sources = [offscreen];
+    h.listSequence = [[offscreen], replacement];
+    await assert.rejects(h.session.begin(offscreen.id));
+    assert.equal((await h.session.refresh()).sessionId, '');
+  }
+});
+test('activation denial or the wrong focused window cannot start video', async () => {
+  for (const failure of ['denied', 'wrong-window']) {
+    const h = harness();
+    h.sources = [source({ isOnScreen: false, captureId: undefined })];
+    if (failure === 'denied') h.focusError = new Error('Accessibility denied');
+    else h.focusResult = source({ nativeId: 99 });
+    await assert.rejects(h.session.begin('window:10:0'));
+    assert.equal((await h.session.refresh()).sessionId, '');
+  }
+});
+test('an activated window missing from Electron eventually fails without a session', async () => {
+  const h = harness();
+  h.sources = [source({ captureId: undefined })];
+  await assert.rejects(h.session.begin('window:10:0'), /无法启动捕获/);
+  assert.equal((await h.session.refresh()).sessionId, '');
+});
+test('disconnect during activation cancels capture and permits a new selection', async () => {
+  const h = harness();
+  h.sources = [source({ isOnScreen: false, captureId: undefined })];
+  let release;
+  h.focusWait = new Promise((resolve) => {
+    release = resolve;
+  });
+  const rejected = assert.rejects(h.session.begin('window:10:0'), /已取消/);
+  await tick();
+  const ended = h.session.end();
+  h.sources = [source()];
+  const newer = h.session.begin('window:10:0');
+  release();
+  await rejected;
+  await ended;
+  const current = await newer;
+  assert.equal((await h.session.refresh()).sessionId, current.sessionId);
+  assert.deepEqual(h.events, []);
+});
+test('leaving the capturable Space ends capture even though the window remains listed', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  h.sources = [source({ isOnScreen: false, captureId: undefined })];
+  const refreshed = await h.session.refresh();
+  assert.equal(refreshed.sources.length, 1);
+  assert.equal(refreshed.sessionId, '');
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'text', text: 'x' })
+  );
+  assert.equal(h.focusCalls, 0);
+});
+test('input is rejected when native focus has not made the exact window visible', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  h.sources = [source({ isOnScreen: false })];
+  await assert.rejects(
+    h.session.input(sessionId, { action: 'text', text: 'x' })
+  );
+  assert.deepEqual(h.events, []);
 });
 test('Terminal and Claude can each be captured and controlled using their exact identity', async () => {
   for (const bundleId of [

@@ -10,6 +10,7 @@ const source = {
   appName: 'Terminal',
   thumbnail: '',
   appIcon: '',
+  isOnScreen: false,
 };
 
 test('duplicate titles retain distinct identities and expose only picker metadata', () => {
@@ -19,6 +20,7 @@ test('duplicate titles retain distinct identities and expose only picker metadat
   assert.equal(catalog.get(windows[1].id).id, 'window:11:0');
   assert.equal(windows[0].ownerPid, undefined);
   assert.equal(windows[0].bundleId, undefined);
+  assert.equal(windows[0].isOnScreen, false);
   assert.throws(() => catalog.get('window:10:0'));
 });
 test('refresh and different peers reject stale or borrowed selection tokens', () => {
