@@ -13,7 +13,7 @@
 - [x] Gitleaks 8.30.1 扫描全部可达 Git 历史，工具统计 197 个提交；3 处命中均为上游旧广告页的公开 `cps_key` 推广参数，已人工核对，未发现真实凭据。
 - [x] 整理后的当前源码快照完成 Gitleaks 扫描，未发现凭据。
 - [x] 整理后的 40 项单元测试、类型检查、网页构建和 macOS 原生辅助程序编译通过。
-- [x] 干净目录按锁文件安装并验证源码检查；配置允许的安装脚本后完成普通安装，核对 Electron 运行时、esbuild 和 Vue 3 兼容层。本机 Electron 下载需要显式代理。
+- [x] 干净目录按锁文件安装并验证源码检查；配置允许的安装脚本后完成普通安装，核对 Electron 运行时、esbuild 和 Vue 3 兼容层。本机 Electron 下载需要显式代理。此检查复用了本机 pnpm 缓存，网络下载可用性以无缓存 CI 为准。
 - [ ] 确认 CI 在 GitHub 上通过。
 - [ ] 切换为公开仓库时启用 private vulnerability reporting。
 
@@ -23,7 +23,7 @@ Gitleaks 只做本地扫描，不上传源码。历史扫描没有改写 Git 历
 
 ## 依赖审计
 
-对现有 `pnpm-lock.yaml` 运行 `pnpm audit --json --registry=https://registry.npmjs.org`，结果为 **5 critical、111 high、107 moderate、23 low**。这些是审计接口报告的依赖告警计数，包括开发工具与传递依赖，不能直接解释为同等数量的可利用产品漏洞。
+对首次准备提交 `8b0cf32` 的 `pnpm-lock.yaml` 运行 `pnpm audit --json --registry=https://registry.npmjs.org`，结果为 **5 critical、111 high、107 moderate、23 low**。这些是审计接口报告的依赖告警计数，包括开发工具与传递依赖，不能直接解释为同等数量的可利用产品漏洞。
 
 优先处理项：
 
