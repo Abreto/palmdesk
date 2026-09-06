@@ -1,20 +1,26 @@
 <template>
   <div class="about-wrap">
-    <div class="item logo"></div>
+    <PhonePortraitOutline
+      class="item logo"
+      role="img"
+      aria-label="PalmDesk"
+    />
     <div class="item name">{{ PRODUCT_NAME }}</div>
     <div class="item version">v{{ appStore.version }}</div>
     <div class="copyright">
-      Copyright © 2023-2024
+      Copyright © 2026
       <span
         class="link"
         @click="handleClick()"
-        >Galaxy-s10</span
-      >. All rights reserved.
+        >Abreto</span
+      >. MIT License. Based on BilldDesk.
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
+import { PhonePortraitOutline } from '@vicons/ionicons5';
+
 import { AUTHOR_INFO, PRODUCT_NAME, WINDOW_ID_ENUM } from '@/constant';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
 import { useAppStore } from '@/store/app';
@@ -44,12 +50,11 @@ function handleClick() {
     text-align: center;
   }
   .logo {
+    display: block;
     margin-top: 50px;
     width: 100px;
     height: 100px;
-    border-radius: 10px;
-
-    @include setBackground('@/assets/img/logo.png');
+    color: #167c65;
   }
   .name {
     padding-top: 15px;

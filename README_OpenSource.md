@@ -1,4 +1,7 @@
-[BilldDesk Pro](./README.md) | BilldDesk 开源版
+> 以下为保留的 BilldDesk 上游开源版说明，产品、服务、下载和联系方式均属于上游。
+> PalmDesk 的功能范围和启动方法见 [README.md](./README.md)。
+
+[BilldDesk Pro](https://github.com/galaxy-s10/billd-desk) | BilldDesk 开源版
 
 <p align="center">
   <a href="https://desk.hsslive.cn" target="_blank">

@@ -3,10 +3,15 @@ import { Key } from '@nut-tree-fork/shared';
 
 import type { BilldHtmlWebpackPluginLog } from '@/interface';
 
-export const PROJECT_GITHUB = `https://github.com/galaxy-s10/billd-desk-electron`;
+export const PROJECT_GITHUB = 'https://github.com/Abreto/palmdesk';
+export const UPSTREAM_GITHUB = 'https://github.com/galaxy-s10/billd-desk';
 export const WEB_DESK_URL = `https://desk.hsslive.cn`;
 
 export const AUTHOR_INFO = {
+  github: 'https://github.com/Abreto',
+};
+
+export const UPSTREAM_AUTHOR_INFO = {
   github: 'https://github.com/galaxy-s10',
   wechat: 'shuisheng9905',
   qq: '2274751790',
@@ -17,7 +22,7 @@ export const COMMON_URL = {
   payCoursesArticle: `https://www.hsslive.cn/article/151`,
 };
 
-export const PROJECT_NAME = 'billd-desk';
+export const PROJECT_NAME = 'palmdesk';
 
 // @ts-ignore
 export const APP_BUILD_INFO = process.env
@@ -57,7 +62,7 @@ export const COOKIE_DOMAIN = undefined;
 
 export const THEME_COLOR = '#167c65';
 
-export const PRODUCT_NAME = 'Codex Remote';
+export const PRODUCT_NAME = 'PalmDesk';
 
 export const NUT_KEY_MAP = {
   A: Key.A,

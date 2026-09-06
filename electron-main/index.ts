@@ -51,7 +51,7 @@ process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
   : path.join(process.env.DIST, '../public');
 
-app.setName('Codex Remote');
+app.setName('PalmDesk');
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -79,7 +79,7 @@ async function listCaptureSources(): Promise<ICaptureSource[]> {
     fetchWindowIcons: true,
   });
   if (systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
-    throw new Error('请为 Codex Remote 开启屏幕录制权限并重启应用');
+    throw new Error('请为 PalmDesk 开启屏幕录制权限并重启应用');
   }
   const owners = await nativeWindows.request<NativeWindow[]>('list');
   return matchCaptureSources(sources, owners);
@@ -115,7 +115,7 @@ const captureSession = new CaptureSession(
   listCaptureSources,
   async (source) => {
     if (!systemPreferences.isTrustedAccessibilityClient(false)) {
-      throw new Error('请为 Codex Remote 开启辅助功能权限');
+      throw new Error('请为 PalmDesk 开启辅助功能权限');
     }
     const refreshed = await nativeWindows.request<NativeWindow>('focus', {
       nativeId: source.nativeId,

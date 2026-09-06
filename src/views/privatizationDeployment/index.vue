@@ -98,7 +98,11 @@ import { openToTarget } from 'billd-utils';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { AUTHOR_INFO, COMMON_URL, WEB_DESK_URL } from '@/constant';
+import {
+  UPSTREAM_AUTHOR_INFO as AUTHOR_INFO,
+  COMMON_URL,
+  WEB_DESK_URL,
+} from '@/constant';
 
 const router = useRouter();
 const showContach = ref(false);

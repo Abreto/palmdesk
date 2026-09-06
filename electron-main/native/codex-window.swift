@@ -21,7 +21,7 @@ struct TargetWindow: Codable {
 
 enum WindowError: String, Error {
     case unavailable = "Target window is no longer visible"
-    case permission = "Accessibility permission is required for Codex Remote"
+    case permission = "Accessibility permission is required for PalmDesk"
     case ambiguous = "Cannot identify the exact accessibility window"
     case focus = "The selected window could not be focused"
     case invalid = "Invalid native window request"
