@@ -58,7 +58,7 @@ export const defaultRoutes: RouteRecordRaw[] = [
   {
     name: routerName.privatizationDeployment,
     path: '/privatizationDeployment',
-    component: () => import('@/views/privatizationDeployment/index.vue'),
+    redirect: { name: routerName.setting },
   },
   {
     name: routerName.webrtc,
@@ -78,7 +78,7 @@ export const defaultRoutes: RouteRecordRaw[] = [
   {
     name: mobileRouterName.h5privatizationDeployment,
     path: '/h5/privatizationDeployment',
-    component: () => import('@/views/h5/privatizationDeployment/index.vue'),
+    redirect: { name: routerName.setting },
   },
 ];
 

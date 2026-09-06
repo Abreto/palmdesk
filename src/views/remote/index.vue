@@ -5,7 +5,7 @@
   >
     <div class="container">
       <header class="page-heading">
-        <h1>Codex Remote</h1>
+        <h1>PalmDesk</h1>
         <span class="connection-state">{{
           connectStatus === WsConnectStatusEnum.connect
             ? '服务已连接'

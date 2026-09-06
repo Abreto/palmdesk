@@ -15,7 +15,7 @@ if (process.platform === 'darwin') {
   const runtime = path.join(root, '.local/electron-dev');
   const target = path.join(runtime, 'Electron.app');
   const stamp = path.join(runtime, 'version');
-  const version = `${require('electron/package.json').version}:codex-remote-dev-2`;
+  const version = `${require('electron/package.json').version}:palmdesk-dev-2`;
   if ((await readFile(stamp, 'utf8').catch(() => '')) !== version) {
     await mkdir(runtime, { recursive: true });
     await rm(target, { recursive: true, force: true });
@@ -26,9 +26,9 @@ if (process.platform === 'darwin') {
     });
     const plist = path.join(target, 'Contents/Info.plist');
     for (const [key, value] of Object.entries({
-      CFBundleIdentifier: 'com.codexremote.desktop.dev',
-      CFBundleName: 'Codex Remote Dev',
-      CFBundleDisplayName: 'Codex Remote Dev',
+      CFBundleIdentifier: 'io.github.abreto.palmdesk.dev',
+      CFBundleName: 'PalmDesk Dev',
+      CFBundleDisplayName: 'PalmDesk Dev',
       NSAppleEventsUsageDescription:
         'Focus the selected application window for remote input.',
       NSScreenCaptureUsageDescription:
@@ -54,7 +54,7 @@ if (process.platform === 'darwin') {
     await writeFile(stamp, version);
   }
   env.ELECTRON_OVERRIDE_DIST_PATH = runtime;
-  console.log(`Desktop identity: com.codexremote.desktop.dev (${target})`);
+  console.log(`Desktop identity: io.github.abreto.palmdesk.dev (${target})`);
 }
 const vite = path.join(
   path.dirname(require.resolve('vite/package.json')),

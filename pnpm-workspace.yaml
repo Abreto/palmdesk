@@ -1,0 +1,15 @@
+# Runtime downloads and the Vue compatibility bridge used by this client.
+allowBuilds:
+  electron: true
+  esbuild: true
+  vue-demi: true
+  # Legacy deployment/icon tools and informational installation hooks.
+  billd-deploy: false
+  billd-html-webpack-plugin: false
+  billd-scss: false
+  billd-utils: false
+  core-js: false
+  core-js-pure: false
+  cpu-features: false
+  phantomjs-prebuilt: false
+  ssh2: false

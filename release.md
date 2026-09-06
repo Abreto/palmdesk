@@ -1,3 +1,7 @@
+# BilldDesk 上游历史发布说明
+
+以下版本属于上游，不是 PalmDesk 的发布记录。PalmDesk 当前状态见 [README.md](README.md)。
+
 ## v0.77.0
 
 更新内容：

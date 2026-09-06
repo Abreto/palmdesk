@@ -1,4 +1,5 @@
 node_modules
+.pnpm-store
 dist
 components.d.ts
 auto-imports.d.ts
@@ -9,5 +10,11 @@ electron-release
 electron-dist
 native-bin
 .local
-.env.local
-.env.*.local
+.env
+.env.*
+!.env.example
+*.log
+*.pem
+*.key
+*.p12
+*.pfx

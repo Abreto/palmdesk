@@ -32,15 +32,24 @@
       >
     </section>
     <section>
-      <h2>Codex Remote</h2>
+      <h2>{{ PRODUCT_NAME }}</h2>
       <p>v{{ appStore.version }}</p>
       <a
-        href="https://github.com/galaxy-s10/billd-desk"
+        :href="PROJECT_GITHUB"
         target="_blank"
         rel="noopener"
-        @click.prevent="openUpstream"
-        >BilldDesk <OpenOutline
+        @click.prevent="openProject(PROJECT_GITHUB)"
+        >PalmDesk <OpenOutline
       /></a>
+      <p>
+        <a
+          :href="UPSTREAM_GITHUB"
+          target="_blank"
+          rel="noopener"
+          @click.prevent="openProject(UPSTREAM_GITHUB)"
+          >BilldDesk (MIT) <OpenOutline
+        /></a>
+      </p>
     </section>
     <UrlModal
       v-if="showUrlModal"
@@ -56,6 +65,9 @@ import { ref, watch } from 'vue';
 import {
   AXIOS_BASEURL,
   COTURN_URL,
+  PRODUCT_NAME,
+  PROJECT_GITHUB,
+  UPSTREAM_GITHUB,
   WEBSOCKET_URL,
   WINDOW_ID_ENUM,
 } from '@/constant';
@@ -75,10 +87,10 @@ const appStore = useAppStore();
 const cacheStore = usePiniaCacheStore();
 const showUrlModal = ref(false);
 const { handleOpenExternal, handlesetAlwaysOnTop } = useIpcRendererSend();
-function openUpstream() {
+function openProject(url: string) {
   handleOpenExternal({
     windowId: WINDOW_ID_ENUM.remote,
-    url: 'https://github.com/galaxy-s10/billd-desk',
+    url,
   });
 }
 watch(

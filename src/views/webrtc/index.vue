@@ -10,7 +10,7 @@
         <ArrowBackOutline />
       </button>
       <div class="heading">
-        <h1>Codex Remote</h1>
+        <h1>PalmDesk</h1>
         <span :title="selectedWindow?.name">{{
           selectedWindow?.name || remoteDeskUserUuid || '未连接电脑'
         }}</span>

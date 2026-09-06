@@ -36,10 +36,10 @@
       class="sidebar"
       aria-label="主导航"
     >
-      <img
+      <PhonePortraitOutline
         class="brand-icon"
-        src="@/assets/img/logo.png"
-        alt="Codex Remote"
+        role="img"
+        aria-label="PalmDesk"
       />
       <div class="list">
         <div
@@ -109,6 +109,7 @@
 </template>
 
 <script lang="ts" setup>
+import { PhonePortraitOutline } from '@vicons/ionicons5';
 import { getRandomString, windowReload } from 'billd-utils';
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -433,7 +434,7 @@ $sidebar-width: 160px;
   display: block;
   width: 36px;
   height: 36px;
-  object-fit: contain;
+  color: #167c65;
   margin: 0 auto 12px;
 }
 .layout.browser .sidebar {
