@@ -2,8 +2,6 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-let allowedBundles: Set<String> = ["com.openai.codex", "com.openai.chat"]
-
 struct Bounds: Codable {
     let x: Double
     let y: Double
@@ -15,6 +13,7 @@ struct TargetWindow: Codable {
     let nativeId: UInt32
     let ownerPid: Int32
     let bundleId: String
+    let appName: String
     let name: String
     let bounds: Bounds
 }
@@ -35,12 +34,13 @@ func windows() -> [TargetWindow] {
               entry[kCGWindowLayer as String] as? Int == 0,
               let app = NSRunningApplication(processIdentifier: pid),
               let bundle = app.bundleIdentifier,
-              allowedBundles.contains(bundle),
+              app.activationPolicy == .regular,
               let rawBounds = entry[kCGWindowBounds as String] as? [String: Any],
               let rect = CGRect(dictionaryRepresentation: rawBounds as CFDictionary),
               rect.width > 0, rect.height > 0 else { return nil }
         let title = entry[kCGWindowName as String] as? String ?? ""
         return TargetWindow(nativeId: id, ownerPid: pid, bundleId: bundle,
+                            appName: app.localizedName ?? bundle,
                             name: title.isEmpty ? (app.localizedName ?? bundle) : title,
                             bounds: Bounds(x: rect.origin.x, y: rect.origin.y, width: rect.width, height: rect.height))
     }
@@ -113,15 +113,14 @@ while let line = readLine() {
         case "focus":
             guard let id = request["nativeId"] as? UInt32,
                   let pid = request["ownerPid"] as? Int32,
-                  let bundle = request["bundleId"] as? String,
-                  allowedBundles.contains(bundle) else { throw WindowError.invalid }
+                  let bundle = request["bundleId"] as? String else { throw WindowError.invalid }
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(focus(id, pid, bundle)))
         case "permissions":
             data = ["accessibility": AXIsProcessTrusted(), "screen": CGPreflightScreenCaptureAccess()]
         case "reveal":
             guard let bundle = request["bundleId"] as? String,
-                  allowedBundles.contains(bundle),
-                  let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first else { throw WindowError.unavailable }
+                  let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundle).first,
+                  running.activationPolicy == .regular else { throw WindowError.unavailable }
             if AXIsProcessTrusted() {
                 let application = AXUIElementCreateApplication(running.processIdentifier)
                 let candidates = attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] ?? []
@@ -132,11 +131,12 @@ while let line = readLine() {
             let entries = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
             data = [
                 "windowCount": entries.count,
-                "applications": NSWorkspace.shared.runningApplications.filter { allowedBundles.contains($0.bundleIdentifier ?? "") }.map { ["pid": $0.processIdentifier, "bundleId": $0.bundleIdentifier ?? ""] as [String: Any] },
+                "applications": NSWorkspace.shared.runningApplications.filter { $0.activationPolicy == .regular }.map { ["pid": $0.processIdentifier, "bundleId": $0.bundleIdentifier ?? ""] as [String: Any] },
                 "windows": entries.compactMap { entry -> [String: Any]? in
                     guard let pid = entry[kCGWindowOwnerPID as String] as? Int32,
-                          let bundle = NSRunningApplication(processIdentifier: pid)?.bundleIdentifier,
-                          allowedBundles.contains(bundle) else { return nil }
+                          let app = NSRunningApplication(processIdentifier: pid),
+                          let bundle = app.bundleIdentifier,
+                          app.activationPolicy == .regular else { return nil }
                     return ["pid": pid, "bundleId": bundle, "id": entry[kCGWindowNumber as String] ?? 0, "layer": entry[kCGWindowLayer as String] ?? 0, "onscreen": entry[kCGWindowIsOnscreen as String] ?? false]
                 }
             ]

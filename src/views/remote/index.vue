@@ -148,7 +148,7 @@
       >
         <div class="target-heading">
           <div>
-            <div class="label">Codex 控制窗口</div>
+            <div class="label">此设备窗口</div>
           </div>
           <button
             class="refresh-target"
@@ -185,11 +185,7 @@
             />
             <span class="capture-source-name">{{ source.name }}</span>
             <span class="capture-source-meta">
-              {{
-                source.boundsSource === 'window'
-                  ? '窗口边界已读取'
-                  : '窗口边界不可用'
-              }}
+              {{ source.appName || source.bundleId }}
             </span>
           </button>
         </div>
@@ -197,19 +193,7 @@
           v-else
           class="capture-empty"
         >
-          {{
-            permissions.targetApps.length
-              ? '目标窗口不在当前桌面或已最小化'
-              : '未检测到 Codex/ChatGPT Desktop 窗口'
-          }}
-          <button
-            v-if="permissions.targetApps.length"
-            class="reveal-target"
-            type="button"
-            @click="showTargetApplication"
-          >
-            显示应用窗口
-          </button>
+          当前桌面没有可用窗口，窗口可能已最小化
         </div>
         <div
           v-if="captureError"
@@ -261,7 +245,7 @@
           v-if="ipcRenderer"
           class="tip"
         >
-          {{ selectedCaptureSource ? '等待手机连接' : '尚未选择窗口' }}
+          等待手机连接并选择窗口
         </div>
         <details class="quality-settings">
           <summary>连接画质</summary>
@@ -462,6 +446,7 @@ import {
 } from '@/utils';
 import { CaptureLifecycle } from '@/utils/capture-lifecycle';
 import { WebRTCClass } from '@/utils/network/webRTC';
+import { WindowCatalog } from '@/utils/window-catalog';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
 
 const route = useRoute();
@@ -502,6 +487,10 @@ const pwd = ref('');
 const errMsg = ref('');
 const captureSessionId = ref('');
 const captureLifecycle = new CaptureLifecycle();
+const windowCatalogs = new Map<string, WindowCatalog>();
+const listingPeers = new Set<string>();
+let windowSelection: symbol | undefined;
+let captureOwner = '';
 let captureGeneration = 0;
 const permissions = ref({
   screen: 'unknown',
@@ -578,6 +567,14 @@ watch(
         if (!jsondata || !jsondata.data || typeof jsondata.data !== 'object')
           return;
         const { msgType } = jsondata;
+        if (
+          msgType === WsMsgTypeEnum.remoteWindowsRequest ||
+          msgType === WsMsgTypeEnum.remoteWindowSelect
+        ) {
+          await handleWindowRequest(item, jsondata);
+          return;
+        }
+        if (item.receiver !== captureOwner) return;
         if (msgType === WsMsgTypeEnum.changeMaxBitrate) {
           const { data }: { data: WsChangeMaxBitrateType['data'] } = jsondata;
           currentMaxBitrate.value = data.val;
@@ -648,36 +645,9 @@ watch(
 );
 
 watch(
-  () => anchorStream.value,
-  (newval) => {
-    if (newval) {
-      appStore.remoteDesk.forEach((item) => {
-        if (!item.isClose) {
-          handleRTC(item.sender);
-        }
-      });
-    }
-  }
-);
-
-watch(
   () => appStore.remoteDesk.size,
-  async (newval) => {
-    if (newval) {
-      startCaptureBoundsRefresh();
-      if (!anchorStream.value) {
-        if (!selectedCaptureSourceId.value) {
-          await refreshCaptureSources();
-        }
-        if (!appStore.remoteDesk.size) return;
-        if (selectedCaptureSourceId.value) {
-          await beginSelectedCapture();
-        } else {
-          captureError.value = '没有可用的 Codex 窗口，远程连接未启动';
-          handleCloseAll();
-        }
-      }
-    } else {
+  (newval) => {
+    if (!newval) {
       clearInterval(captureRefreshTimer.value);
       handleCloseAll();
     }
@@ -697,6 +667,8 @@ watch(
         //   duration: 2000,
         // });
         appStore.remoteDesk.delete(item.sender);
+        windowCatalogs.delete(item.sender);
+        if (item.sender === captureOwner) handleCloseAll();
         return;
       }
       currentMaxBitrate.value = item.maxBitrate;
@@ -821,13 +793,6 @@ async function openPermission(kind: 'screen' | 'accessibility') {
   await refreshCaptureSources();
 }
 
-async function showTargetApplication() {
-  await invokeCapture(IPC_EVENT.showTargetApplication, {
-    bundleId: permissions.value.targetApps[0],
-  });
-  await refreshCaptureSources();
-}
-
 function selectCaptureSource(source: ICaptureSource) {
   if (appStore.remoteDesk.size > 0) return;
   selectedCaptureSourceId.value = source.id;
@@ -852,7 +817,7 @@ async function refreshCaptureSources() {
     if (permissionResult?.code === 0) permissions.value = permissionResult.data;
     const res = await invokeCapture(IPC_EVENT.getCaptureSources);
     if (generation !== captureGeneration) return;
-    if (res?.code !== 0) throw new Error(res?.msg || '读取 Codex 窗口失败');
+    if (res?.code !== 0) throw new Error(res?.msg || '读取窗口失败');
     captureSources.value = Array.isArray(res.data.sources)
       ? res.data.sources
       : [];
@@ -866,11 +831,8 @@ async function refreshCaptureSources() {
     const retained = captureSources.value.some(
       (source) => source.id === selectedCaptureSourceId.value
     );
-    if (!retained)
-      selectedCaptureSourceId.value = captureSources.value[0]?.id || '';
+    if (!retained) selectedCaptureSourceId.value = '';
     captureWarning.value = getCaptureBoundsWarning(selectedCaptureSource.value);
-    if (!captureSources.value.length && !permissions.value.targetApps.length)
-      captureError.value ||= '未检测到 Codex/ChatGPT Desktop 窗口';
   } catch (error) {
     if (generation !== captureGeneration) return;
     captureSources.value = [];
@@ -1001,24 +963,33 @@ function stopCaptureStream() {
   anchorStream.value = undefined;
   const sessionId = captureSessionId.value;
   captureSessionId.value = '';
+  captureOwner = '';
+  windowSelection = undefined;
+  clearInterval(captureRefreshTimer.value);
   if (ipcRenderer) void invokeCapture(IPC_EVENT.stopCapture, { sessionId });
 }
 
-async function beginSelectedCapture() {
+async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
   captureGeneration += 1;
   const generation = captureGeneration;
+  captureOwner = receiver;
+  captureError.value = '';
   try {
     const result = await invokeCapture(IPC_EVENT.beginCapture, {
       sourceId: selectedCaptureSourceId.value,
+      expectedSource: { ownerPid: source.ownerPid, bundleId: source.bundleId },
     });
     if (result?.code !== 0) throw new Error(result?.msg || '无法启动窗口捕获');
-    const { sessionId, source } = result.data;
-    if (generation !== captureGeneration || !appStore.remoteDesk.size) {
+    const { sessionId, source: capturedSource } = result.data;
+    if (
+      generation !== captureGeneration ||
+      !appStore.remoteDesk.has(receiver)
+    ) {
       await invokeCapture(IPC_EVENT.stopCapture, { sessionId });
       return;
     }
     captureSessionId.value = sessionId;
-    captureWarning.value = getCaptureBoundsWarning(source);
+    captureWarning.value = getCaptureBoundsWarning(capturedSource);
     const stream = await captureLifecycle.start(() =>
       navigator.mediaDevices.getUserMedia({
         audio: false,
@@ -1027,7 +998,7 @@ async function beginSelectedCapture() {
           // @ts-ignore
           mandatory: {
             chromeMediaSource: 'desktop',
-            chromeMediaSourceId: source.id,
+            chromeMediaSourceId: capturedSource.id,
           },
         },
       })
@@ -1035,7 +1006,7 @@ async function beginSelectedCapture() {
     if (
       !stream ||
       generation !== captureGeneration ||
-      !appStore.remoteDesk.size
+      !appStore.remoteDesk.has(receiver)
     )
       return;
     stream.getVideoTracks().forEach((track) =>
@@ -1050,35 +1021,24 @@ async function beginSelectedCapture() {
       )
     );
     anchorStream.value = stream;
+    captureOwner = receiver;
+    startCaptureBoundsRefresh();
+    return stream;
   } catch (error) {
     if (generation !== captureGeneration) return;
     captureError.value =
-      error instanceof Error ? error.message : '无法捕获 Codex 窗口';
-    handleCloseAll();
+      error instanceof Error ? error.message : '无法捕获窗口';
+    stopCaptureStream();
+    throw error;
   }
 }
 
 async function handleRTC(receiver) {
-  if (!anchorStream.value || networkStore.rtcMap.has(receiver)) return;
+  if (networkStore.rtcMap.has(receiver)) return;
   try {
-    await handlConstraints({
-      frameRate: currentMaxFramerate.value,
-      height: currentResolutionRatio.value,
-      stream: anchorStream.value,
-    });
-    setVideoTrackContentHints(
-      anchorStream.value,
-      // @ts-ignore
-      currentVideoContentHint.value
-    );
-    setAudioTrackContentHints(
-      anchorStream.value,
-      // @ts-ignore
-      currentAudioContentHint.value
-    );
     updateWebRtcRemoteDeskConfig({
       roomId: roomId.value,
-      anchorStream: anchorStream.value,
+      anchorStream: undefined,
     });
     rtc.value = webRtcRemoteDesk.newWebRtc({
       // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
@@ -1089,12 +1049,95 @@ async function handleRTC(receiver) {
       deskUserUuid: cacheStore.deskUserUuid,
       remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
     });
-    webRtcRemoteDesk.sendOffer({
+    await webRtcRemoteDesk.sendOffer({
       sender: mySocketId.value,
       receiver,
     });
   } catch (error) {
     console.log(error);
+  }
+}
+
+async function handleWindowRequest(
+  peer: WebRTCClass,
+  request: { msgType: WsMsgTypeEnum; requestId: string; data: any }
+) {
+  if (typeof request.requestId !== 'string' || request.requestId.length > 64)
+    return;
+  const current = () =>
+    appStore.remoteDesk.has(peer.receiver) &&
+    networkStore.rtcMap.get(peer.receiver)?.cbDataChannel ===
+      peer.cbDataChannel;
+  const reply = (msgType: WsMsgTypeEnum, data: unknown) => {
+    if (current())
+      peer.dataChannelSend({ msgType, requestId: request.requestId, data });
+  };
+  if (request.msgType === WsMsgTypeEnum.remoteWindowsRequest) {
+    if (listingPeers.has(peer.receiver)) return;
+    listingPeers.add(peer.receiver);
+    try {
+      const result = await invokeCapture(IPC_EVENT.getCaptureSources);
+      if (!current()) return;
+      if (result?.code !== 0) throw new Error(result?.msg || '读取窗口失败');
+      captureSources.value = result.data.sources;
+      const catalog = new WindowCatalog();
+      windowCatalogs.set(peer.receiver, catalog);
+      catalog.update(result.data.sources).forEach((source) => {
+        reply(WsMsgTypeEnum.remoteWindowsResult, { source });
+      });
+      reply(WsMsgTypeEnum.remoteWindowsResult, { done: true });
+    } catch (error) {
+      reply(WsMsgTypeEnum.remoteWindowsResult, {
+        done: true,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      listingPeers.delete(peer.receiver);
+    }
+    return;
+  }
+  if (windowSelection || captureSessionId.value) {
+    reply(WsMsgTypeEnum.remoteWindowSelected, {
+      error: '已有窗口正在连接或控制，请先断开再选择',
+    });
+    return;
+  }
+  const selection = Symbol();
+  windowSelection = selection;
+  try {
+    const catalog = windowCatalogs.get(peer.receiver);
+    if (!catalog || typeof request.data.id !== 'string')
+      throw new Error('请先刷新窗口列表');
+    const source = catalog.get(request.data.id);
+    selectedCaptureSourceId.value = source.id;
+    const stream = await beginSelectedCapture(source, peer.receiver);
+    if (!stream || !current()) return;
+    await handlConstraints({
+      frameRate: currentMaxFramerate.value,
+      height: currentResolutionRatio.value,
+      stream,
+    });
+    if (!current() || anchorStream.value !== stream) return;
+    setVideoTrackContentHints(stream, currentVideoContentHint.value as any);
+    updateWebRtcRemoteDeskConfig({
+      roomId: roomId.value,
+      anchorStream: stream,
+    });
+    await webRtcRemoteDesk.sendOffer({
+      sender: mySocketId.value,
+      receiver: peer.receiver,
+    });
+    reply(WsMsgTypeEnum.remoteWindowSelected, {
+      id: request.data.id,
+      name: source.name,
+    });
+  } catch (error) {
+    if (captureOwner === peer.receiver) stopCaptureStream();
+    reply(WsMsgTypeEnum.remoteWindowSelected, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+  } finally {
+    if (windowSelection === selection) windowSelection = undefined;
   }
 }
 
@@ -1273,6 +1316,7 @@ async function startRemote() {
 
 function handleCloseAll() {
   stopCaptureStream();
+  windowCatalogs.clear();
   [...appStore.remoteDesk.values()].forEach((item) =>
     networkStore.removeRtc(item.sender)
   );

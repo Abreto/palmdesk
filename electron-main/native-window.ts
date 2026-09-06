@@ -7,6 +7,7 @@ export interface NativeWindow {
   nativeId: number;
   ownerPid: number;
   bundleId: string;
+  appName?: string;
   name: string;
   bounds: ICaptureBounds;
 }
@@ -17,24 +18,26 @@ export function matchCaptureSources(
   sources: Electron.DesktopCapturerSource[],
   owners: NativeWindow[]
 ): ICaptureSource[] {
-  return sources.flatMap((source) => {
+  const matched = sources.flatMap((source) => {
     const match = /^window:(\d+):\d+$/.exec(source.id);
     const owner = owners.find((item) => item.nativeId === Number(match?.[1]));
-    if (!match || !owner || !TARGET_BUNDLES.has(owner.bundleId)) return [];
+    if (!match || !owner) return [];
     return [
       {
         ...owner,
         id: source.id,
         name: source.name || owner.name,
         displayId: source.display_id,
-        thumbnail: source.thumbnail.toDataURL(),
-        appIcon: source.appIcon?.toDataURL() || '',
-        isCodex: true,
+        thumbnail: `data:image/jpeg;base64,${source.thumbnail.toJPEG(55).toString('base64')}`,
+        appIcon:
+          source.appIcon?.resize({ width: 32, height: 32 }).toDataURL() || '',
+        isCodex: TARGET_BUNDLES.has(owner.bundleId),
         boundsSource: 'window' as const,
         inputScale: 1,
       },
     ];
   });
+  return matched.sort((a, b) => Number(b.isCodex) - Number(a.isCodex));
 }
 
 export class NativeWindowBridge {

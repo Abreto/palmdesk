@@ -22,8 +22,8 @@
     artifactName: '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
-      NSScreenCaptureUsageDescription: '用于远程控制时捕获选定的 Codex 窗口。',
-      NSAppleEventsUsageDescription: '用于聚焦选定的 Codex 窗口。',
+      NSScreenCaptureUsageDescription: '用于远程观察或控制时捕获选定的应用窗口。',
+      NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },
   linux: {

@@ -15,7 +15,7 @@ if (process.platform === 'darwin') {
   const runtime = path.join(root, '.local/electron-dev');
   const target = path.join(runtime, 'Electron.app');
   const stamp = path.join(runtime, 'version');
-  const version = `${require('electron/package.json').version}:codex-remote-dev-1`;
+  const version = `${require('electron/package.json').version}:codex-remote-dev-2`;
   if ((await readFile(stamp, 'utf8').catch(() => '')) !== version) {
     await mkdir(runtime, { recursive: true });
     await rm(target, { recursive: true, force: true });
@@ -30,9 +30,9 @@ if (process.platform === 'darwin') {
       CFBundleName: 'Codex Remote Dev',
       CFBundleDisplayName: 'Codex Remote Dev',
       NSAppleEventsUsageDescription:
-        'Focus the selected Codex window for remote input.',
+        'Focus the selected application window for remote input.',
       NSScreenCaptureUsageDescription:
-        'Share the selected Codex window with your phone.',
+        'Share the selected application window with your phone.',
     })) {
       try {
         execFileSync(

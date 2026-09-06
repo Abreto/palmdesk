@@ -82,7 +82,10 @@ async function listCaptureSources(): Promise<ICaptureSource[]> {
     throw new Error('请为 Codex Remote 开启屏幕录制权限并重启应用');
   }
   const owners = await nativeWindows.request<NativeWindow[]>('list');
-  return matchCaptureSources(sources, owners);
+  return matchCaptureSources(
+    sources,
+    owners.filter((owner) => owner.ownerPid !== process.pid)
+  );
 }
 
 const captureSession = new CaptureSession(
@@ -673,7 +676,7 @@ function main() {
   };
   captureHandler(IPC_EVENT.getCaptureSources, () => captureSession.refresh());
   captureHandler(IPC_EVENT.beginCapture, (data) =>
-    captureSession.begin(String(data.sourceId || ''))
+    captureSession.begin(String(data.sourceId || ''), data.expectedSource)
   );
   captureHandler(IPC_EVENT.stopCapture, (data) =>
     captureSession.end(data.sessionId)

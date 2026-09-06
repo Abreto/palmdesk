@@ -347,23 +347,21 @@ export const useWebsocket = () => {
         if (data.isRemoteDesk) {
           if (data.receiver === mySocketId.value) {
             console.warn('是发给我的nativeWebRtcOffer-isRemoteDesk');
-            if (networkStore.rtcMap.get(data.sender)) {
-              return;
-            }
             updateWebRtcRemoteDeskConfig({
               roomId: roomId.value,
               userStream: userStream.value,
               anchorStream: canvasVideoStream.value,
             });
-            webRtcRemoteDesk.newWebRtc({
-              // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
-              // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
-              sender: mySocketId.value,
-              receiver: data.sender,
-              videoEl: createNullVideo(),
-              deskUserUuid: deskUserUuid.value,
-              remoteDeskUserUuid: remoteDeskUserUuid.value,
-            });
+            if (!networkStore.rtcMap.has(data.sender))
+              webRtcRemoteDesk.newWebRtc({
+                // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
+                // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
+                sender: mySocketId.value,
+                receiver: data.sender,
+                videoEl: createNullVideo(),
+                deskUserUuid: deskUserUuid.value,
+                remoteDeskUserUuid: remoteDeskUserUuid.value,
+              });
             await webRtcRemoteDesk.sendAnswer({
               sender: mySocketId.value,
               // data.data.receiver是接收者；我们现在new pc，发送者是自己，接收者肯定是房主，不能是data.data.receiver，因为data.data.receiver是自己
