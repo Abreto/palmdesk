@@ -1,0 +1,252 @@
+TAP version 13
+# Subtest: native owner identity admits untitled Codex and rejects a browser titled Codex
+ok 1 - native owner identity admits untitled Codex and rejects a browser titled Codex
+  ---
+  duration_ms: 0.865584
+  type: 'test'
+  ...
+# Subtest: ChatGPT bundle is supported and unrelated OpenAI-looking titles are excluded
+ok 2 - ChatGPT bundle is supported and unrelated OpenAI-looking titles are excluded
+  ---
+  duration_ms: 0.13025
+  type: 'test'
+  ...
+# Subtest: corners, center, out-of-range and negative desktop coordinates map to the exact window
+ok 3 - corners, center, out-of-range and negative desktop coordinates map to the exact window
+  ---
+  duration_ms: 0.452459
+  type: 'test'
+  ...
+# Subtest: display fallback and non-finite coordinates are rejected
+ok 4 - display fallback and non-finite coordinates are rejected
+  ---
+  duration_ms: 0.232
+  type: 'test'
+  ...
+# Subtest: move is rejected without an active capture session
+ok 5 - move is rejected without an active capture session
+  ---
+  duration_ms: 0.28025
+  type: 'test'
+  ...
+# Subtest: down is rejected without an active capture session
+ok 6 - down is rejected without an active capture session
+  ---
+  duration_ms: 0.061083
+  type: 'test'
+  ...
+# Subtest: up is rejected without an active capture session
+ok 7 - up is rejected without an active capture session
+  ---
+  duration_ms: 0.116583
+  type: 'test'
+  ...
+# Subtest: click is rejected without an active capture session
+ok 8 - click is rejected without an active capture session
+  ---
+  duration_ms: 0.049834
+  type: 'test'
+  ...
+# Subtest: doubleClick is rejected without an active capture session
+ok 9 - doubleClick is rejected without an active capture session
+  ---
+  duration_ms: 0.288917
+  type: 'test'
+  ...
+# Subtest: rightClick is rejected without an active capture session
+ok 10 - rightClick is rejected without an active capture session
+  ---
+  duration_ms: 0.315916
+  type: 'test'
+  ...
+# Subtest: scroll is rejected without an active capture session
+ok 11 - scroll is rejected without an active capture session
+  ---
+  duration_ms: 0.100417
+  type: 'test'
+  ...
+# Subtest: text is rejected without an active capture session
+ok 12 - text is rejected without an active capture session
+  ---
+  duration_ms: 0.079583
+  type: 'test'
+  ...
+# Subtest: keysDown is rejected without an active capture session
+ok 13 - keysDown is rejected without an active capture session
+  ---
+  duration_ms: 0.183375
+  type: 'test'
+  ...
+# Subtest: keysUp is rejected without an active capture session
+ok 14 - keysUp is rejected without an active capture session
+  ---
+  duration_ms: 0.054834
+  type: 'test'
+  ...
+# Subtest: starting capture requires an explicit existing source ID
+ok 15 - starting capture requires an explicit existing source ID
+  ---
+  duration_ms: 0.1505
+  type: 'test'
+  ...
+# Subtest: a new capture uses a fresh token and rejects the previous token
+ok 16 - a new capture uses a fresh token and rejects the previous token
+  ---
+  duration_ms: 0.34225
+  type: 'test'
+  ...
+# Subtest: pointer, scroll and keys each verify focus without an 800 ms bypass
+ok 17 - pointer, scroll and keys each verify focus without an 800 ms bypass
+  ---
+  duration_ms: 0.183458
+  type: 'test'
+  ...
+# Subtest: bounds are read again before each pointer event
+ok 18 - bounds are read again before each pointer event
+  ---
+  duration_ms: 0.074875
+  type: 'test'
+  ...
+# Subtest: same title with a new window ID cannot take over the video target
+ok 19 - same title with a new window ID cannot take over the video target
+  ---
+  duration_ms: 0.11675
+  type: 'test'
+  ...
+# Subtest: PID reuse or bundle mismatch invalidates input
+ok 20 - PID reuse or bundle mismatch invalidates input
+  ---
+  duration_ms: 0.162125
+  type: 'test'
+  ...
+# Subtest: enumeration error clears the session
+ok 21 - enumeration error clears the session
+  ---
+  duration_ms: 0.082541
+  type: 'test'
+  ...
+# Subtest: focus denial blocks system input
+ok 22 - focus denial blocks system input
+  ---
+  duration_ms: 0.098125
+  type: 'test'
+  ...
+# Subtest: disconnect invalidates input already awaiting focus
+ok 23 - disconnect invalidates input already awaiting focus
+  ---
+  duration_ms: 4.865417
+  type: 'test'
+  ...
+# Subtest: down, move and up remain ordered even while focus awaits
+ok 24 - down, move and up remain ordered even while focus awaits
+  ---
+  duration_ms: 0.676958
+  type: 'test'
+  ...
+# Subtest: disconnect releases held modifiers and mouse buttons
+ok 25 - disconnect releases held modifiers and mouse buttons
+  ---
+  duration_ms: 0.482334
+  type: 'test'
+  ...
+# Subtest: stopping an obsolete session does not stop a new capture
+ok 26 - stopping an obsolete session does not stop a new capture
+  ---
+  duration_ms: 0.149041
+  type: 'test'
+  ...
+# Subtest: a cancelled capture lookup cannot create a new session
+ok 27 - a cancelled capture lookup cannot create a new session
+  ---
+  duration_ms: 0.845417
+  type: 'test'
+  ...
+# Subtest: obsolete enumeration success or failure cannot end a newer capture
+ok 28 - obsolete enumeration success or failure cannot end a newer capture
+  ---
+  duration_ms: 0.391875
+  type: 'test'
+  ...
+# Subtest: malformed keys and oversized text never reach the native driver
+ok 29 - malformed keys and oversized text never reach the native driver
+  ---
+  duration_ms: 0.225958
+  type: 'test'
+  ...
+# (node:40979) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: single touch survives normal lostpointercapture and sends one click
+ok 30 - single touch survives normal lostpointercapture and sends one click
+  ---
+  duration_ms: 1.43575
+  type: 'test'
+  ...
+# Subtest: double touch emits a double click without a preceding single click
+ok 31 - double touch emits a double click without a preceding single click
+  ---
+  duration_ms: 0.199084
+  type: 'test'
+  ...
+# Subtest: two fast taps at different positions are both retained
+ok 32 - two fast taps at different positions are both retained
+  ---
+  duration_ms: 0.207417
+  type: 'test'
+  ...
+# Subtest: long touch emits a right click and suppresses the following tap
+ok 33 - long touch emits a right click and suppresses the following tap
+  ---
+  duration_ms: 0.174959
+  type: 'test'
+  ...
+# Subtest: drag clamps to video edges and releases once
+ok 34 - drag clamps to video edges and releases once
+  ---
+  duration_ms: 0.137791
+  type: 'test'
+  ...
+# Subtest: touch scrolling carries a point within the selected video and no mouse press
+ok 35 - touch scrolling carries a point within the selected video and no mouse press
+  ---
+  duration_ms: 0.079541
+  type: 'test'
+  ...
+# Subtest: cancel releases a held button even after switching to watch mode
+ok 36 - cancel releases a held button even after switching to watch mode
+  ---
+  duration_ms: 0.184125
+  type: 'test'
+  ...
+# Subtest: letterbox clicks and empty video bounds are ignored
+ok 37 - letterbox clicks and empty video bounds are ignored
+  ---
+  duration_ms: 0.071958
+  type: 'test'
+  ...
+# Subtest: text payload preserves composed Chinese, spaces and newlines
+ok 38 - text payload preserves composed Chinese, spaces and newlines
+  ---
+  duration_ms: 0.387125
+  type: 'test'
+  ...
+# Subtest: disconnect during asynchronous capture stops the late stream
+ok 39 - disconnect during asynchronous capture stops the late stream
+  ---
+  duration_ms: 0.449667
+  type: 'test'
+  ...
+# Subtest: reconnect cannot reuse the previous or late-arriving media stream
+ok 40 - reconnect cannot reuse the previous or late-arriving media stream
+  ---
+  duration_ms: 0.1405
+  type: 'test'
+  ...
+1..40
+# tests 40
+# suites 0
+# pass 40
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 340.694334

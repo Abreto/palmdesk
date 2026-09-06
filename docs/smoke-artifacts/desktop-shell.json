@@ -1,0 +1,24 @@
+{
+  "scope": "Real Codex Remote Electron shell and guarded IPC; no target capture, focus, input, or permission changes",
+  "identity": {
+    "name": "Codex Remote",
+    "electron": "33.2.1",
+    "executable": "/Users/abreto/workspace/codex-remote/.local/electron-dev/Electron.app/Contents/MacOS/Electron"
+  },
+  "permissions": {
+    "screen": "granted",
+    "accessibility": false,
+    "appName": "Codex Remote",
+    "packaged": false,
+    "targetApps": [
+      "com.openai.codex"
+    ]
+  },
+  "checks": [
+    "cold startup",
+    "backend connection",
+    "invalid input session denied",
+    "secondary renderer IPC denied",
+    "no uncaught renderer errors"
+  ]
+}

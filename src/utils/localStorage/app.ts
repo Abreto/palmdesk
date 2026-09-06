@@ -30,3 +30,12 @@ export const setCoturnUrl = (val: string) => {
 export const clearCoturnUrl = () => {
   return cache.clearStorage(LS_KEY.coturnUrl);
 };
+
+export const getCoturnUsername = () =>
+  cache.getStorage<string>(LS_KEY.coturnUsername);
+export const setCoturnUsername = (value: string) =>
+  cache.setStorage(LS_KEY.coturnUsername, value);
+export const getCoturnCredential = () =>
+  cache.getStorage<string>(LS_KEY.coturnCredential);
+export const setCoturnCredential = (value: string) =>
+  cache.setStorage(LS_KEY.coturnCredential, value);

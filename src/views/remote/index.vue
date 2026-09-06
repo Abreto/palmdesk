@@ -1,17 +1,34 @@
 <template>
-  <div class="remote-wrap">
+  <div
+    class="remote-wrap"
+    :class="{ 'browser-controller': !ipcRenderer }"
+  >
     <div class="container">
-      <div class="local-device">
+      <header class="page-heading">
+        <h1>Codex Remote</h1>
+        <span class="connection-state">{{
+          connectStatus === WsConnectStatusEnum.connect
+            ? '服务已连接'
+            : '正在连接服务'
+        }}</span>
+      </header>
+      <div
+        v-if="ipcRenderer"
+        class="local-device"
+      >
         <div class="label">此设备</div>
         <div class="info">
           <div class="info-left">
             <div class="txt">设备代码</div>
             <div class="code-info">
               <div class="code">{{ cacheStore.deskUserUuid }}</div>
-              <div
+              <button
                 class="ico copy"
-                @click="handleCopyRemoteInfo"
-              ></div>
+                type="button"
+                title="复制设备代码"
+                aria-label="复制设备代码"
+                @click="handleCopy(cacheStore.deskUserUuid)"
+              ></button>
               <div
                 class="ico refresh"
                 @click="handleResetDeskuuid"
@@ -26,6 +43,13 @@
                   cacheStore.hidePwd ? '********' : cacheStore.deskUserPassword
                 }}
               </div>
+              <button
+                class="ico copy"
+                type="button"
+                title="复制临时密码"
+                aria-label="复制临时密码"
+                @click="handleCopy(cacheStore.deskUserPassword)"
+              ></button>
               <div
                 class="ico eye"
                 :class="{ hide: cacheStore.hidePwd }"
@@ -40,7 +64,7 @@
         </div>
       </div>
       <div class="remote-device">
-        <div class="label">远程控制设备</div>
+        <div class="label">连接电脑</div>
         <div class="info">
           <div
             v-on-click-outside="handleClickOutside"
@@ -56,6 +80,12 @@
                 class="ipt"
                 :placeholder="'请输入远程设备代码'"
                 maxlength="8"
+                aria-label="远程设备代码"
+                inputmode="text"
+                autocapitalize="none"
+                :spellcheck="false"
+                autocomplete="off"
+                @keydown.enter="startRemote"
               />
               <div
                 class="arrow-down"
@@ -92,9 +122,15 @@
               </div>
             </div>
           </div>
-          <div
+          <button
             class="btn"
+            type="button"
             :class="{ gray: !cacheStore.remoteDeskUserUuid.length, loading }"
+            :disabled="
+              loading ||
+              !cacheStore.deskUserUuid ||
+              !cacheStore.remoteDeskUserUuid.length
+            "
             @click="startRemote"
           >
             <div v-if="!loading">连接</div>
@@ -102,84 +138,206 @@
               v-else
               class="loading"
             ></div>
+          </button>
+        </div>
+      </div>
+
+      <div
+        v-if="ipcRenderer"
+        class="codex-target"
+      >
+        <div class="target-heading">
+          <div>
+            <div class="label">Codex 控制窗口</div>
           </div>
+          <button
+            class="refresh-target"
+            type="button"
+            :disabled="captureLoading || appStore.remoteDesk.size > 0"
+            @click="refreshCaptureSources"
+          >
+            <span
+              class="refresh-icon"
+              aria-hidden="true"
+            ></span>
+            {{ captureLoading ? '刷新中' : '刷新窗口' }}
+          </button>
+        </div>
+
+        <div
+          v-if="captureSources.length"
+          class="capture-source-list"
+        >
+          <button
+            v-for="source in captureSources"
+            :key="source.id"
+            class="capture-source"
+            :class="{ selected: source.id === selectedCaptureSourceId }"
+            type="button"
+            :disabled="appStore.remoteDesk.size > 0"
+            @click="selectCaptureSource(source)"
+          >
+            <img
+              v-if="source.thumbnail"
+              class="capture-thumbnail"
+              :src="source.thumbnail"
+              :alt="source.name"
+            />
+            <span class="capture-source-name">{{ source.name }}</span>
+            <span class="capture-source-meta">
+              {{
+                source.boundsSource === 'window'
+                  ? '窗口边界已读取'
+                  : '窗口边界不可用'
+              }}
+            </span>
+          </button>
+        </div>
+        <div
+          v-else
+          class="capture-empty"
+        >
+          {{
+            permissions.targetApps.length
+              ? '目标窗口不在当前桌面或已最小化'
+              : '未检测到 Codex/ChatGPT Desktop 窗口'
+          }}
+          <button
+            v-if="permissions.targetApps.length"
+            class="reveal-target"
+            type="button"
+            @click="showTargetApplication"
+          >
+            显示应用窗口
+          </button>
+        </div>
+        <div
+          v-if="captureError"
+          class="capture-error"
+        >
+          {{ captureError }}
+        </div>
+        <div
+          v-else-if="selectedCaptureSource"
+          class="capture-selected"
+        >
+          已选择：{{ selectedCaptureSource.name }}
+          <span v-if="captureWarning">（{{ captureWarning }}）</span>
+        </div>
+      </div>
+
+      <div
+        v-if="ipcRenderer"
+        class="permissions"
+      >
+        <div>
+          <span>屏幕录制</span
+          ><span>{{
+            permissions.screen === 'granted' ? '已授权' : '未授权'
+          }}</span
+          ><button
+            v-if="permissions.screen !== 'granted'"
+            type="button"
+            @click="openPermission('screen')"
+          >
+            打开设置
+          </button>
+        </div>
+        <div>
+          <span>辅助功能</span
+          ><span>{{ permissions.accessibility ? '已授权' : '未授权' }}</span
+          ><button
+            v-if="!permissions.accessibility"
+            type="button"
+            @click="openPermission('accessibility')"
+          >
+            打开设置
+          </button>
         </div>
       </div>
 
       <template v-if="!appStore.remoteDesk.size">
-        <div class="tip">已准备好连接</div>
-        <div class="link-config">
-          <div class="link-item">
-            <n-space>
-              <div class="link-label">码率：</div>
-              <n-radio-group v-model:value="currentMaxBitrate">
-                <n-radio
-                  v-for="item in maxBitrate"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </n-radio>
-              </n-radio-group>
-            </n-space>
-          </div>
-          <div class="link-item">
-            <n-space>
-              <div class="link-label">帧率：</div>
-              <n-radio-group v-model:value="currentMaxFramerate">
-                <n-radio
-                  v-for="item in maxFramerate"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </n-radio>
-              </n-radio-group>
-            </n-space>
-          </div>
-          <div class="link-item">
-            <n-space>
-              <div class="link-label">分辨率：</div>
-              <n-radio-group v-model:value="currentResolutionRatio">
-                <n-radio
-                  v-for="item in resolutionRatio"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </n-radio>
-              </n-radio-group>
-            </n-space>
-          </div>
-          <div class="link-item">
-            <n-space>
-              <div class="link-label">视频内容：</div>
-              <n-radio-group v-model:value="currentVideoContentHint">
-                <n-radio
-                  v-for="item in videoContentHint"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </n-radio>
-              </n-radio-group>
-            </n-space>
-          </div>
-          <div class="link-item">
-            <n-space>
-              <div class="link-label">音频内容：</div>
-              <n-radio-group v-model:value="currentAudioContentHint">
-                <n-radio
-                  v-for="item in audioContentHint"
-                  :key="item.value"
-                  :value="item.value"
-                >
-                  {{ item.label }}
-                </n-radio>
-              </n-radio-group>
-            </n-space>
-          </div>
+        <div
+          v-if="ipcRenderer"
+          class="tip"
+        >
+          {{ selectedCaptureSource ? '等待手机连接' : '尚未选择窗口' }}
         </div>
+        <details class="quality-settings">
+          <summary>连接画质</summary>
+          <div class="link-config">
+            <div class="link-item">
+              <n-space>
+                <div class="link-label">码率：</div>
+                <n-radio-group v-model:value="currentMaxBitrate">
+                  <n-radio
+                    v-for="item in maxBitrate"
+                    :key="item.value"
+                    :value="item.value"
+                  >
+                    {{ item.label }}
+                  </n-radio>
+                </n-radio-group>
+              </n-space>
+            </div>
+            <div class="link-item">
+              <n-space>
+                <div class="link-label">帧率：</div>
+                <n-radio-group v-model:value="currentMaxFramerate">
+                  <n-radio
+                    v-for="item in maxFramerate"
+                    :key="item.value"
+                    :value="item.value"
+                  >
+                    {{ item.label }}
+                  </n-radio>
+                </n-radio-group>
+              </n-space>
+            </div>
+            <div class="link-item">
+              <n-space>
+                <div class="link-label">分辨率：</div>
+                <n-radio-group v-model:value="currentResolutionRatio">
+                  <n-radio
+                    v-for="item in resolutionRatio"
+                    :key="item.value"
+                    :value="item.value"
+                  >
+                    {{ item.label }}
+                  </n-radio>
+                </n-radio-group>
+              </n-space>
+            </div>
+            <div class="link-item">
+              <n-space>
+                <div class="link-label">视频内容：</div>
+                <n-radio-group v-model:value="currentVideoContentHint">
+                  <n-radio
+                    v-for="item in videoContentHint"
+                    :key="item.value"
+                    :value="item.value"
+                  >
+                    {{ item.label }}
+                  </n-radio>
+                </n-radio-group>
+              </n-space>
+            </div>
+            <div class="link-item">
+              <n-space>
+                <div class="link-label">音频内容：</div>
+                <n-radio-group v-model:value="currentAudioContentHint">
+                  <n-radio
+                    v-for="item in audioContentHint"
+                    :key="item.value"
+                    :value="item.value"
+                  >
+                    {{ item.label }}
+                  </n-radio>
+                </n-radio-group>
+              </n-space>
+            </div>
+          </div>
+        </details>
       </template>
 
       <div
@@ -275,6 +433,7 @@ import { useTip } from '@/hooks/use-tip';
 import { useWebsocket } from '@/hooks/use-websocket';
 import { useWebRtcRemoteDesk } from '@/hooks/webrtc/remoteDesk';
 import { IIpcRendererData } from '@/interface';
+import type { ICaptureSource } from '@/pure-interface';
 import router, { routerName } from '@/router';
 import { useAppStore } from '@/store/app';
 import { usePiniaCacheStore } from '@/store/cache';
@@ -301,6 +460,7 @@ import {
   setAudioTrackContentHints,
   setVideoTrackContentHints,
 } from '@/utils';
+import { CaptureLifecycle } from '@/utils/capture-lifecycle';
 import { WebRTCClass } from '@/utils/network/webRTC';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
 
@@ -311,7 +471,8 @@ const cacheStore = usePiniaCacheStore();
 
 const { updateWebRtcRemoteDeskConfig, webRtcRemoteDesk } =
   useWebRtcRemoteDesk();
-const { initWs, connectStatus } = useWebsocket();
+const { initWs, connectStatus, deskUserUuid, deskUserPassword } =
+  useWebsocket();
 const {
   maxBitrate,
   maxFramerate,
@@ -319,10 +480,10 @@ const {
   audioContentHint,
   videoContentHint,
 } = useRTCParams();
-const { handleScreen, handleRtcBilldDeskBehavior } = useIpcRendererSend();
+const { handleRtcBilldDeskBehavior } = useIpcRendererSend();
 
 const currentMaxBitrate = ref(maxBitrate.value[3].value);
-const currentMaxFramerate = ref(maxFramerate.value[4].value);
+const currentMaxFramerate = ref(30);
 const currentResolutionRatio = ref(resolutionRatio.value[3].value);
 const currentVideoContentHint = ref(videoContentHint.value[3].value);
 const currentAudioContentHint = ref(audioContentHint.value[0].value);
@@ -339,7 +500,20 @@ const arrowDownRef = ref();
 const linkDeviceListRef = ref();
 const pwd = ref('');
 const errMsg = ref('');
-const chromeMediaSourceId = ref();
+const captureSessionId = ref('');
+const captureLifecycle = new CaptureLifecycle();
+let captureGeneration = 0;
+const permissions = ref({
+  screen: 'unknown',
+  accessibility: false,
+  targetApps: [] as string[],
+});
+const captureSources = ref<ICaptureSource[]>([]);
+const selectedCaptureSourceId = ref('');
+const captureLoading = ref(false);
+const captureError = ref('');
+const captureWarning = ref('');
+const captureRefreshTimer = ref<ReturnType<typeof setInterval>>();
 const originalPassword = ref('');
 const loopBilldDeskUpdateUserTimer = ref();
 const suspend = ref('');
@@ -349,9 +523,16 @@ const position = ref({ x: 0, y: 0 });
 const mySocketId = computed(() => {
   return networkStore.wsMap.get(roomId.value)?.socketIo?.id || '';
 });
+const selectedCaptureSource = computed(() => {
+  return captureSources.value.find(
+    (source) => source.id === selectedCaptureSourceId.value
+  );
+});
 
 onUnmounted(() => {
   clearInterval(loopBilldDeskUpdateUserTimer.value);
+  clearInterval(captureRefreshTimer.value);
+  stopCaptureStream();
 });
 
 onMounted(() => {
@@ -375,12 +556,27 @@ watch(
     newval.forEach((item) => {
       if (!item.cbDataChannel) return;
       // const setting = anchorStream.value?.getVideoTracks()[0].getSettings();
-      item.cbDataChannel.onmessage = (event) => {
+      item.cbDataChannel.onmessage = async (event) => {
+        if (
+          !appStore.remoteDesk.has(item.receiver) ||
+          networkStore.rtcMap.get(item.receiver)?.cbDataChannel !==
+            item.cbDataChannel
+        )
+          return;
+        if (typeof event.data !== 'string' || event.data.length > 32768) return;
         const jsondata: {
           msgType: WsMsgTypeEnum;
           requestId: string;
           data: any;
-        } = JSON.parse(event.data);
+        } = (() => {
+          try {
+            return JSON.parse(event.data);
+          } catch {
+            return null;
+          }
+        })();
+        if (!jsondata || !jsondata.data || typeof jsondata.data !== 'object')
+          return;
         const { msgType } = jsondata;
         if (msgType === WsMsgTypeEnum.changeMaxBitrate) {
           const { data }: { data: WsChangeMaxBitrateType['data'] } = jsondata;
@@ -425,7 +621,22 @@ watch(
           }
         } else if (msgType === WsMsgTypeEnum.billdDeskBehavior) {
           const { data }: { data: WsBilldDeskBehaviorType['data'] } = jsondata;
-          handleRtcBilldDeskBehavior(WINDOW_ID_ENUM.remote, data);
+          if (anchorStream.value && captureSessionId.value) {
+            const sessionId = captureSessionId.value;
+            const result = await handleRtcBilldDeskBehavior(
+              WINDOW_ID_ENUM.remote,
+              data,
+              sessionId
+            );
+            if (
+              captureSessionId.value === sessionId &&
+              result?.code !== 0 &&
+              result?.msg
+            ) {
+              captureError.value = result.msg;
+              handleCloseAll();
+            }
+          }
         }
       };
     });
@@ -451,12 +662,23 @@ watch(
 
 watch(
   () => appStore.remoteDesk.size,
-  (newval) => {
+  async (newval) => {
     if (newval) {
+      startCaptureBoundsRefresh();
       if (!anchorStream.value) {
-        handleScreen({ windowId: WINDOW_ID_ENUM.remote });
+        if (!selectedCaptureSourceId.value) {
+          await refreshCaptureSources();
+        }
+        if (!appStore.remoteDesk.size) return;
+        if (selectedCaptureSourceId.value) {
+          await beginSelectedCapture();
+        } else {
+          captureError.value = '没有可用的 Codex 窗口，远程连接未启动';
+          handleCloseAll();
+        }
       }
     } else {
+      clearInterval(captureRefreshTimer.value);
       handleCloseAll();
     }
   },
@@ -515,8 +737,11 @@ function handleLoopBilldDeskUpdateUserTimer() {
 
 async function handleInit() {
   handleInitIpcRendererOn();
-  handleInitIpcRendererSend();
+  await handleInitIpcRendererSend();
+  await refreshCaptureSources();
   await initDeskUser();
+  deskUserUuid.value = cacheStore.deskUserUuid;
+  deskUserPassword.value = cacheStore.deskUserPassword;
   handleLoopBilldDeskUpdateUserTimer();
   initWs({
     roomId: roomId.value,
@@ -576,13 +801,84 @@ function responseWorkAreaSize(_event, data: IIpcRendererData) {
   };
 }
 
-function responseGetScreenStream(_event, data: IIpcRendererData) {
-  if (data.code !== 0) {
-    window.$message.error(data.msg || '');
-    return;
+function invokeCapture(channel: string, data: Record<string, unknown> = {}) {
+  return ipcRendererInvoke({
+    windowId: WINDOW_ID_ENUM.remote,
+    channel,
+    requestId: getRandomString(8),
+    data,
+  });
+}
+
+function getCaptureBoundsWarning(source?: ICaptureSource) {
+  return source && source.boundsSource !== 'window'
+    ? '无法读取精确边界，控制已停用'
+    : '';
+}
+
+async function openPermission(kind: 'screen' | 'accessibility') {
+  await invokeCapture(IPC_EVENT.openCapturePermission, { kind });
+  await refreshCaptureSources();
+}
+
+async function showTargetApplication() {
+  await invokeCapture(IPC_EVENT.showTargetApplication, {
+    bundleId: permissions.value.targetApps[0],
+  });
+  await refreshCaptureSources();
+}
+
+function selectCaptureSource(source: ICaptureSource) {
+  if (appStore.remoteDesk.size > 0) return;
+  selectedCaptureSourceId.value = source.id;
+  captureError.value = '';
+  captureWarning.value = getCaptureBoundsWarning(source);
+}
+
+function startCaptureBoundsRefresh() {
+  clearInterval(captureRefreshTimer.value);
+  captureRefreshTimer.value = setInterval(() => {
+    void refreshCaptureSources();
+  }, 2000);
+}
+
+async function refreshCaptureSources() {
+  if (!ipcRenderer || captureLoading.value) return;
+  const generation = captureGeneration;
+  captureLoading.value = true;
+  captureError.value = '';
+  try {
+    const permissionResult = await invokeCapture(IPC_EVENT.capturePermissions);
+    if (permissionResult?.code === 0) permissions.value = permissionResult.data;
+    const res = await invokeCapture(IPC_EVENT.getCaptureSources);
+    if (generation !== captureGeneration) return;
+    if (res?.code !== 0) throw new Error(res?.msg || '读取 Codex 窗口失败');
+    captureSources.value = Array.isArray(res.data.sources)
+      ? res.data.sources
+      : [];
+    if (
+      captureSessionId.value &&
+      res.data.sessionId !== captureSessionId.value
+    ) {
+      captureError.value = '目标窗口已关闭或不可见，远程控制已结束';
+      handleCloseAll();
+    }
+    const retained = captureSources.value.some(
+      (source) => source.id === selectedCaptureSourceId.value
+    );
+    if (!retained)
+      selectedCaptureSourceId.value = captureSources.value[0]?.id || '';
+    captureWarning.value = getCaptureBoundsWarning(selectedCaptureSource.value);
+    if (!captureSources.value.length && !permissions.value.targetApps.length)
+      captureError.value ||= '未检测到 Codex/ChatGPT Desktop 窗口';
+  } catch (error) {
+    if (generation !== captureGeneration) return;
+    captureSources.value = [];
+    captureError.value = error instanceof Error ? error.message : String(error);
+    handleCloseAll();
+  } finally {
+    captureLoading.value = false;
   }
-  chromeMediaSourceId.value = data.data.stream.id;
-  handleDesktopStream(data.data.stream.id);
 }
 
 function handleInitIpcRendererOn() {
@@ -602,8 +898,6 @@ function handleInitIpcRendererOn() {
   );
 
   ipcRendererOn(IPC_EVENT.response_workAreaSize, responseWorkAreaSize);
-
-  ipcRendererOn(IPC_EVENT.response_getScreenStream, responseGetScreenStream);
 }
 
 async function initDeskUser() {
@@ -701,26 +995,71 @@ function handleWsMsg() {
   );
 }
 
-async function handleDesktopStream(chromeMediaSourceId) {
+function stopCaptureStream() {
+  captureGeneration += 1;
+  captureLifecycle.stop();
+  anchorStream.value = undefined;
+  const sessionId = captureSessionId.value;
+  captureSessionId.value = '';
+  if (ipcRenderer) void invokeCapture(IPC_EVENT.stopCapture, { sessionId });
+}
+
+async function beginSelectedCapture() {
+  captureGeneration += 1;
+  const generation = captureGeneration;
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      audio: false,
-      video: {
-        // @ts-ignore
-        mandatory: {
-          chromeMediaSource: 'desktop',
-          chromeMediaSourceId,
-        },
-      },
+    const result = await invokeCapture(IPC_EVENT.beginCapture, {
+      sourceId: selectedCaptureSourceId.value,
     });
+    if (result?.code !== 0) throw new Error(result?.msg || '无法启动窗口捕获');
+    const { sessionId, source } = result.data;
+    if (generation !== captureGeneration || !appStore.remoteDesk.size) {
+      await invokeCapture(IPC_EVENT.stopCapture, { sessionId });
+      return;
+    }
+    captureSessionId.value = sessionId;
+    captureWarning.value = getCaptureBoundsWarning(source);
+    const stream = await captureLifecycle.start(() =>
+      navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          // Electron binds the stream to the native window ID approved by the main process.
+          // @ts-ignore
+          mandatory: {
+            chromeMediaSource: 'desktop',
+            chromeMediaSourceId: source.id,
+          },
+        },
+      })
+    );
+    if (
+      !stream ||
+      generation !== captureGeneration ||
+      !appStore.remoteDesk.size
+    )
+      return;
+    stream.getVideoTracks().forEach((track) =>
+      track.addEventListener(
+        'ended',
+        () => {
+          if (captureSessionId.value !== sessionId) return;
+          captureError.value = '窗口视频已结束';
+          handleCloseAll();
+        },
+        { once: true }
+      )
+    );
     anchorStream.value = stream;
   } catch (error) {
-    console.log(error);
+    if (generation !== captureGeneration) return;
+    captureError.value =
+      error instanceof Error ? error.message : '无法捕获 Codex 窗口';
+    handleCloseAll();
   }
 }
 
 async function handleRTC(receiver) {
-  if (!anchorStream.value) return;
+  if (!anchorStream.value || networkStore.rtcMap.has(receiver)) return;
   try {
     await handlConstraints({
       frameRate: currentMaxFramerate.value,
@@ -757,24 +1096,6 @@ async function handleRTC(receiver) {
   } catch (error) {
     console.log(error);
   }
-}
-
-function handleCopyRemoteInfo() {
-  const str = `BilldDesk:设备代码:${cacheStore.remoteDeskUserUuid};临时密码:${cacheStore.remoteDeskUserPassword}`;
-  // @ts-ignore
-  textArea.select(); // 选择文本
-  // @ts-ignore
-  textArea.setSelectionRange(0, 99999); // 对于移动设备
-  // 使用剪贴板 API 复制文本
-  navigator.clipboard
-    .writeText(str)
-    .then(() => {
-      window.$message.success('已复制邀请信息！');
-    })
-    .catch((err) => {
-      console.log(err);
-      window.$message.error('复制邀请信息失败！');
-    });
 }
 
 function changeDebugUrl() {
@@ -848,24 +1169,23 @@ async function handleConfirm(pwd: string) {
           });
         } else {
           networkStore.removeAllWsAndRtc();
-          setTimeout(() => {
-            router.push({
-              name: routerName.webrtc,
-              query: {
-                roomId: cacheStore.remoteDeskUserUuid,
-                deskUserUuid: cacheStore.deskUserUuid,
-                deskUserPassword: cacheStore.deskUserPassword,
-                remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
-                remoteDeskUserPassword: pwd,
-                receiverId: receiverId.value,
-                maxBitrate: currentMaxBitrate.value,
-                maxFramerate: currentMaxFramerate.value,
-                resolutionRatio: currentResolutionRatio.value,
-                audioContentHint: currentAudioContentHint.value,
-                videoContentHint: currentVideoContentHint.value,
-              },
-            });
-          }, 300);
+          sessionStorage.setItem(
+            'codex-remote-session',
+            JSON.stringify({
+              roomId: cacheStore.remoteDeskUserUuid,
+              deskUserUuid: cacheStore.deskUserUuid,
+              deskUserPassword: cacheStore.deskUserPassword,
+              remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
+              remoteDeskUserPassword: pwd,
+              receiverId: receiverId.value,
+              maxBitrate: currentMaxBitrate.value,
+              maxFramerate: currentMaxFramerate.value,
+              resolutionRatio: currentResolutionRatio.value,
+              audioContentHint: currentAudioContentHint.value,
+              videoContentHint: currentVideoContentHint.value,
+            })
+          );
+          await router.push({ name: routerName.webrtc });
         }
 
         const flag = cacheStore.linkDeviceList.find(
@@ -906,6 +1226,8 @@ function handleDelLinkDeviceList(item) {
 }
 
 async function startRemote() {
+  if (loading.value || !cacheStore.deskUserUuid) return;
+  cacheStore.remoteDeskUserUuid = cacheStore.remoteDeskUserUuid.trim();
   if (cacheStore.remoteDeskUserUuid === '') {
     window.$message.warning('请输入远程设备代码！');
     return;
@@ -950,10 +1272,11 @@ async function startRemote() {
 }
 
 function handleCloseAll() {
-  anchorStream.value = undefined;
-  appStore.remoteDesk.forEach((item) => {
-    networkStore.removeRtc(item.sender);
-  });
+  stopCaptureStream();
+  [...appStore.remoteDesk.values()].forEach((item) =>
+    networkStore.removeRtc(item.sender)
+  );
+  appStore.remoteDesk.clear();
 }
 
 function handleDel(sender) {
@@ -963,12 +1286,65 @@ function handleDel(sender) {
 
 <style lang="scss" scoped>
 .remote-wrap {
+  .page-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 0 20px;
+    border-bottom: 1px solid #e0e6e2;
+  }
+  .page-heading h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #213d31;
+  }
+  .connection-state {
+    color: #648074;
+    font-size: 12px;
+  }
+  .permissions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    margin: 18px 0;
+    padding: 14px 0;
+    border-top: 1px solid #e0e6e2;
+    border-bottom: 1px solid #e0e6e2;
+  }
+  .permissions > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  .permissions button {
+    padding: 6px 10px;
+    border: 1px solid #bdcec4;
+    border-radius: 4px;
+    background: white;
+    color: #167c65;
+    cursor: pointer;
+  }
+  .quality-settings {
+    margin-top: 20px;
+  }
+  .quality-settings summary {
+    width: fit-content;
+    padding: 8px 0;
+    color: #52665b;
+    font-size: 14px;
+    cursor: pointer;
+  }
   position: relative;
+  overflow-y: auto;
   box-sizing: border-box;
   height: 100vh;
 
   .container {
     padding: 50px 40px 0;
+    padding-bottom: 24px;
 
     .local-device {
       padding-top: 20px;
@@ -980,6 +1356,18 @@ function handleDel(sender) {
       .info {
         display: flex;
         justify-content: space-between;
+        button.copy {
+          flex-shrink: 0;
+          padding: 0;
+          border: 0;
+          background-color: transparent;
+          @include setBackground('@/assets/img/copy.png');
+
+          &:focus-visible {
+            outline: 2px solid $theme-color-gold;
+            outline-offset: 2px;
+          }
+        }
         .info-left {
           .txt {
             margin-bottom: 6px;
@@ -1002,9 +1390,6 @@ function handleDel(sender) {
               height: 20px;
               cursor: pointer;
 
-              &.copy {
-                @include setBackground('@/assets/img/copy.png');
-              }
               &.refresh {
                 @include setBackground('@/assets/img/refresh.png');
               }
@@ -1191,6 +1576,121 @@ function handleDel(sender) {
         }
       }
     }
+    .codex-target {
+      margin-top: 18px;
+      padding: 18px 0;
+      border-top: 1px solid #e0e6e2;
+
+      .target-heading {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 12px;
+
+        .label {
+          font-weight: 500;
+          font-size: 17px;
+        }
+        .target-hint {
+          margin-top: 3px;
+          color: #999;
+          font-size: 12px;
+        }
+      }
+
+      .refresh-target {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        flex: 0 0 auto;
+        padding: 4px 10px;
+        border: 1px solid $theme-color-gold;
+        border-radius: 4px;
+        background: white;
+        color: $theme-color-gold;
+        cursor: pointer;
+        .refresh-icon {
+          width: 14px;
+          height: 14px;
+          @include setBackground('@/assets/img/refresh.png');
+        }
+        &:disabled {
+          opacity: 0.45;
+          cursor: not-allowed;
+        }
+      }
+
+      .capture-source-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+        gap: 8px;
+        margin-top: 10px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+
+      .capture-source {
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        grid-template-rows: auto auto;
+        column-gap: 8px;
+        align-items: center;
+        padding: 6px;
+        min-width: 0;
+        border: 1px solid rgba(153, 153, 153, 0.2);
+        border-radius: 4px;
+        background: white;
+        text-align: left;
+        cursor: pointer;
+        &:hover {
+          border-color: $theme-color-gold;
+        }
+        &.selected {
+          border-color: $theme-color-gold;
+          box-shadow: 0 0 0 1px rgba($theme-color-gold, 0.2);
+        }
+        &:disabled {
+          cursor: not-allowed;
+        }
+        .capture-thumbnail {
+          grid-row: 1 / 3;
+          width: 72px;
+          height: 42px;
+          object-fit: cover;
+          background: #eee;
+        }
+        .capture-source-name,
+        .capture-source-meta {
+          overflow: hidden;
+          min-width: 0;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .capture-source-name {
+          color: #333;
+          font-size: 13px;
+        }
+        .capture-source-meta {
+          margin-top: 3px;
+          color: #999;
+          font-size: 11px;
+        }
+      }
+
+      .capture-empty,
+      .capture-error,
+      .capture-selected {
+        margin-top: 8px;
+        font-size: 12px;
+      }
+      .capture-empty,
+      .capture-selected {
+        color: #777;
+      }
+      .capture-error {
+        color: #c0392b;
+      }
+    }
     .tip {
       margin-top: 10px;
       color: #666;
@@ -1253,6 +1753,59 @@ function handleDel(sender) {
         }
       }
     }
+  }
+}
+</style>
+
+<style scoped lang="scss">
+.browser-controller .container {
+  max-width: 850px;
+  margin: 0 auto;
+  padding-top: 28px;
+}
+.browser-controller .remote-device {
+  padding-top: 28px;
+}
+.reveal-target {
+  display: block;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid #167c65;
+  border-radius: 4px;
+  background: white;
+  color: #167c65;
+  cursor: pointer;
+}
+@media (max-width: 700px) {
+  .remote-wrap {
+    height: auto;
+    min-height: calc(100dvh - 70px);
+    overflow: visible;
+  }
+  .remote-wrap .container {
+    padding: 20px 18px;
+  }
+  .remote-wrap .container .local-device .info {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+  .remote-wrap .container .remote-device .label {
+    font-size: 18px;
+    margin-bottom: 14px;
+  }
+  .remote-wrap .container .remote-device .info .ipt-wrap {
+    min-width: 0;
+  }
+  .remote-wrap .container .remote-device .info .btn {
+    width: 76px;
+    height: 46px;
+  }
+  .remote-wrap .container .remote-device .info .ipt-wrap .ipt-top .ipt {
+    height: 46px;
+    padding-right: 38px;
+  }
+  .remote-wrap .container .codex-target .capture-source-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 </style>

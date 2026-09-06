@@ -19,6 +19,8 @@
           class="ipt"
           maxlength="12"
           placeholder="请输入连接密码"
+          aria-label="连接密码"
+          @keydown.enter="handleConfirm"
         />
         <div
           class="ico eye"
@@ -66,8 +68,8 @@ onMounted(() => {
 function handleConfirm() {
   if (
     password.value &&
-    password.value.length > 6 &&
-    password.value.length < 12
+    password.value.length >= 6 &&
+    password.value.length <= 12
   ) {
     emits('confirm', password.value);
   } else {
@@ -91,9 +93,9 @@ function handleConfirm() {
     left: 50%;
     box-sizing: border-box;
     padding: 15px 20px;
-    width: 320px;
+    width: min(320px, calc(100vw - 32px));
     height: 220px;
-    border-radius: 10px;
+    border-radius: 6px;
     background-color: white;
     box-shadow: 0 2px 20px rgb(0 0 0 / 20%);
     transform: translate(-50%, -50%);

@@ -13,27 +13,15 @@ import { createHtmlPlugin } from 'vite-plugin-html';
 
 import pkg from './package.json';
 
+import type { ChildProcess } from 'node:child_process';
+
 const isWeb = process.env['VITE_APP_RELEASE_PROJECT_ISWEB'] === 'true';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
 
-  const outputStaticUrl = () => {
-    if (isWeb) {
-      if (isProduction) {
-        return 'https://resource.hsslive.cn/billd-desk/dist/';
-      } else {
-        return './';
-      }
-    } else {
-      if (isProduction) {
-        return 'dist';
-      } else {
-        return './';
-      }
-    }
-  };
+  const outputStaticUrl = () => './';
 
   return {
     base: outputStaticUrl(),
@@ -67,29 +55,61 @@ export default defineConfig(({ mode }) => {
           },
         },
       }),
-      electron({
-        main: {
-          entry: 'electron-main/index.ts', // 主进程文件
-          vite: {
-            build: {
-              outDir: 'electron-dist',
-              lib: {
-                entry: 'electron-main/index.ts', // 主进程文件
-                formats: ['cjs'],
-                fileName: () => '[name].cjs',
+      !isWeb &&
+        electron({
+          main: {
+            entry: 'electron-main/index.ts', // 主进程文件
+            onstart: async ({ startup }) => {
+              const runtime = process as NodeJS.Process & {
+                electronApp?: ChildProcess;
+              };
+              const previous = runtime.electronApp;
+              // Wait for the old app to release its single-instance lock before relaunching.
+              if (
+                previous &&
+                previous.exitCode === null &&
+                previous.signalCode === null
+              ) {
+                previous.removeAllListeners('exit');
+                await new Promise<void>((resolve) => {
+                  const timer = setTimeout(
+                    () => previous.kill('SIGKILL'),
+                    3000
+                  );
+                  previous.once('exit', () => {
+                    clearTimeout(timer);
+                    resolve();
+                  });
+                  previous.kill('SIGTERM');
+                });
+              }
+              runtime.electronApp = undefined;
+              await startup();
+            },
+            vite: {
+              build: {
+                outDir: 'electron-dist',
+                // Avoid merged ESM/CJS library formats writing the same file.
+                lib: false,
+                rollupOptions: {
+                  input: 'electron-main/index.ts',
+                  output: {
+                    format: 'cjs',
+                    entryFileNames: '[name].cjs',
+                  },
+                },
               },
             },
           },
-        },
-        preload: {
-          input: 'electron-main/preload.ts',
-          vite: {
-            build: {
-              outDir: 'electron-dist',
+          preload: {
+            input: 'electron-main/preload.ts',
+            vite: {
+              build: {
+                outDir: 'electron-dist',
+              },
             },
           },
-        },
-      }),
+        }),
       // renderer({
       //   resolve: {
       //     '@nut-tree/nut-js': { type: 'cjs' },
@@ -132,8 +152,13 @@ export default defineConfig(({ mode }) => {
     },
 
     server: {
-      host: '0.0.0.0',
+      host: '127.0.0.1',
       proxy: {
+        '/socket.io': {
+          target: 'http://127.0.0.1:4300',
+          ws: true,
+          changeOrigin: true,
+        },
         '/api': {
           target: 'http://localhost:4300',
           secure: false, // 默认情况下（secure: true），不接受在HTTPS上运行的带有无效证书的后端服务器。设置secure: false后，后端服务器的HTTPS有无效证书也可运行

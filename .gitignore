@@ -7,3 +7,7 @@ auto-imports.d.ts
 deploy
 electron-release
 electron-dist
+native-bin
+.local
+.env.local
+.env.*.local

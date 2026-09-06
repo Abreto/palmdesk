@@ -4,7 +4,9 @@
  */
 {
   $schema: 'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
-  appId: 'com.billddesk.app',
+  appId: 'com.codexremote.desktop',
+  productName: 'Codex Remote',
+  beforePack: './scripts/before-pack.cjs',
   // asar: false,
   // 优先读取这个文件的productName，没有就会读取package.json的productName
   // productName: 'BilldDesk',
@@ -13,9 +15,16 @@
   },
   files: ['dist', 'electron-dist'],
   mac: {
+    extraResources: [
+      { from: 'native-bin/codex-window', to: 'native-bin/codex-window' },
+    ],
     target: ['dmg'],
     artifactName: '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
-    icon: 'build/icons/icon.incs',
+    icon: 'build/icons/icon.icns',
+    extendInfo: {
+      NSScreenCaptureUsageDescription: '用于远程控制时捕获选定的 Codex 窗口。',
+      NSAppleEventsUsageDescription: '用于聚焦选定的 Codex 窗口。',
+    },
   },
   linux: {
     artifactName: '${productName}-linux-${platform}-${version}-${arch}-installer.${ext}',

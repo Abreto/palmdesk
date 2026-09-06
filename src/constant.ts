@@ -2,7 +2,6 @@ export * from '@/pure-constant';
 import { Key } from '@nut-tree-fork/shared';
 
 import type { BilldHtmlWebpackPluginLog } from '@/interface';
-import { prodDomain } from '@/spec-config';
 
 export const PROJECT_GITHUB = `https://github.com/galaxy-s10/billd-desk-electron`;
 export const WEB_DESK_URL = `https://desk.hsslive.cn`;
@@ -26,7 +25,7 @@ export const APP_BUILD_INFO = process.env
 
 export const NODE_ENV = process.env.NODE_ENV;
 
-export const COTURN_URL = `turn:hk.${prodDomain}`;
+export const COTURN_URL = import.meta.env.VITE_TURN_URL || '';
 
 // ======本地调试=====
 
@@ -45,23 +44,20 @@ export const COTURN_URL = `turn:hk.${prodDomain}`;
 // ======线上正式=====
 
 export const WEBSOCKET_URL =
-  process.env.NODE_ENV === 'development'
-    ? `ws://localhost:4300`
-    : `wss://srs-pull.${prodDomain}`;
+  import.meta.env.VITE_SIGNALING_URL ||
+  (location.protocol === 'file:' ? 'http://127.0.0.1:4300' : location.origin);
 
 export const AXIOS_BASEURL =
-  process.env.NODE_ENV === 'development'
-    ? `/api`
-    : `https://api-live.${prodDomain}`;
+  import.meta.env.VITE_API_BASE_URL ||
+  (location.protocol === 'file:' ? 'http://127.0.0.1:4300' : '/api');
 
 // ======线上正式=====
 
-export const COOKIE_DOMAIN =
-  process.env.NODE_ENV === 'development' ? undefined : `.${prodDomain}`;
+export const COOKIE_DOMAIN = undefined;
 
-export const THEME_COLOR = '#ffd700';
+export const THEME_COLOR = '#167c65';
 
-export const PRODUCT_NAME = 'BilldDesk';
+export const PRODUCT_NAME = 'Codex Remote';
 
 export const NUT_KEY_MAP = {
   A: Key.A,
@@ -126,6 +122,7 @@ export const NUT_KEY_MAP = {
   F23: Key.F23,
   F24: Key.F24,
   Delete: Key.Delete,
+  Escape: Key.Escape,
   Enter: Key.Enter,
   Space: Key.Space,
   Backspace: Key.Backspace,
@@ -175,4 +172,6 @@ export const LS_KEY = {
   axiosBaseUrl: 'axiosBaseUrl',
   wssUrl: 'wssUrl',
   coturnUrl: 'coturnUrl',
+  coturnUsername: 'coturnUsername',
+  coturnCredential: 'coturnCredential',
 };

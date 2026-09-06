@@ -1,0 +1,30 @@
+{
+  "scope": "Real Vue business workflow, official local backend, synthetic native capture and IPC driver",
+  "results": [
+    "real host page registers a device and selects the native capture fixture",
+    "mobile service settings reject invalid URLs and apply saved configuration after reload",
+    "phone landing view presents connection controls without native host controls",
+    "real business WebRTC video decoded (960x600)",
+    "Chinese text and Enter travel through the business DataChannel and IPC bridge",
+    "real touch click, drag, release and scrolling produce window-relative input",
+    "long touch sends a right click through the business input channel",
+    "zoomed touch panning moves only the local viewport, without host input",
+    "watch-only mode blocks pointer and text input and releases held state",
+    "portrait phone, landscape phone and desktop fit their viewports",
+    "disconnect stops host tracks and reconnect captures a fresh stream",
+    "source disappearance closes the business connection and stops captured tracks",
+    "recent devices return to the connection form with the selected computer",
+    "no uncaught page errors"
+  ],
+  "decoded": {
+    "width": 960,
+    "height": 600,
+    "pixel": [
+      25,
+      123,
+      98,
+      255
+    ]
+  },
+  "errors": []
+}

@@ -1,5 +1,8 @@
 <template>
-  <div class="layout">
+  <div
+    class="layout"
+    :class="{ browser: !ipcRenderer }"
+  >
     <div
       v-if="useCustomBar"
       class="system-bar"
@@ -29,17 +32,22 @@
       </div>
       <div class="top-right"></div>
     </div>
-    <div class="sidebar">
-      <div class="user">
-        <div class="dot"></div>
-      </div>
+    <nav
+      class="sidebar"
+      aria-label="主导航"
+    >
+      <img
+        class="brand-icon"
+        src="@/assets/img/logo.png"
+        alt="Codex Remote"
+      />
       <div class="list">
         <div
           class="item"
           :class="{ active: route.name === routerName.remote }"
           @click="router.push({ name: routerName.remote })"
         >
-          远程控制
+          连接
         </div>
         <div
           class="item"
@@ -56,7 +64,7 @@
           高级设置
         </div>
       </div>
-    </div>
+    </nav>
     <div class="view">
       <RouterView></RouterView>
     </div>
@@ -412,6 +420,66 @@ $sidebar-width: 160px;
       font-size: 16px;
       cursor: pointer;
     }
+  }
+}
+</style>
+
+<style scoped lang="scss">
+.layout .sidebar {
+  background: #f0f5f2;
+  border-right: 1px solid #dfe8e2;
+}
+.brand-icon {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  margin: 0 auto 12px;
+}
+.layout.browser .sidebar {
+  padding-top: 32px;
+}
+@media (max-width: 700px) {
+  .layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 100dvh;
+  }
+  .layout .sidebar,
+  .layout.browser .sidebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    height: auto;
+    padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+    box-sizing: border-box;
+    border-right: 0;
+    border-bottom: 1px solid #dfe8e2;
+  }
+  .layout .sidebar .brand-icon {
+    flex: 0 0 auto;
+    margin: 0;
+    width: 28px;
+    height: 28px;
+  }
+  .layout .sidebar .list {
+    display: flex;
+    flex: 1;
+    gap: 6px;
+    padding: 0;
+    justify-content: space-evenly;
+  }
+  .layout .sidebar .list .item {
+    margin: 0;
+    padding: 0 8px;
+    height: 38px;
+    line-height: 38px;
+    font-size: 13px;
+  }
+  .layout .view {
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

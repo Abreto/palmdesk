@@ -13,12 +13,23 @@
           :key="index"
           class="link-device-item"
         >
-          <div class="left">{{ item.remoteDeskUserUuid }}</div>
+          <button
+            class="left"
+            type="button"
+            @click="selectDevice(item)"
+          >
+            <LaptopOutline />{{ item.remoteDeskUserUuid }}
+          </button>
           <div class="right">
-            <div
+            <button
               class="del"
+              type="button"
+              title="移除记录"
+              :aria-label="`移除 ${item.remoteDeskUserUuid}`"
               @click="handleDelLinkDeviceList(item)"
-            ></div>
+            >
+              <TrashOutline />
+            </button>
           </div>
         </div>
       </div>
@@ -27,10 +38,18 @@
 </template>
 
 <script lang="ts" setup>
+import { LaptopOutline, TrashOutline } from '@vicons/ionicons5';
+
+import router, { routerName } from '@/router';
 import { usePiniaCacheStore } from '@/store/cache';
 
 const cacheStore = usePiniaCacheStore();
 
+function selectDevice(item) {
+  cacheStore.remoteDeskUserUuid = item.remoteDeskUserUuid;
+  cacheStore.remoteDeskUserPassword = item.remoteDeskUserPassword;
+  void router.push({ name: routerName.remote });
+}
 function handleDelLinkDeviceList(item) {
   cacheStore.linkDeviceList = cacheStore.linkDeviceList.filter(
     (v) => v.remoteDeskUserUuid !== item.remoteDeskUserUuid
@@ -84,19 +103,56 @@ function handleDelLinkDeviceList(item) {
           background-color: #f8f8fb;
         }
         .left {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          flex: 1;
+          height: 40px;
+          padding: 0;
+          border: 0;
+          background: transparent;
+          color: #167c65;
+          cursor: pointer;
           font-size: 16px;
+          svg {
+            width: 20px;
+            height: 20px;
+          }
         }
         .right {
           .del {
-            width: 15px;
-            height: 15px;
+            display: grid;
+            place-items: center;
+            width: 36px;
+            height: 36px;
+            padding: 8px;
+            border: 0;
+            background: transparent;
+            color: #66756e;
             cursor: pointer;
-
-            @include cross(#666, 1px);
+            svg {
+              width: 20px;
+              height: 20px;
+            }
           }
         }
       }
     }
+  }
+}
+</style>
+
+<style scoped lang="scss">
+@media (max-width: 640px) {
+  .setting-wrap {
+    height: auto;
+  }
+  .setting-wrap .nav {
+    display: none;
+  }
+  .setting-wrap .container {
+    height: auto;
+    padding: 30px 18px;
   }
 }
 </style>

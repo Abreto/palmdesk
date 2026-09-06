@@ -46,7 +46,6 @@ class MyAxios {
     this.instance.interceptors.response.use(
       (response) => {
         console.log('response.config.url', response.config.url);
-        console.log('response.data', response.data);
         return response.data;
       },
       (error) => {
@@ -54,11 +53,11 @@ class MyAxios {
         if (error.message.indexOf('timeout') !== -1) {
           console.error(error.message);
           window.$message.error('请求超时，请重试');
-          return;
+          return Promise.reject(error);
         }
-        const statusCode = error.response.status as number;
+        const statusCode = error.response?.status as number;
         const errorResponse = error.response;
-        const errorResponseData = errorResponse.data;
+        const errorResponseData = errorResponse?.data;
         const whiteList = ['400', '401', '403', '404', '500'];
         if (error.response) {
           if (!whiteList.includes(`${statusCode}`)) {

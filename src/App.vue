@@ -33,23 +33,24 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#ffd700',
-    primaryColorHover: '#ffd700',
+    primaryColor: '#167c65',
+    primaryColorHover: '#126951',
   },
 };
 
 onMounted(() => {
-  console.log('当前地址栏', location.href);
   appStore.version = APP_BUILD_INFO.pkgVersion;
   appStore.lastBuildDate = APP_BUILD_INFO.lastBuildDate;
   handlesetAlwaysOnTop({
     windowId: WINDOW_ID_ENUM.remote,
     flag: cacheStore.isAlwaysOnTop,
   });
-  getClient();
-  if (ipcRenderer) {
+  if (import.meta.env.VITE_ENABLE_UPSTREAM_VERSION_CHECK === 'true') {
+    getClient();
+    if (ipcRenderer) handleDeskVersionCheck();
+  }
+  if (ipcRenderer && import.meta.env.VITE_OPEN_DEVTOOLS === 'true') {
     handleOpenDevTools({ windowId: WINDOW_ID_ENUM.remote });
-    handleDeskVersionCheck();
   }
 });
 
@@ -84,6 +85,15 @@ async function getClient() {
 <style lang="scss" scoped></style>
 
 <style lang="scss">
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  letter-spacing: 0;
+}
 #app {
   user-select: none;
 }

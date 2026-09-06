@@ -21,7 +21,7 @@ export function prettierSendWsMsg(data: {
     `${new Date().toLocaleString()}【websocket】发送消息 msgType:${
       data.msgType
     },requestId:${data.requestId}`,
-    data
+    { msgType: data.msgType, requestId: data.requestId }
   );
 }
 

@@ -11,13 +11,18 @@ import {
   powerSaveBlocker,
   screen,
   shell,
+  systemPreferences,
 } from 'electron';
 
 import { IPC_EVENT } from '../src/event';
 import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
+import { CaptureSession } from './capture-session';
+import { NativeWindowBridge, matchCaptureSources } from './native-window';
+
+import type { NativeWindow } from './native-window';
 import type { nutjsTs } from './types';
-import type { IIpcRendererData } from '../src/pure-interface';
+import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
 const nutjs: nutjsTs = require('@nut-tree-fork/nut-js');
 
@@ -46,16 +51,91 @@ process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
   : path.join(process.env.DIST, '../public');
 
+app.setName('Codex Remote');
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
   process.exit(0);
 }
 
-const windowNormalParams = { width: 800, height: 500 };
+const windowNormalParams = { width: 960, height: 720 };
 let winBounds: Electron.Rectangle | null;
 const mainWindowId = WINDOW_ID_ENUM.remote;
 const windowMap = new Map<number, BrowserWindow>();
 const appName = app.getName();
+const nativeWindows = new NativeWindowBridge(
+  path.join(
+    app.isPackaged ? process.resourcesPath : path.join(__dirname, '..'),
+    'native-bin',
+    'codex-window'
+  )
+);
+
+async function listCaptureSources(): Promise<ICaptureSource[]> {
+  if (platform !== 'darwin') throw new Error('当前单窗口控制支持 macOS');
+  const sources = await desktopCapturer.getSources({
+    types: ['window'],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true,
+  });
+  if (systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+    throw new Error('请为 Codex Remote 开启屏幕录制权限并重启应用');
+  }
+  const owners = await nativeWindows.request<NativeWindow[]>('list');
+  return matchCaptureSources(sources, owners);
+}
+
+const captureSession = new CaptureSession(
+  {
+    position: (point) => nutjs.mouse.setPosition(point),
+    buttonDown: (button) =>
+      nutjs.mouse.pressButton(
+        button === 'left' ? nutjs.Button.LEFT : nutjs.Button.RIGHT
+      ),
+    buttonUp: (button) =>
+      nutjs.mouse.releaseButton(
+        button === 'left' ? nutjs.Button.LEFT : nutjs.Button.RIGHT
+      ),
+    click: (button, double) => {
+      const value = button === 'left' ? nutjs.Button.LEFT : nutjs.Button.RIGHT;
+      return double ? nutjs.mouse.doubleClick(value) : nutjs.mouse.click(value);
+    },
+    scroll: (direction, amount) => {
+      if (direction === 'up') return nutjs.mouse.scrollUp(amount);
+      if (direction === 'down') return nutjs.mouse.scrollDown(amount);
+      if (direction === 'left') return nutjs.mouse.scrollLeft(amount);
+      return nutjs.mouse.scrollRight(amount);
+    },
+    text: (value) => nutjs.keyboard.type(value),
+    keysDown: (keys) => nutjs.keyboard.pressKey(...keys),
+    keysUp: (keys) => nutjs.keyboard.releaseKey(...keys),
+    validKey: (key) =>
+      typeof key === 'number' && Object.values(nutjs.Key).includes(key),
+  },
+  listCaptureSources,
+  async (source) => {
+    if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+      throw new Error('请为 Codex Remote 开启辅助功能权限');
+    }
+    const refreshed = await nativeWindows.request<NativeWindow>('focus', {
+      nativeId: source.nativeId,
+      ownerPid: source.ownerPid,
+      bundleId: source.bundleId,
+    });
+    return { ...source, ...refreshed };
+  }
+);
+
+let quitting = false;
+app.on('before-quit', (event) => {
+  if (quitting) return;
+  event.preventDefault();
+  quitting = true;
+  void captureSession.end().finally(() => {
+    nativeWindows.close();
+    app.quit();
+  });
+});
 
 async function createWindow({
   windowId,
@@ -157,25 +237,16 @@ function winWebContentsSend(data: IIpcRendererData) {
 }
 
 function handleUrlQuery(obj: Record<string, string>) {
-  let res = '';
-  Object.keys(obj).forEach((item) => {
-    res += `${item}=${obj[item]}&`;
-  });
-  if (res.length > 0) {
-    return `?${res.slice(0, -1)}`;
-  } else {
-    return res;
-  }
+  const query = new URLSearchParams(obj).toString();
+  return query ? `?${query}` : '';
 }
 
 function main() {
   const mainWindow = new BrowserWindow({
     width: windowNormalParams.width,
     height: windowNormalParams.height,
-    minWidth: windowNormalParams.width,
-    minHeight: windowNormalParams.height,
-    maxWidth: windowNormalParams.width,
-    maxHeight: windowNormalParams.height,
+    minWidth: 800,
+    minHeight: 560,
     // 隐藏菜单栏
     autoHideMenuBar: true,
     webPreferences: {
@@ -194,7 +265,17 @@ function main() {
 
   windowMap.set(mainWindowId, mainWindow);
 
+  mainWindow.webContents.on('render-process-gone', () => {
+    void captureSession.end();
+  });
+  mainWindow.webContents.on(
+    'did-start-navigation',
+    (_event, _url, inPlace, isMainFrame) => {
+      if (isMainFrame && !inPlace) void captureSession.end();
+    }
+  );
   mainWindow.on('close', () => {
+    void captureSession.end();
     console.log('mainWindow-close');
     windowMap.forEach((item) => {
       if (!item?.isDestroyed()) {
@@ -205,6 +286,7 @@ function main() {
     windowMap.clear();
   });
   mainWindow.on('closed', () => {
+    void captureSession.end();
     console.log('mainWindow-closed');
     windowMap.forEach((item) => {
       if (!item?.isDestroyed()) {
@@ -325,34 +407,6 @@ function main() {
   );
 
   ipcMain.on(
-    IPC_EVENT.commonTest,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.commonTest}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, x, y } = data;
-      try {
-        await nutjs.mouse.move([{ x, y }]);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.commonTest,
-          requestId,
-          data: {},
-          code: 0,
-        });
-      } catch (error) {
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.commonTest,
-          requestId,
-          data,
-          code: 1,
-          msg: JSON.stringify(error),
-        });
-      }
-    }
-  );
-
-  ipcMain.on(
     IPC_EVENT.powerSaveBlockerStart,
     (_event, reqData: IIpcRendererData) => {
       console.log(`electron收到${IPC_EVENT.powerSaveBlockerStart}`, reqData);
@@ -467,501 +521,6 @@ function main() {
           data: {},
           code: 0,
         });
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseScrollDown,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseScrollDown}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, amount } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.scrollDown(amount);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollDown,
-            requestId,
-            data: { amount },
-            code: 0,
-          });
-        } catch (error) {
-          console.log(error);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollDown,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseScrollUp,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseScrollUp}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, amount } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.scrollUp(amount);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollUp,
-            requestId,
-            data: { amount },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollUp,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseScrollLeft,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseScrollLeft}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, amount } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.scrollLeft(amount);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollLeft,
-            requestId,
-            data: { amount },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollLeft,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseScrollRight,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseScrollRight}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, amount } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.scrollRight(amount);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollRight,
-            requestId,
-            data: { amount },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseScrollRight,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseSetPosition,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseSetPosition}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, x, y } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.setPosition({ x, y });
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseSetPosition,
-            requestId,
-            data: { x, y },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseSetPosition,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(IPC_EVENT.mouseMove, async (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.mouseMove}`, reqData);
-    const { requestId, data } = reqData;
-    const { windowId, x, y } = data;
-    const win = windowMap.get(windowId);
-    if (win) {
-      try {
-        await nutjs.mouse.move([{ x, y }]);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_mouseMove,
-          requestId,
-          data: { x, y },
-          code: 0,
-        });
-      } catch (error) {
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_mouseMove,
-          requestId,
-          data,
-          code: 1,
-          msg: JSON.stringify(error),
-        });
-      }
-    }
-  });
-
-  ipcMain.on(IPC_EVENT.mouseDrag, async (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.mouseDrag}`, reqData);
-    const { requestId, data } = reqData;
-    const { windowId, x, y } = data;
-    const win = windowMap.get(windowId);
-    if (win) {
-      try {
-        await nutjs.mouse.drag([{ x, y }]);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_mouseDrag,
-          requestId,
-          data: { x, y },
-          code: 0,
-        });
-      } catch (error) {
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_mouseDrag,
-          requestId,
-          data,
-          code: 1,
-          msg: JSON.stringify(error),
-        });
-      }
-    }
-  });
-
-  // 输入字符串或按键
-  ipcMain.on(
-    IPC_EVENT.keyboardType,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.keyboardType}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, key } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.keyboard.type(key);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardType,
-            requestId,
-            data: { key },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardType,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  // 输入按键
-  ipcMain.on(
-    IPC_EVENT.keyboardPressKey,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.keyboardPressKey}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, key } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.keyboard.pressKey(...key);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardPressKey,
-            requestId,
-            data: { key },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardPressKey,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  // 释放按键
-  ipcMain.on(
-    IPC_EVENT.keyboardReleaseKey,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.keyboardReleaseKey}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId, key } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.keyboard.releaseKey(...key);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardReleaseKey,
-            requestId,
-            data: { key },
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_keyboardReleaseKey,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mousePressButtonLeft,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mousePressButtonLeft}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.pressButton(nutjs.Button.LEFT);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mousePressButtonLeft,
-            requestId,
-            data: {},
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mousePressButtonLeft,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseReleaseButtonLeft,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseReleaseButtonLeft}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.releaseButton(nutjs.Button.LEFT);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseReleaseButtonLeft,
-            requestId,
-            data: {},
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseReleaseButtonLeft,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseDoubleClick,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseDoubleClick}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.doubleClick(nutjs.Button.LEFT);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseDoubleClick,
-            requestId,
-            data: {},
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseDoubleClick,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseLeftClick,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseLeftClick}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.click(nutjs.Button.LEFT);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseLeftClick,
-            requestId,
-            data: {},
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseLeftClick,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.mouseRightClick,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.mouseRightClick}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          await nutjs.mouse.click(nutjs.Button.RIGHT);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseRightClick,
-            requestId,
-            data: {},
-            code: 0,
-          });
-        } catch (error) {
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_mouseRightClick,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.getMousePosition,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.getMousePosition}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        try {
-          const point = await nutjs.mouse.getPosition();
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_getMousePosition,
-            requestId,
-            data: { point },
-            code: 0,
-          });
-        } catch (error) {
-          console.log(error);
-          winWebContentsSend({
-            windowId,
-            channel: IPC_EVENT.response_getMousePosition,
-            requestId,
-            data,
-            code: 1,
-            msg: JSON.stringify(error),
-          });
-        }
       }
     }
   );
@@ -1089,34 +648,81 @@ function main() {
     }
   );
 
-  ipcMain.on(
-    IPC_EVENT.getScreenStream,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.getScreenStream}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(Number(windowId));
-      if (win) {
-        const inputSources = await desktopCapturer.getSources({
-          types: ['screen'],
-        });
-        const res: any[] = [];
-        Object.keys(inputSources).forEach((key) => {
-          const source = inputSources[key];
-          if (!res.length) {
-            res.push(source);
-          }
-        });
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_getScreenStream,
-          requestId,
-          data: { stream: res[0] },
+  const captureHandler = (
+    channel: string,
+    action: (data: any) => Promise<any>
+  ) => {
+    ipcMain.handle(channel, async (event, request: IIpcRendererData) => {
+      try {
+        if (windowMap.get(mainWindowId)?.webContents !== event.sender)
+          throw new Error('无权访问本机捕获会话');
+        return {
           code: 0,
-        });
+          requestId: request.requestId,
+          data: await action(request.data || {}),
+        };
+      } catch (error) {
+        return {
+          code: 1,
+          requestId: request.requestId,
+          data: {},
+          msg: error instanceof Error ? error.message : String(error),
+        };
       }
-    }
+    });
+  };
+  captureHandler(IPC_EVENT.getCaptureSources, () => captureSession.refresh());
+  captureHandler(IPC_EVENT.beginCapture, (data) =>
+    captureSession.begin(String(data.sourceId || ''))
   );
+  captureHandler(IPC_EVENT.stopCapture, (data) =>
+    captureSession.end(data.sessionId)
+  );
+  captureHandler(IPC_EVENT.remoteInput, (data) =>
+    captureSession.input(data.sessionId, data.input)
+  );
+  captureHandler(IPC_EVENT.capturePermissions, async () => {
+    const diagnostics =
+      platform === 'darwin'
+        ? await nativeWindows.request<{ applications: { bundleId: string }[] }>(
+            'diagnostics'
+          )
+        : { applications: [] };
+    return {
+      screen:
+        platform === 'darwin'
+          ? systemPreferences.getMediaAccessStatus('screen')
+          : 'unsupported',
+      accessibility:
+        platform === 'darwin' &&
+        systemPreferences.isTrustedAccessibilityClient(false),
+      appName: app.getName(),
+      packaged: app.isPackaged,
+      targetApps: diagnostics.applications.map(
+        (application) => application.bundleId
+      ),
+    };
+  });
+  captureHandler(IPC_EVENT.showTargetApplication, (data) =>
+    nativeWindows.request('reveal', { bundleId: data.bundleId })
+  );
+  captureHandler(IPC_EVENT.openCapturePermission, async (data) => {
+    if (platform !== 'darwin') throw new Error('当前平台不支持此权限设置');
+    if (data.kind === 'accessibility') {
+      systemPreferences.isTrustedAccessibilityClient(true);
+      await shell.openExternal(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'
+      );
+    } else if (data.kind === 'screen') {
+      await desktopCapturer.getSources({
+        types: ['window'],
+        thumbnailSize: { width: 0, height: 0 },
+      });
+      await shell.openExternal(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture'
+      );
+    }
+  });
 
   ipcMain.on(IPC_EVENT.setAlwaysOnTop, (_event, reqData: IIpcRendererData) => {
     console.log(`electron收到${IPC_EVENT.setAlwaysOnTop}`, reqData);

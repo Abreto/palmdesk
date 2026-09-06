@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>BilldDesk Local WebRTC Smoke</title>
+    <style>
+      body {
+        font:
+          15px system-ui,
+          sans-serif;
+        color: #222;
+        margin: 24px;
+      }
+      h1 {
+        font-size: 22px;
+      }
+      .media {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin: 20px 0;
+      }
+      canvas,
+      video {
+        width: 320px;
+        max-width: 100%;
+        aspect-ratio: 16 / 9;
+        background: #222;
+      }
+      button {
+        padding: 8px 16px;
+      }
+      pre {
+        white-space: pre-wrap;
+        line-height: 1.6;
+      }
+      [data-status='PASS'] {
+        color: #126a43;
+      }
+      [data-status='FAIL'] {
+        color: #b12d30;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>BilldDesk Local WebRTC Smoke</h1>
+    <button id="run">Run Smoke Test</button>
+    <div class="media">
+      <canvas
+        id="source"
+        width="320"
+        height="180"
+      ></canvas>
+      <video
+        id="receiver"
+        autoplay
+        muted
+        playsinline
+      ></video>
+    </div>
+    <pre
+      id="result"
+      aria-live="polite"
+      data-status="READY"
+    >
+READY</pre
+    >
+    <script
+      type="module"
+      src="./transport.mjs"
+    ></script>
+  </body>
+</html>

@@ -1,12 +1,11 @@
 import { getRandomString } from 'billd-utils';
 
-import { COTURN_URL } from '@/constant';
 import { LiveLineEnum, MediaTypeEnum } from '@/interface';
 import { AppRootState, useAppStore } from '@/store/app';
 import { useNetworkStore } from '@/store/network';
 import { WsCandidateType, WsMsgTypeEnum } from '@/types/websocket';
 
-import { getCoturnUrl } from '../localStorage/app';
+import { getIceServers } from './iceServers';
 
 export class WebRTCClass {
   roomId = '';
@@ -20,6 +19,8 @@ export class WebRTCClass {
   peerConnection: RTCPeerConnection | null = null;
   dataChannel: RTCDataChannel | null = null;
   cbDataChannel: RTCDataChannel | null = null;
+  pendingCandidates: RTCIceCandidateInit[] = [];
+  closed = false;
 
   /** 最大码率 */
   maxBitrate = -1;
@@ -205,6 +206,11 @@ export class WebRTCClass {
 
   /** 处理candidate */
   addIceCandidate = async (candidate: RTCIceCandidateInit) => {
+    if (!this.peerConnection?.remoteDescription) {
+      if (!this.closed && this.pendingCandidates.length < 256)
+        this.pendingCandidates.push(candidate);
+      return;
+    }
     this.prettierLog({ msg: 'addIceCandidate开始', type: 'warn' });
     try {
       await this.peerConnection?.addIceCandidate(candidate);
@@ -234,6 +240,11 @@ export class WebRTCClass {
     this.prettierLog({ msg: 'setRemoteDescription开始', type: 'warn' });
     try {
       await this.peerConnection.setRemoteDescription(sdp);
+      await Promise.all(
+        this.pendingCandidates
+          .splice(0)
+          .map((candidate) => this.peerConnection!.addIceCandidate(candidate))
+      );
       this.prettierLog({ msg: 'setRemoteDescription成功', type: 'success' });
     } catch (error) {
       this.prettierLog({ msg: 'setRemoteDescription失败', type: 'error' });
@@ -536,36 +547,26 @@ export class WebRTCClass {
       return;
     }
     if (!this.peerConnection) {
-      const iceServers = this.isSRS
-        ? []
-        : [
-            // {
-            //   urls: 'stun:stun.l.google.com:19302',
-            // },
-            {
-              urls: getCoturnUrl() || COTURN_URL,
-              username: 'hss',
-              credential: '123456',
-            },
-          ];
+      const iceServers = this.isSRS ? [] : getIceServers();
       this.peerConnection = new RTCPeerConnection({
         iceServers,
       });
       this.peerConnection.ondatachannel = (event) => {
         this.cbDataChannel = event.channel;
+        this.cbDataChannel.onclose = () => this.close();
         this.update();
       };
       this.dataChannel = this.peerConnection.createDataChannel(
         'MessageChannel',
         {
           // maxRetransmits，用户代理应尝试重新传输在不可靠模式下第一次失败的消息的最大次数。虽然该值是 16 位无符号数，但每个用户代理都可以将其限制为它认为合适的任何最大值。
-          maxRetransmits: 3,
           // ordered，表示通过 RTCDataChannel 的信息的到达顺序需要和发送顺序一致 (true), 或者到达顺序不需要和发送顺序一致 (false). 默认：true
-          ordered: false,
+          ordered: true,
           // protocol: 'udp',
         }
       );
       this.dataChannel.onopen = () => {
+        this.update();
         this.prettierLog({
           msg: 'dataChannel连接成功！',
           type: 'success',
@@ -578,6 +579,7 @@ export class WebRTCClass {
         });
         this.close();
       };
+      this.dataChannel.onclose = () => this.close();
       this.handleStreamEvent();
       this.handleConnectionEvent();
       this.update();
@@ -586,6 +588,10 @@ export class WebRTCClass {
 
   /** 手动关闭webrtc连接 */
   close = () => {
+    if (this.closed) return;
+    this.closed = true;
+    clearInterval(this.loopGetStatsTimer);
+    this.pendingCandidates = [];
     try {
       console.warn(
         '手动关闭webrtc连接',
@@ -597,8 +603,11 @@ export class WebRTCClass {
       this.localStream = null;
       this.peerConnection?.close();
       this.dataChannel?.close();
+      this.cbDataChannel?.close();
       this.peerConnection = null;
       this.dataChannel = null;
+      this.cbDataChannel = null;
+      this.videoEl.srcObject = null;
       this.videoEl.remove();
       const appStore = useAppStore();
       const networkStore = useNetworkStore();

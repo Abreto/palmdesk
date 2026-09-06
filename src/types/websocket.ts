@@ -337,6 +337,7 @@ export enum BilldDeskBehaviorEnum {
   keyboardType,
   keyboardPressKey,
   keyboardReleaseKey,
+  releaseAll,
 }
 
 export type WsBilldDeskStartRemote = IReqWsFormat<{
@@ -359,6 +360,7 @@ export type WsBilldDeskBehaviorType = IReqWsFormat<{
   sender: string;
   receiver: string;
   type: BilldDeskBehaviorEnum;
+  text?: string;
   x: number;
   y: number;
   amount: number;
