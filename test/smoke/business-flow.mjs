@@ -8,6 +8,7 @@ import { exerciseQrConnection } from './qr-connection.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const base = process.env.SMOKE_CLIENT_URL || 'http://localhost:5173';
+const hostBase = process.env.SMOKE_HOST_URL || base;
 const artifacts = path.resolve(
   process.env.SMOKE_ARTIFACT_DIR || 'docs/smoke-artifacts'
 );
@@ -32,13 +33,24 @@ try {
   // Only native capture and OS input are substituted. Both real Vue routes,
   // device APIs, signaling, WebRTCClass and DataChannels run unchanged.
   await hostContext.addInitScript(() => {
-    const state = { sessionId: '', streams: [], inputs: [], sources: true };
+    const state = {
+      sessionId: '',
+      streams: [],
+      inputs: [],
+      sources: true,
+      hiddenIds: [],
+      listError: '',
+      capturedIds: [],
+      delayCapture: false,
+      captureWaiters: [],
+    };
     window.__smoke = state;
     const source = {
       id: 'window:101:0',
       nativeId: 101,
       ownerPid: 4242,
       bundleId: 'com.openai.codex',
+      appName: 'Codex',
       name: 'Synthetic window fixture',
       thumbnail: '',
       appIcon: '',
@@ -47,6 +59,43 @@ try {
       inputScale: 1,
       isCodex: true,
     };
+    const sources = [
+      source,
+      {
+        ...source,
+        id: 'window:102:0',
+        nativeId: 102,
+        bundleId: 'com.apple.Terminal',
+        appName: 'Terminal',
+        name: 'Agent CLI - workspace',
+        isCodex: false,
+      },
+      {
+        ...source,
+        id: 'window:103:0',
+        nativeId: 103,
+        bundleId: 'com.anthropic.claudefordesktop',
+        appName: 'Claude',
+        name: 'Project planning - a long window title for responsive layout verification',
+        isCodex: false,
+      },
+    ];
+    for (const [index, item] of sources.entries()) {
+      const preview = document.createElement('canvas');
+      preview.width = 320;
+      preview.height = 180;
+      const ctx = preview.getContext('2d');
+      ctx.fillStyle = index === 1 ? '#252a28' : '#f0f4f2';
+      ctx.fillRect(0, 0, 320, 180);
+      ctx.fillStyle = ['#147e67', '#b34b63', '#466ea5'][index];
+      ctx.fillRect(0, 0, 320, 30);
+      ctx.fillStyle = index === 1 ? '#eeeeee' : '#243e33';
+      ctx.font = '18px sans-serif';
+      ctx.fillText(item.appName, 16, 66);
+      for (let row = 0; row < 4; row++)
+        ctx.fillRect(16, 90 + row * 16, 140 + row * 25, 4);
+      item.thumbnail = preview.toDataURL('image/jpeg', 0.6);
+    }
     window.electronAPI = {
       ipcRenderer: {
         send() {},
@@ -61,18 +110,26 @@ try {
               targetApps: ['com.openai.codex'],
             };
           if (channel === 'getCaptureSources') {
+            if (state.listError) return { code: 1, msg: state.listError };
             if (!state.sources) state.sessionId = '';
             result = {
-              sources: state.sources ? [source] : [],
+              sources: state.sources
+                ? sources.filter((item) => !state.hiddenIds.includes(item.id))
+                : [],
               sessionId: state.sessionId,
             };
           }
           if (channel === 'beginCapture') {
-            if (!state.sources || data.sourceId !== source.id)
+            const selected = sources.find(
+              (item) =>
+                item.id === data.sourceId && !state.hiddenIds.includes(item.id)
+            );
+            if (!state.sources || !selected)
               return { code: 1, msg: 'Fixture window unavailable' };
             state.sessionId = `fixture-${state.streams.length}-${Date.now()}`;
+            state.capturedIds.push(selected.id);
             result = {
-              source,
+              source: selected,
               sessionId: state.sessionId,
               stream: { id: source.id },
             };
@@ -103,8 +160,12 @@ try {
       });
     }
     navigator.mediaDevices.getUserMedia = async (constraints) => {
-      if (constraints.video.mandatory.chromeMediaSourceId !== source.id)
-        throw new Error('Unexpected capture source');
+      if (state.delayCapture)
+        await new Promise((resolve) => state.captureWaiters.push(resolve));
+      const selected = sources.find(
+        (item) => item.id === constraints.video.mandatory.chromeMediaSourceId
+      );
+      if (!selected) throw new Error('Unexpected capture source');
       const canvas = document.createElement('canvas');
       canvas.width = 960;
       canvas.height = 600;
@@ -113,7 +174,7 @@ try {
       const draw = () => {
         context.fillStyle = '#f0f4f2';
         context.fillRect(0, 0, 960, 600);
-        context.fillStyle = '#147e67';
+        context.fillStyle = selected.id === source.id ? '#147e67' : '#b34b63';
         context.fillRect(0, 0, 960, 70);
         context.fillStyle = '#ffffff';
         context.font = '24px sans-serif';
@@ -153,10 +214,11 @@ try {
     response.url().endsWith('/desk_user/create')
   );
   registration.catch(() => {});
-  await host.goto(base);
+  await host.goto(hostBase);
   const device = (await (await registration).json()).data;
   assert.ok(device.uuid && device.password);
-  await host.locator('.capture-source.selected').waitFor();
+  await host.locator('.capture-source').first().waitFor();
+  assert.equal(await host.locator('.capture-source.selected').count(), 0);
   await host.waitForFunction(async (uuid) => {
     const response = await fetch(
       `/api/desk_user/find_receiver_by_uuid?uuid=${encodeURIComponent(uuid)}`
@@ -164,7 +226,7 @@ try {
     return (await response.json()).data.receiver;
   }, device.uuid);
   pass(
-    'real host page registers a device and selects the native capture fixture'
+    'real host registers a device and lists app windows without auto-selecting'
   );
 
   const phoneContext = await browser.newContext({
@@ -199,7 +261,7 @@ try {
     'phone landing view presents connection controls without native host controls'
   );
 
-  async function connectPhone() {
+  async function connectPhone(select = true) {
     await phone.getByLabel('远程设备代码').fill(device.uuid);
     await phone.locator('.remote-device .btn').click();
     await Promise.race([
@@ -213,6 +275,31 @@ try {
       phone.waitForURL('**/webrtc'),
     ]);
     await phone.waitForURL('**/webrtc');
+    await phone
+      .getByRole('button', {
+        name: `选择 ${'Synthetic window fixture'}`,
+        exact: true,
+      })
+      .waitFor({ timeout: 25000 });
+    assert.equal(await host.evaluate(() => !!window.__smoke.sessionId), false);
+    assert.equal(
+      await host.evaluate(() =>
+        window.__smoke.streams.some((stream) =>
+          stream.getTracks().some((track) => track.readyState === 'live')
+        )
+      ),
+      false
+    );
+    if (!select) return;
+    await phone
+      .getByRole('button', {
+        name: '选择 Synthetic window fixture',
+        exact: true,
+      })
+      .click();
+    await waitForVideo();
+  }
+  async function waitForVideo() {
     await phone.waitForFunction(
       () =>
         document.querySelector('video')?.readyState >= 2 &&
@@ -224,8 +311,93 @@ try {
   }
   if (process.env.SMOKE_QR === 'true') {
     await exerciseQrConnection({ host, phone, device, base, artifacts, pass });
+    await host.evaluate(() => {
+      window.__smoke.capturedIds = [];
+    });
   }
-  await connectPhone();
+  await connectPhone(false);
+  assert.equal(await phone.locator('.window-item').count(), 3);
+  assert.equal(await phone.locator('video').count(), 0);
+  pass(
+    'authenticated phone sees all app windows before any video capture starts'
+  );
+  await phone.getByLabel('搜索应用或窗口').fill('no-matching-window');
+  await phone.getByText('没有匹配的窗口', { exact: true }).waitFor();
+  await phone.getByLabel('搜索应用或窗口').fill('terminal');
+  assert.equal(await phone.locator('.window-item').count(), 1);
+  await phone.getByLabel('搜索应用或窗口').fill('');
+  for (const [name, viewport] of [
+    ['mobile-window-picker', { width: 390, height: 844 }],
+    ['narrow-window-picker', { width: 320, height: 568 }],
+    ['landscape-window-picker', { width: 844, height: 390 }],
+    ['desktop-window-picker', { width: 1440, height: 900 }],
+  ]) {
+    await phone.setViewportSize(viewport);
+    assert.ok(
+      await phone.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth
+      )
+    );
+    assert.equal(
+      await phone
+        .locator('.window-preview img')
+        .evaluateAll((images) =>
+          images.every((img) => img.complete && img.naturalWidth > 0)
+        ),
+      true
+    );
+    await phone.screenshot({ path: path.join(artifacts, `${name}.png`) });
+  }
+  await phone.setViewportSize({ width: 390, height: 844 });
+  pass(
+    'window search and actual thumbnails render in portrait, narrow, landscape and desktop layouts'
+  );
+  await host.evaluate(() => {
+    window.__smoke.hiddenIds = ['window:103:0'];
+  });
+  await phone
+    .getByRole('button', { name: '选择 Project planning', exact: false })
+    .click();
+  await phone
+    .getByRole('alert')
+    .filter({ hasText: 'Fixture window unavailable' })
+    .waitFor();
+  assert.equal(await host.evaluate(() => window.__smoke.capturedIds.length), 0);
+  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone.waitForFunction(
+    () => document.querySelectorAll('.window-item').length === 2
+  );
+  pass(
+    'a window closed after listing cannot start capture and refresh removes it'
+  );
+  await host.evaluate(() => {
+    window.__smoke.listError = '屏幕录制权限不可用';
+  });
+  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone
+    .getByRole('alert')
+    .filter({ hasText: '屏幕录制权限不可用' })
+    .waitFor();
+  await host.evaluate(() => {
+    window.__smoke.listError = '';
+    window.__smoke.sources = false;
+  });
+  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone
+    .getByText('当前桌面没有可用窗口，窗口可能已最小化', { exact: true })
+    .waitFor();
+  await host.evaluate(() => {
+    window.__smoke.sources = true;
+    window.__smoke.hiddenIds = [];
+  });
+  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone
+    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .click();
+  await waitForVideo();
+  pass(
+    'permission errors and empty lists recover by refreshing, then explicit selection starts video'
+  );
   assert.ok(!phone.url().includes('Password'));
   const decoded = await phone.locator('video').evaluate((video) => {
     const canvas = document.createElement('canvas');
@@ -424,6 +596,80 @@ try {
     await phone.screenshot({ path: path.join(artifacts, `${name}.png`) });
   }
   pass('portrait phone, landscape phone and desktop fit their viewports');
+
+  await phone.getByLabel('断开并重选窗口', { exact: true }).click();
+  await phone
+    .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
+    .waitFor();
+  await host.waitForFunction(
+    () =>
+      !window.__smoke.sessionId &&
+      window.__smoke.streams.every((stream) =>
+        stream.getTracks().every((track) => track.readyState === 'ended')
+      )
+  );
+  await phone
+    .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
+    .click();
+  await waitForVideo();
+  assert.equal(
+    await host.evaluate(() => window.__smoke.capturedIds.at(-1)),
+    'window:102:0'
+  );
+  const terminalPixel = await phone.locator('video').evaluate((video) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 960;
+    canvas.height = 600;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, 960, 600);
+    return [...ctx.getImageData(20, 20, 1, 1).data];
+  });
+  assert.ok(terminalPixel[0] > terminalPixel[1]);
+  pass(
+    'disconnect-and-reselect stops the previous stream and opens the selected terminal window'
+  );
+
+  await phone.getByLabel('断开并重选窗口', { exact: true }).click();
+  await phone
+    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .waitFor();
+  await host.evaluate(() => {
+    window.__smoke.delayCapture = true;
+  });
+  await phone
+    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .click();
+  await host.waitForFunction(() => window.__smoke.captureWaiters.length === 1);
+  await phone.getByLabel('断开并返回').click();
+  await host.waitForFunction(() => !window.__smoke.sessionId);
+  await host.evaluate(() => {
+    window.__smoke.delayCapture = false;
+  });
+  await connectPhone();
+  const activeSession = await host.evaluate(() => window.__smoke.sessionId);
+  await host.evaluate(() => {
+    window.__smoke.captureWaiters.splice(0).forEach((resolve) => resolve());
+  });
+  await host.waitForFunction(
+    () =>
+      window.__smoke.streams.at(-1).getVideoTracks()[0].readyState === 'ended'
+  );
+  assert.equal(
+    await host.evaluate(() => window.__smoke.sessionId),
+    activeSession
+  );
+  assert.equal(
+    await host.evaluate(
+      () =>
+        window.__smoke.streams.filter(
+          (stream) => stream.getVideoTracks()[0].readyState === 'live'
+        ).length
+    ),
+    1
+  );
+  pass(
+    'disconnect during pending capture stops the late stream without disturbing the new session'
+  );
 
   const firstTrack = await host.evaluate(
     () => window.__smoke.streams[0].getVideoTracks()[0].id

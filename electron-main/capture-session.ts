@@ -78,7 +78,10 @@ export class CaptureSession {
     ]);
   }
 
-  begin(sourceId: string) {
+  begin(
+    sourceId: string,
+    expectedSource?: Pick<ICaptureSource, 'ownerPid' | 'bundleId'>
+  ) {
     this.generation += 1;
     const generation = this.generation;
     this.active = undefined;
@@ -88,6 +91,12 @@ export class CaptureSession {
       if (generation !== this.generation) throw new Error('捕获请求已取消');
       if (!source || source.boundsSource !== 'window' || !source.bounds)
         throw new Error('选定窗口已不可用');
+      if (
+        expectedSource &&
+        (source.ownerPid !== expectedSource.ownerPid ||
+          source.bundleId !== expectedSource.bundleId)
+      )
+        throw new Error('选定窗口身份已变化，请刷新窗口列表');
       this.active = { id: randomUUID(), source };
       return { sessionId: this.active.id, source, stream: { id: source.id } };
     });

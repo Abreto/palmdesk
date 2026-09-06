@@ -4,16 +4,13 @@
  */
 {
   $schema: 'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
-  appId: 'com.codexremote.desktop',
-  productName: 'Codex Remote',
+  appId: 'io.github.abreto.palmdesk',
+  productName: 'PalmDesk',
   beforePack: './scripts/before-pack.cjs',
-  // asar: false,
-  // 优先读取这个文件的productName，没有就会读取package.json的productName
-  // productName: 'BilldDesk',
   directories: {
     output: 'electron-release/${version}',
   },
-  files: ['dist', 'electron-dist'],
+  files: ['dist', 'electron-dist', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md'],
   mac: {
     extraResources: [
       { from: 'native-bin/codex-window', to: 'native-bin/codex-window' },
@@ -22,8 +19,8 @@
     artifactName: '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
-      NSScreenCaptureUsageDescription: '用于远程控制时捕获选定的 Codex 窗口。',
-      NSAppleEventsUsageDescription: '用于聚焦选定的 Codex 窗口。',
+      NSScreenCaptureUsageDescription: '用于远程观察或控制时捕获选定的应用窗口。',
+      NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },
   linux: {

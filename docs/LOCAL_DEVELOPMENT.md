@@ -1,99 +1,84 @@
-# 本地开发与测试后端
+# 本地开发
 
-本次已自行启动官方 [billd-desk-server](https://github.com/galaxy-s10/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)，固定提交 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，检出目录为 `/private/tmp/codex-remote-billd-desk-server`。这是本地测试实例，与线上环境无关。
+## 环境与服务端
 
-| 服务            | 本机地址                                           |
-| --------------- | -------------------------------------------------- |
-| 前端            | `http://localhost:5173/`                           |
-| API / Socket.IO | `http://127.0.0.1:4300/`                           |
-| MySQL 8.0       | `127.0.0.1:14306`，容器 `codex-remote-smoke-mysql` |
-| Redis 7         | `127.0.0.1:14379`，容器 `codex-remote-smoke-redis` |
+客户端使用 Node.js 22 和 `package.json` 固定的 pnpm 版本；macOS 主机还需要 Xcode Command Line Tools。浏览器前端可以独立启动，但设备注册和连接必须有后端。
 
-数据库为 `codex_remote_smoke`，只保存烟测设备和官方初始化数据。后端临时目录中的 `src/secret/secret.ts` 已配置这两个本地容器；没有修改本仓库的线上密钥。`src/setup.ts` 固定监听 `127.0.0.1`，在 `CODEX_REMOTE_SMOKE=true` 时跳过定时任务与 FFmpeg 初始化。
-
-## 重启现有测试实例
-
-以下命令依赖上述临时检出目录和已初始化的容器仍然存在。先检查端口，服务在运行时不需要重复启动。
+1. 在独立目录部署 [billd-desk-server](https://github.com/galaxy-s10/billd-desk-server)。历史烟测使用提交 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，参见 [对应服务端说明](https://github.com/galaxy-s10/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)。
+2. 按服务端文档配置 MySQL、Redis 和服务端密钥，初始化数据库及 live 配置。服务端密钥留在服务端目录，不写入客户端的 `VITE_*` 变量。
+3. 将开发后端监听地址配置为 `127.0.0.1:4300`，并允许实际前端 origin。改用其他地址时，调整本项目 `vite.config.ts` 的开发代理或显式配置 API / 信令 URL。
+4. 在本仓库运行以下命令，再按 [服务配置](SERVICE_CONFIGURATION.md) 连接手机。
 
 ```bash
-docker start codex-remote-smoke-mysql codex-remote-smoke-redis
+pnpm install --frozen-lockfile
+cp .env.example .env.local
+pnpm dev:desktop
 ```
 
-在独立终端运行后端：
+依赖含原生模块和 Electron，首次安装需要访问 npm 和 Electron 的下载服务。`pnpm-workspace.yaml` 已允许 Electron、esbuild 和 vue-demi 的必要安装脚本，并禁用遗留部署、图标工具及提示信息脚本。CI 的 `--ignore-scripts` 安装仅用于源码检查；本地启动桌面端请使用上面的普通安装命令。
+
+Electron 下载器需要代理时，设置 `ELECTRON_GET_USE_PROXY=1` 和指向自己 HTTP 代理的 `GLOBAL_AGENT_HTTP_PROXY`。这些是本机安装环境变量，不写入客户端构建配置。本次首次安装在配置代理后完成，并核对了 Electron 可执行文件和 Vue 3 兼容层。
+
+只开发网页时运行 `pnpm dev:web`，局域网实机调试使用 `pnpm dev:web:lan`。启动时以终端输出的端口为准。
+
+## 检查
+
+无需后端的检查：
 
 ```bash
-cd /private/tmp/codex-remote-billd-desk-server
-CODEX_REMOTE_SMOKE=true \
-NODE_ENV=development \
-NODE_APP_RELEASE_PROJECT_NAME=billd-desk-server \
-NODE_APP_RELEASE_PROJECT_ENV=development \
-NODE_APP_RELEASE_PROJECT_PORT=4300 \
-node -r @swc-node/register ./src/index.ts
+pnpm test:smoke
+pnpm typecheck
+pnpm build:prod
 ```
 
-在本仓库运行客户端：
+macOS 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`。GitHub Actions 工作流仍需在新仓库中实际运行后确认云端通过。
+
+后端启动后运行信令测试：
 
 ```bash
-npm run dev:desktop
+node --test test/smoke/signaling.test.mjs
 ```
 
-只需手机网页时使用 `npm run dev:web`。两条命令可分别使用不同端口，共用同一个后端。`5174` 在本次机器上属于其他任务，不应停止它。
+## 浏览器与 Electron 烟测
 
-后端临时目录如果已经被系统清理，需要按官方服务端文档重新安装依赖、设置 MySQL/Redis 并初始化表和 live 配置，单独启动前端不会重建数据库。
-
-## 浏览器测试依赖
-
-单元测试使用现有 TypeScript 依赖；浏览器烟测使用 Playwright 和本机 Chrome。可将测试依赖装在被 Git 忽略的目录中：
+烟测使用 Playwright 和本机 Chrome。把额外依赖装在被 Git 忽略的目录：
 
 ```bash
 npm install --prefix .local/smoke --no-package-lock --no-save playwright
 NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/business-flow.mjs
 ```
 
-默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 和 `SMOKE_BACKEND_URL` 分别覆盖前端和信令测试后端。
+默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
 
-本次环境已提供 Playwright，可直接复用：
+Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 PalmDesk 实例占用单实例锁：
 
 ```bash
-NODE_PATH=/Users/abreto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
-node test/smoke/business-flow.mjs
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-shell.mjs
 ```
 
 扫码流程使用同一个烟测入口，指定可达的局域网地址（不要用回环地址）：
 
 ```bash
-npm run dev:web:lan -- --port 5187
+pnpm dev:web:lan --port 5187
 ```
 
 另一个终端运行：
 
 ```bash
-NODE_PATH=/Users/abreto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
+NODE_PATH="$PWD/.local/smoke/node_modules" \
+SMOKE_HOST_URL=http://127.0.0.1:5187 \
 SMOKE_CLIENT_URL=http://192.168.1.10:5187 \
 SMOKE_QR=true \
 SMOKE_ARTIFACT_DIR=.local/qr-artifacts \
 node test/smoke/business-flow.mjs
 ```
 
-将 IP 替换为本机地址。该测试实际渲染和解码 host 二维码，运行本地 API、Socket.IO 和 WebRTC，覆盖链接直达、图片识码、相机帧识码、密码变更、无效码、设备离线、失败重试和相机释放。相机视频、原生窗口捕获和系统输入使用测试替身，不操作真实应用窗口，也不代表手机相机或微信已实机验收。
+将客户端 IP 替换为本机地址。模拟电脑端使用回环地址获得与 Electron 一致的安全上下文，手机端使用局域网 HTTP 验证相机受限时的流程。该测试实际渲染和解码 host 二维码，运行本地 API、Socket.IO 和 WebRTC，覆盖链接直达、图片识码、相机帧识码、密码变更、无效码、设备离线、失败重试和相机释放。相机视频、原生窗口捕获和系统输入使用测试替身，不操作真实应用窗口，也不代表手机相机或微信已实机验收。
 
-Electron 外壳测试还要求 `electron-dist/` 已构建、独立开发 Electron 已由 `npm run dev:desktop` 生成，并且没有另一个 Codex Remote 实例占用单实例锁：
+测试会写入 `docs/smoke-artifacts/`。提交截图前检查设备代码、密码和窗口内容；合成视频测试不代表真实窗口验收完成。旧报告记录的是当时的本机测试环境，临时目录、容器和进程不属于新克隆的前置条件。
 
-```bash
-NODE_PATH=/Users/abreto/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules \
-node test/smoke/desktop-shell.mjs
-```
+## 应用身份
 
-外壳测试只读取本项目权限与 IPC 状态，不选择、聚焦或输入真实 Codex 窗口，也不修改系统权限。
+开发版为 `io.github.abreto.palmdesk.dev`，打包版为 `io.github.abreto.palmdesk`。从旧 Codex Remote 版本迁移需要重新授予权限，原有连接设置不自动迁移。
 
-## 日志与停止
-
-本次后台日志在 `/private/tmp/codex-remote-smoke-backend.log`、`/private/tmp/codex-remote-web.log`、`/private/tmp/codex-remote-dev.log`。停止服务前先核对占用端口的进程命令，避免使用旧文档中的 PID。
-
-```bash
-lsof -nP -iTCP:4300 -sTCP:LISTEN
-lsof -nP -iTCP:5173 -sTCP:LISTEN
-docker stop codex-remote-smoke-mysql codex-remote-smoke-redis
-```
-
-日志、临时后端和容器属于本机测试环境，不是分发产物。测试凭据不应复用于正式服务。
+应用不会读取 Codex 会话目录；视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。

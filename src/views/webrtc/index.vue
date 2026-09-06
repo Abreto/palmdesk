@@ -10,14 +10,35 @@
         <ArrowBackOutline />
       </button>
       <div class="heading">
-        <h1>Codex Remote</h1>
-        <span>{{ remoteDeskUserUuid || '未连接电脑' }}</span>
+        <h1>PalmDesk</h1>
+        <span :title="selectedWindow?.name">{{
+          selectedWindow?.name || remoteDeskUserUuid || '未连接电脑'
+        }}</span>
       </div>
       <span
         class="status"
-        :class="{ online: connected }"
-        >{{ connected ? '已连接' : error ? '连接已结束' : '正在连接' }}</span
+        :class="{ online: controlling, ready: connected && !controlling }"
+        >{{
+          controlling
+            ? '已连接'
+            : selectedWindow
+              ? '正在加载'
+              : connected
+                ? '选择窗口'
+                : error
+                  ? '已断开'
+                  : '正在连接'
+        }}</span
       >
+      <button
+        v-if="selectedWindow"
+        type="button"
+        title="断开并重选窗口"
+        aria-label="断开并重选窗口"
+        @click="connect"
+      >
+        <BrowsersOutline />
+      </button>
       <details class="connection-options">
         <summary
           aria-label="连接设置"
@@ -52,9 +73,19 @@
         </div>
       </details>
     </header>
+    <WindowPicker
+      v-if="connected && !selectedWindow"
+      :sources="windows"
+      :loading="windowsLoading"
+      :disabled="windowStarting"
+      :error="windowError"
+      @refresh="requestWindows"
+      @select="selectWindow"
+    />
     <RemoteViewport
+      v-if="selectedWindow"
       :video="peer?.videoEl"
-      :connected="connected"
+      :connected="controlling"
       @behavior="sendBehavior"
     />
     <div
@@ -82,15 +113,21 @@
 </template>
 
 <script setup lang="ts">
-import { ArrowBackOutline, OptionsOutline } from '@vicons/ionicons5';
+import {
+  ArrowBackOutline,
+  BrowsersOutline,
+  OptionsOutline,
+} from '@vicons/ionicons5';
 import { getRandomString } from 'billd-utils';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import RemoteViewport from '@/components/RemoteViewport/index.vue';
+import WindowPicker from '@/components/WindowPicker/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useWebsocket } from '@/hooks/use-websocket';
+import type { IRemoteWindow } from '@/pure-interface';
 import router, { routerName } from '@/router';
 import { useAppStore } from '@/store/app';
 import { useNetworkStore } from '@/store/network';
@@ -122,6 +159,15 @@ const quality = ref(1080);
 const frameRate = ref(30);
 const error = ref('');
 const hasCredentials = ref(false);
+const windows = ref<IRemoteWindow[]>([]);
+const windowsLoading = ref(false);
+const windowStarting = ref(false);
+const windowError = ref('');
+const selectedWindow = ref<{ id: string; name: string }>();
+const videoReady = ref(false);
+let listRequest = '';
+let selectRequest = '';
+let requestTimer: ReturnType<typeof setTimeout>;
 let timeout: ReturnType<typeof setTimeout>;
 let heartbeat: ReturnType<typeof setInterval>;
 let hadPeer = false;
@@ -135,6 +181,133 @@ const connected = computed(
     peer.value?.peerConnection?.connectionState === 'connected' &&
     peer.value?.dataChannel?.readyState === 'open'
 );
+const controlling = computed(
+  () => connected.value && !!selectedWindow.value && videoReady.value
+);
+
+function requestWindows() {
+  if (!connected.value || windowStarting.value) return;
+  clearTimeout(requestTimer);
+  listRequest = getRandomString(16);
+  windows.value = [];
+  windowsLoading.value = true;
+  windowError.value = '';
+  peer.value?.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteWindowsRequest,
+    requestId: listRequest,
+    data: {},
+  });
+  requestTimer = setTimeout(() => {
+    listRequest = '';
+    windowsLoading.value = false;
+    windowError.value = '读取窗口列表超时，请刷新重试';
+  }, 15000);
+}
+function selectWindow(source: IRemoteWindow) {
+  if (!connected.value || windowsLoading.value || windowStarting.value) return;
+  clearTimeout(requestTimer);
+  selectRequest = getRandomString(16);
+  windowStarting.value = true;
+  windowError.value = '';
+  peer.value?.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteWindowSelect,
+    requestId: selectRequest,
+    data: { id: source.id },
+  });
+  requestTimer = setTimeout(() => {
+    endConnection('打开窗口超时，请重新连接');
+  }, 20000);
+}
+function receiveWindowMessage(event: MessageEvent) {
+  if (typeof event.data !== 'string' || event.data.length > 65536) return;
+  let message: any;
+  try {
+    message = JSON.parse(event.data);
+  } catch {
+    return;
+  }
+  if (!message?.data || typeof message.data !== 'object') return;
+  const { data } = message;
+  if (
+    message.msgType === WsMsgTypeEnum.remoteWindowsResult &&
+    listRequest &&
+    message.requestId === listRequest
+  ) {
+    const source = data.source;
+    if (
+      source &&
+      ['id', 'name', 'appName', 'thumbnail', 'appIcon'].every(
+        (key) => typeof source[key] === 'string'
+      )
+    )
+      windows.value.push(source);
+    if (data.done) {
+      clearTimeout(requestTimer);
+      listRequest = '';
+      windowsLoading.value = false;
+      windowError.value = typeof data.error === 'string' ? data.error : '';
+    }
+  } else if (
+    message.msgType === WsMsgTypeEnum.remoteWindowSelected &&
+    selectRequest &&
+    message.requestId === selectRequest
+  ) {
+    clearTimeout(requestTimer);
+    selectRequest = '';
+    windowStarting.value = false;
+    if (typeof data.error === 'string') windowError.value = data.error;
+    else if (typeof data.id === 'string' && typeof data.name === 'string') {
+      selectedWindow.value = { id: data.id, name: data.name };
+      requestTimer = setTimeout(() => {
+        if (!controlling.value) endConnection('窗口视频加载超时，请重新连接');
+      }, 20000);
+    }
+  }
+}
+
+watch(
+  () => peer.value?.cbDataChannel,
+  (channel, previous) => {
+    previous?.removeEventListener('message', receiveWindowMessage);
+    channel?.addEventListener('message', receiveWindowMessage);
+  }
+);
+watch(
+  () => peer.value?.videoEl,
+  (video, previous) => {
+    previous?.removeEventListener('loadeddata', markVideoReady);
+    videoReady.value = !!video && video.readyState >= 2;
+    video?.addEventListener('loadeddata', markVideoReady);
+  }
+);
+function markVideoReady() {
+  videoReady.value = true;
+}
+watch(controlling, (value) => {
+  if (value) clearTimeout(requestTimer);
+});
+watch([connected, () => peer.value?.cbDataChannel], ([ready, channel]) => {
+  if (
+    ready &&
+    channel &&
+    !listRequest &&
+    !selectedWindow.value &&
+    !windowStarting.value &&
+    !windows.value.length
+  )
+    requestWindows();
+});
+
+function endConnection(message: string) {
+  clearTimeout(timeout);
+  clearTimeout(requestTimer);
+  releaseInput();
+  hadPeer = false;
+  networkStore.removeAllWsAndRtc();
+  appStore.remoteDesk.clear();
+  selectedWindow.value = undefined;
+  error.value = message;
+}
 
 function connectionData() {
   return {
@@ -185,12 +358,21 @@ function requestConnection() {
 function connect() {
   if (!hasCredentials.value) return;
   clearTimeout(timeout);
+  clearTimeout(requestTimer);
   releaseInput();
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
   hadPeer = false;
   error.value = '';
   receiverId.value = '';
+  selectedWindow.value = undefined;
+  windows.value = [];
+  windowsLoading.value = false;
+  windowStarting.value = false;
+  windowError.value = '';
+  listRequest = '';
+  selectRequest = '';
+  videoReady.value = false;
   initWs({ roomId: roomId.value, isAnchor: false, isRemoteDesk: true });
   timeout = setTimeout(() => {
     if (!connected.value)
@@ -198,7 +380,7 @@ function connect() {
   }, 20000);
 }
 function sendBehavior(data: Partial<WsBilldDeskBehaviorType['data']>) {
-  if (!connected.value && data.type !== Behavior.releaseAll) return;
+  if (!controlling.value && data.type !== Behavior.releaseAll) return;
   peer.value?.dataChannelSend<WsBilldDeskBehaviorType['data']>({
     requestId: getRandomString(8),
     msgType: WsMsgTypeEnum.billdDeskBehavior,
@@ -233,6 +415,7 @@ function updateQuality() {
 }
 function disconnect() {
   leaving = true;
+  clearTimeout(requestTimer);
   releaseInput();
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
@@ -309,6 +492,7 @@ onMounted(() => {
 onUnmounted(() => {
   leaving = true;
   clearTimeout(timeout);
+  clearTimeout(requestTimer);
   clearInterval(heartbeat);
   releaseInput();
   networkStore.removeAllWsAndRtc();
@@ -336,6 +520,7 @@ onUnmounted(() => {
   background: #fff;
 }
 .controller-header > button {
+  flex: 0 0 40px;
   width: 40px;
   height: 40px;
   padding: 8px;
@@ -357,6 +542,10 @@ onUnmounted(() => {
   line-height: 1.3;
 }
 .heading span {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-size: 12px;
   color: #6b7871;
 }
@@ -368,6 +557,9 @@ onUnmounted(() => {
 }
 .status.online {
   color: #167c65;
+}
+.status.ready {
+  color: #66736c;
 }
 .connection-options {
   position: relative;

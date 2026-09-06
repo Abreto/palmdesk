@@ -41,7 +41,7 @@ try {
     electron: process.versions.electron,
     executable: process.execPath,
   }));
-  assert.equal(identity.name, 'Codex Remote');
+  assert.equal(identity.name, 'PalmDesk');
   const permissions = await page.evaluate(() =>
     window.electronAPI.ipcRenderer.invoke('capturePermissions', { data: {} })
   );
@@ -81,7 +81,7 @@ try {
   await page.screenshot({ path: path.join(artifacts, `${artifactName}.png`) });
   const result = {
     scope:
-      'Real Codex Remote Electron shell and guarded IPC; no target capture, focus, input, or permission changes',
+      'Real PalmDesk Electron shell and guarded IPC; no target capture, focus, input, or permission changes',
     identity,
     permissions: permissions.data,
     checks: [

@@ -61,11 +61,11 @@ const desktopSource = (id, name) => ({
   id,
   name,
   display_id: '1',
-  thumbnail: { toDataURL: () => 'thumbnail' },
+  thumbnail: { toJPEG: () => Buffer.from('thumbnail') },
   appIcon: null,
 });
 
-test('native owner identity admits untitled Codex and rejects a browser titled Codex', () => {
+test('native owner identity admits ordinary app windows without trusting their titles', () => {
   const sources = [
     desktopSource('window:10:0', 'Project notes'),
     desktopSource('window:11:0', 'Codex'),
@@ -76,11 +76,13 @@ test('native owner identity admits untitled Codex and rejects a browser titled C
     source({ nativeId: 11, ownerPid: 99, bundleId: 'com.google.Chrome' }),
   ];
   const result = matchCaptureSources(sources, owners);
-  assert.equal(result.length, 1);
+  assert.equal(result.length, 2);
   assert.equal(result[0].id, 'window:10:0');
   assert.equal(result[0].ownerPid, 42);
+  assert.equal(result[1].bundleId, 'com.google.Chrome');
+  assert.equal(result[1].isCodex, false);
 });
-test('ChatGPT bundle is supported and unrelated OpenAI-looking titles are excluded', () => {
+test('ChatGPT is supported and windows without native identities are excluded', () => {
   const result = matchCaptureSources(
     [desktopSource('window:12:0', '')],
     [source({ nativeId: 12, bundleId: 'com.openai.chat' })]
@@ -90,6 +92,32 @@ test('ChatGPT bundle is supported and unrelated OpenAI-looking titles are exclud
     matchCaptureSources([desktopSource('window:13:0', 'OpenAI')], []).length,
     0
   );
+});
+test('Terminal and Claude can each be captured and controlled using their exact identity', async () => {
+  for (const bundleId of [
+    'com.apple.Terminal',
+    'com.anthropic.claudefordesktop',
+  ]) {
+    const h = harness();
+    h.sources = [source({ bundleId })];
+    const { sessionId } = await h.session.begin('window:10:0', {
+      ownerPid: 42,
+      bundleId,
+    });
+    await h.session.input(sessionId, { action: 'text', text: 'selected' });
+    assert.deepEqual(h.events, [['text', 'selected']]);
+  }
+});
+test('a window identity changed since listing cannot begin capture', async () => {
+  for (const change of [{ ownerPid: 99 }, { bundleId: 'com.apple.Terminal' }]) {
+    const h = harness();
+    h.sources = [source(change)];
+    await assert.rejects(
+      h.session.begin('window:10:0', source()),
+      /身份已变化/
+    );
+    assert.equal((await h.session.refresh()).sessionId, '');
+  }
 });
 test('corners, center, out-of-range and negative desktop coordinates map to the exact window', () => {
   for (const [x, y, expected] of [

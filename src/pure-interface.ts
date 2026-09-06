@@ -21,6 +21,7 @@ export interface ICaptureSource {
   nativeId: number;
   ownerPid: number;
   bundleId: string;
+  appName?: string;
   name: string;
   displayId?: string;
   thumbnail: string;
@@ -30,6 +31,14 @@ export interface ICaptureSource {
   boundsSource: CaptureBoundsSource;
   /** 将窗口边界转换为 nut.js 屏幕坐标时使用的缩放比例。 */
   inputScale: number;
+}
+
+export interface IRemoteWindow {
+  id: string;
+  name: string;
+  appName: string;
+  thumbnail: string;
+  appIcon: string;
 }
 
 export interface RemoteInput {
