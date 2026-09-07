@@ -14,8 +14,8 @@ function harness(
   platform,
   { compiler = 'Framework64', failure, args = [] } = {}
 ) {
-  const directory = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'palmdesk packaging ')
+  const directory = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'palmdesk packaging '))
   );
   const calls = [];
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
