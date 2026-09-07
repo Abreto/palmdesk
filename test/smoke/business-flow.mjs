@@ -92,7 +92,6 @@ try {
       },
     ];
     for (const [index, item] of sources.entries()) {
-      if (!item.isOnScreen) continue;
       const preview = document.createElement('canvas');
       preview.width = 320;
       preview.height = 180;
@@ -731,7 +730,15 @@ try {
     await phone
       .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
       .innerText(),
-    /当前不可见/
+    /未在当前桌面显示/
+  );
+  assert.equal(
+    await phone
+      .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
+      .locator('.window-preview img')
+      .evaluate((image) => image.complete && image.naturalWidth > 0),
+    true,
+    'other-Space windows retain their previews before activation'
   );
   await phone
     .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })

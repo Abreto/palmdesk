@@ -2,33 +2,45 @@
  * https://www.electron.build/configuration/configuration
  * https://github.com/electron-vite/electron-vite-vue/blob/main/electron-builder.json5
  */
-{
-  $schema: 'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
-  appId: 'io.github.abreto.palmdesk',
-  productName: 'PalmDesk',
+const { getDesktopIdentity } = require('./scripts/desktop-identity.cjs');
+
+const identity = getDesktopIdentity(__dirname);
+
+module.exports = {
+  $schema:
+    'https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json',
+  appId: identity.appId,
+  productName: identity.productName,
+  extraMetadata: { productName: identity.productName },
   beforePack: './scripts/before-pack.cjs',
   directories: {
-    output: 'electron-release/${version}',
+    output: identity.worktreeId
+      ? `electron-release/\${version}/worktree-${identity.worktreeId}`
+      : 'electron-release/${version}',
   },
   files: ['dist', 'electron-dist', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md'],
   mac: {
     sign: './scripts/sign-macos.cjs',
     extraFiles: [{ from: 'native-bin/codex-window', to: 'MacOS/codex-window' }],
     target: ['dmg'],
-    artifactName: '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
+    artifactName:
+      '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
-      NSScreenCaptureUsageDescription: '用于远程观察或控制时捕获选定的应用窗口。',
+      NSScreenCaptureUsageDescription:
+        '用于远程观察或控制时捕获选定的应用窗口。',
       NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },
   linux: {
-    artifactName: '${productName}-linux-${platform}-${version}-${arch}-installer.${ext}',
+    artifactName:
+      '${productName}-linux-${platform}-${version}-${arch}-installer.${ext}',
     // amd是x64
     target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
   },
   win: {
-    artifactName: '${productName}-win-${platform}-${version}-${arch}-installer.${ext}',
+    artifactName:
+      '${productName}-win-${platform}-${version}-${arch}-installer.${ext}',
     // highestAvailable，可用的最高权限
     // requireAdministrator，管理员权限
     requestedExecutionLevel: 'requireAdministrator',
@@ -56,4 +68,4 @@
     // installerIcon: 'build/icons/icon.ico',
     // uninstallerIcon: 'build/icons/icon.ico',
   },
-}
+};

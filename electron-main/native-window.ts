@@ -13,6 +13,9 @@ export interface NativeWindow {
   bounds: ICaptureBounds;
 }
 
+type WindowIdentity = Pick<NativeWindow, 'nativeId' | 'ownerPid' | 'bundleId'>;
+type WindowThumbnail = WindowIdentity & { thumbnail: string };
+
 export const TARGET_BUNDLES = new Set(['com.openai.codex', 'com.openai.chat']);
 
 export class NativeWindowError extends Error {
@@ -71,7 +74,43 @@ export class NativeWindowBridge {
 
   constructor(private executable: string) {}
 
-  request<T>(command: string, target?: Partial<NativeWindow>): Promise<T> {
+  async addThumbnails(sources: ICaptureSource[]): Promise<ICaptureSource[]> {
+    const missing = sources.filter((source) => !source.thumbnail);
+    if (!missing.length) return sources;
+    try {
+      const thumbnails = await this.request<WindowThumbnail[]>('thumbnails', {
+        windows: missing.map(({ nativeId, ownerPid, bundleId }) => ({
+          nativeId,
+          ownerPid,
+          bundleId,
+        })),
+      });
+      return sources.map((source) => {
+        const preview = thumbnails.find(
+          (item) =>
+            item.nativeId === source.nativeId &&
+            item.ownerPid === source.ownerPid &&
+            item.bundleId === source.bundleId
+        );
+        if (
+          source.thumbnail ||
+          !preview?.thumbnail.startsWith('data:image/jpeg;base64,') ||
+          preview.thumbnail.length > 40000
+        )
+          return source;
+        return { ...source, thumbnail: preview.thumbnail };
+      });
+    } catch (error) {
+      // A missing preview must not make an otherwise selectable window disappear.
+      console.warn('Native window previews unavailable:', error);
+      return sources;
+    }
+  }
+
+  request<T>(
+    command: string,
+    target?: Partial<NativeWindow> & { windows?: WindowIdentity[] }
+  ): Promise<T> {
     if (process.platform !== 'darwin') {
       return Promise.reject(
         new Error('当前单窗口控制支持 macOS；此平台尚无应用身份验证适配器')

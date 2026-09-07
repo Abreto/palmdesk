@@ -1,3 +1,4 @@
+import { mkdirSync } from 'node:fs';
 import path from 'path';
 import { platform } from 'process';
 
@@ -55,7 +56,14 @@ process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
   : path.join(process.env.DIST, '../public');
 
-app.setName('PalmDesk');
+const appName = app.isPackaged
+  ? app.getName()
+  : process.env.PALMDESK_APP_NAME || 'PalmDesk Dev';
+app.setName(appName);
+const userData = path.join(app.getPath('appData'), appName);
+mkdirSync(userData, { recursive: true });
+app.setPath('userData', userData);
+app.setPath('sessionData', userData);
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -66,7 +74,6 @@ const windowNormalParams = { width: 960, height: 720 };
 let winBounds: Electron.Rectangle | null;
 const mainWindowId = WINDOW_ID_ENUM.remote;
 const windowMap = new Map<number, BrowserWindow>();
-const appName = app.getName();
 const nativeWindows = new NativeWindowBridge(
   path.join(
     app.isPackaged
@@ -84,7 +91,7 @@ async function listCaptureSources(): Promise<ICaptureSource[]> {
     fetchWindowIcons: true,
   });
   if (systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
-    throw new Error('请为 PalmDesk 开启屏幕录制权限并重启应用');
+    throw new Error(`请为 ${appName} 开启屏幕录制权限并重启应用`);
   }
   const owners = await nativeWindows.request<NativeWindow[]>('list');
   return matchCaptureSources(
@@ -123,7 +130,7 @@ const captureSession = new CaptureSession(
   listCaptureSources,
   async (source) => {
     if (!systemPreferences.isTrustedAccessibilityClient(false)) {
-      throw new InputUnavailableError('请为 PalmDesk 开启辅助功能权限');
+      throw new InputUnavailableError(`请为 ${appName} 开启辅助功能权限`);
     }
     try {
       const refreshed = await nativeWindows.request<NativeWindow>('focus', {
@@ -134,8 +141,7 @@ const captureSession = new CaptureSession(
       return { ...source, ...refreshed };
     } catch (error) {
       const inputErrors: Record<string, string> = {
-        permission:
-          '原生窗口服务没有辅助功能权限，请在电脑上重新授权 PalmDesk 并重启',
+        permission: `原生窗口服务没有辅助功能权限，请在电脑上重新授权 ${appName} 并重启`,
         ambiguous:
           '无法识别选定窗口的辅助功能信息，请在电脑上打开该窗口后重试控制',
         focus: '无法聚焦选定窗口，请在电脑上将该窗口切到前台后重试控制',
@@ -697,7 +703,12 @@ function main() {
       }
     });
   };
-  captureHandler(IPC_EVENT.getCaptureSources, () => captureSession.refresh());
+  captureHandler(IPC_EVENT.getCaptureSources, async () => {
+    const result = await captureSession.refresh();
+    if (!result.sessionId)
+      result.sources = await nativeWindows.addThumbnails(result.sources);
+    return result;
+  });
   captureHandler(IPC_EVENT.beginCapture, (data) =>
     captureSession.begin(String(data.sourceId || ''), data.expectedSource)
   );

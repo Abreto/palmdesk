@@ -1,6 +1,7 @@
 import AppKit
 import ApplicationServices
 import Foundation
+import ScreenCaptureKit
 
 struct Bounds: Codable {
     let x: Double
@@ -18,6 +19,25 @@ struct TargetWindow: Codable {
     let title: String
     let isOnScreen: Bool
     let bounds: Bounds
+}
+
+struct WindowIdentity: Codable, Hashable {
+    let nativeId: UInt32
+    let ownerPid: Int32
+    let bundleId: String
+
+    init(_ window: TargetWindow) {
+        nativeId = window.nativeId
+        ownerPid = window.ownerPid
+        bundleId = window.bundleId
+    }
+}
+
+struct WindowThumbnail: Encodable {
+    let nativeId: UInt32
+    let ownerPid: Int32
+    let bundleId: String
+    let thumbnail: String
 }
 
 enum WindowError: String, Error {
@@ -88,6 +108,68 @@ func listedWindows() -> [TargetWindow] {
             return candidates.contains { matches($0, target) }
         }
         return false
+    }
+}
+
+func thumbnails(_ requested: [WindowIdentity]) -> [WindowThumbnail] {
+    guard #available(macOS 14.0, *), CGPreflightScreenCaptureAccess(), !requested.isEmpty else { return [] }
+    let identities = Set(requested)
+    let targets = listedWindows().filter { identities.contains(WindowIdentity($0)) }
+    if targets.isEmpty { return [] }
+
+    // Pump the main run loop for ScreenCaptureKit callbacks, with one deadline for the whole batch.
+    let deadline = Date().addingTimeInterval(3)
+    var content: SCShareableContent?
+    var listed = false
+    SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: false) { result, _ in
+        DispatchQueue.main.async {
+            content = result
+            listed = true
+        }
+    }
+    while !listed && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    guard let content, Date() < deadline else { return [] }
+
+    var pending = 0
+    var images: [WindowThumbnail] = []
+    for target in targets {
+        guard let window = content.windows.first(where: {
+            $0.windowID == target.nativeId &&
+            $0.owningApplication?.processID == target.ownerPid &&
+            $0.owningApplication?.bundleIdentifier == target.bundleId
+        }), window.frame.width > 1, window.frame.height > 1 else { continue }
+        let filter = SCContentFilter(desktopIndependentWindow: window)
+        let config = SCStreamConfiguration()
+        let scale = min(320 / window.frame.width, 180 / window.frame.height, 1)
+        config.width = max(1, Int(window.frame.width * scale))
+        config.height = max(1, Int(window.frame.height * scale))
+        config.showsCursor = false
+        config.scalesToFit = true
+        config.ignoreShadowsSingleWindow = true
+        if #available(macOS 14.2, *) { config.includeChildWindows = false }
+        pending += 1
+        SCScreenshotManager.captureImage(contentFilter: filter, configuration: config) { image, _ in
+            DispatchQueue.main.async {
+                defer { pending -= 1 }
+                guard Date() < deadline, let image,
+                      let jpeg = NSBitmapImageRep(cgImage: image).representation(using: .jpeg, properties: [.compressionFactor: 0.55]) else { return }
+                let thumbnail = "data:image/jpeg;base64," + jpeg.base64EncodedString()
+                guard thumbnail.utf8.count <= 40000 else { return }
+                images.append(WindowThumbnail(nativeId: target.nativeId, ownerPid: target.ownerPid,
+                                              bundleId: target.bundleId, thumbnail: thumbnail))
+            }
+        }
+    }
+    while pending > 0 && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.01))
+    }
+    let remaining = Set(windows().map { WindowIdentity($0) })
+    return images.filter { image in
+        targets.contains { target in
+            target.nativeId == image.nativeId && remaining.contains(WindowIdentity(target))
+        }
     }
 }
 
@@ -269,6 +351,10 @@ while let line = readLine() {
         switch command {
         case "list":
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(listedWindows()))
+        case "thumbnails":
+            guard let requested = request["windows"] as? [[String: Any]] else { throw WindowError.invalid }
+            let identities = try JSONDecoder().decode([WindowIdentity].self, from: JSONSerialization.data(withJSONObject: requested))
+            data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(thumbnails(identities)))
         case "focus":
             guard let id = request["nativeId"] as? UInt32,
                   let pid = request["ownerPid"] as? Int32,

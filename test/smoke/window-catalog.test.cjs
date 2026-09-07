@@ -39,6 +39,12 @@ test('catalog preserves listed identity when enumeration objects change', () => 
   current.ownerPid = 99;
   assert.equal(catalog.get(window.id).ownerPid, 42);
 });
+test('native previews reach the phone even when their window is offscreen', () => {
+  const thumbnail = 'data:image/jpeg;base64,bmF0aXZl';
+  const [window] = new WindowCatalog().update([{ ...source, thumbnail }]);
+  assert.equal(window.thumbnail, thumbnail);
+  assert.equal(window.isOnScreen, false);
+});
 test('oversized previews are omitted to keep each result below the message limit', () => {
   const [window] = new WindowCatalog().update([
     {

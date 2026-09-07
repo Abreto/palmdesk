@@ -244,7 +244,7 @@
             <span class="capture-source-name">{{ source.name }}</span>
             <span class="capture-source-meta">
               {{ source.appName || source.bundleId }}
-              {{ source.isOnScreen ? '' : ' · 当前不可见' }}
+              {{ source.isOnScreen ? '' : ' · 未在当前桌面显示' }}
             </span>
           </button>
         </div>

@@ -5,6 +5,7 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const { _electron } = require('playwright');
+const { getDesktopIdentity } = require('../../scripts/desktop-identity.cjs');
 const root = process.cwd();
 const packaged = process.env.SMOKE_PACKAGED === 'true';
 const artifactName = packaged ? 'packaged-shell' : 'desktop-shell';
@@ -18,6 +19,8 @@ const application = await _electron.launch({
   cwd: root,
   env: {
     ...process.env,
+    PALMDESK_APP_NAME: getDesktopIdentity(root, { development: true })
+      .productName,
     ...(packaged
       ? {}
       : {
@@ -41,7 +44,10 @@ try {
     electron: process.versions.electron,
     executable: process.execPath,
   }));
-  assert.equal(identity.name, 'PalmDesk');
+  assert.equal(
+    identity.name,
+    getDesktopIdentity(root, { development: !packaged }).productName
+  );
   const permissions = await page.evaluate(() =>
     window.electronAPI.ipcRenderer.invoke('capturePermissions', { data: {} })
   );

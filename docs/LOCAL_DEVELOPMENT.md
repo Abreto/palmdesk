@@ -79,6 +79,31 @@ node test/smoke/business-flow.mjs
 
 ## 应用身份
 
-开发版为 `io.github.abreto.palmdesk.dev`，打包版为 `io.github.abreto.palmdesk`。从旧 Codex Remote 版本迁移需要重新授予权限，原有连接设置不自动迁移。
+主工作区打包版为 `io.github.abreto.palmdesk`（PalmDesk），开发版为 `io.github.abreto.palmdesk.dev`（PalmDesk Dev）。linked worktree 自动使用 `io.github.abreto.palmdesk.worktree.<id>`，开发版再加 `.dev`，名称为 `PalmDesk WT <id>` 或 `PalmDesk WT <id> Dev`。`<id>` 根据该 worktree 的 Git 管理目录生成，重复构建、切换分支和 `git worktree move` 不会改变它。
+
+构建配置为 `electron-builder.cjs`，会同时设置 bundle ID、应用名称和包内运行时名称。`pnpm dev:desktop` 同样隔离主应用及 Electron Helper 的标识。各身份的配置、浏览器存储和单实例锁位于各自的 `~/Library/Application Support/<应用名称>` 目录。每个新身份需单独授予屏幕录制和辅助功能权限；开发版从过去与 PalmDesk 共用的数据目录迁移后，需要重新配置连接服务。
+
+`node scripts/dev.mjs --prepare-only` 可只生成开发应用，用于核对 `Info.plist` 和签名，不启动窗口或申请权限。原生及桌面烟测应使用当前 worktree 的开发应用，不能借用主工作区的 Electron，否则权限申请仍会归属被借用的应用。
+
+worktree 的打包产物位于 `electron-release/<version>/worktree-<id>/`。准备开发应用并完成打包后，可运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录；测试仅加载空白页面，不申请屏幕录制或辅助功能权限。
+
+### 重建与权限恢复
+
+隔离 bundle ID 解决不同构建互相覆盖的问题；ad-hoc 签名的 designated requirement 通常包含代码哈希，重建后同一个身份仍可能需要重新授权。日常使用的主工作区版本应保持固定安装位置，并使用固定的代码签名证书。已在钥匙串安装 Developer ID 或本机代码签名证书时，可以通过 `CSC_NAME` 指定，打包和开发应用都支持；证书不可用会使构建失败。
+
+```bash
+CSC_NAME='证书名称或 SHA-1 指纹' pnpm build:desktop
+```
+
+已有权限条目指向错误副本时，先退出相关 PalmDesk 应用，移走或重新构建仍使用正式版 bundle ID 的旧 worktree 副本。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 PalmDesk 条目，再添加固定位置的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `PalmDesk WT <id>` 条目。
+
+若仍需通过命令清理旧授权，只重置 PalmDesk 的对应权限，然后重新授权：
+
+```bash
+tccutil reset ScreenCapture io.github.abreto.palmdesk
+tccutil reset Accessibility io.github.abreto.palmdesk
+```
+
+代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。
 
 应用不会读取 Codex 会话目录；视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。

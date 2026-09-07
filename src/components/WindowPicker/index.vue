@@ -73,7 +73,7 @@
           <span
             v-if="!source.isOnScreen"
             class="window-visibility"
-            >当前不可见</span
+            >未在当前桌面显示</span
           ></span
         >
         <ChevronForwardOutline

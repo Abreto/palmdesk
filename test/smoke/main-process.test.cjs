@@ -4,7 +4,9 @@ const load = require('./load-source.cjs');
 const { CaptureSession, InputUnavailableError, normalizedPoint } = load(
   'electron-main/capture-session.ts'
 );
-const { matchCaptureSources } = load('electron-main/native-window.ts');
+const { NativeWindowBridge, matchCaptureSources } = load(
+  'electron-main/native-window.ts'
+);
 
 const source = (extra = {}) => ({
   id: 'window:10:0',
@@ -134,6 +136,66 @@ test('offscreen metadata and empty thumbnails do not create usable capture sourc
   );
   assert.equal(result.captureId, undefined);
   assert.equal(result.thumbnail, '');
+});
+test('offscreen previews use native images without changing capture eligibility', async () => {
+  const bridge = new NativeWindowBridge('unused');
+  const [offscreen] = matchCaptureSources([], [source({ isOnScreen: false })]);
+  const thumbnail = 'data:image/jpeg;base64,bmF0aXZl';
+  bridge.request = (command, request) => {
+    assert.equal(command, 'thumbnails');
+    assert.deepEqual(request.windows, [
+      { nativeId: 10, ownerPid: 42, bundleId: 'com.openai.codex' },
+    ]);
+    return Promise.resolve([{ ...request.windows[0], thumbnail }]);
+  };
+  const [preview] = await bridge.addThumbnails([offscreen]);
+  assert.equal(preview.thumbnail, thumbnail);
+  assert.equal(preview.isOnScreen, false);
+  assert.equal(preview.captureId, undefined);
+  assert.equal(offscreen.thumbnail, '', 'input catalog is not mutated');
+});
+test('existing Electron previews are retained even for offscreen windows', async () => {
+  const bridge = new NativeWindowBridge('unused');
+  bridge.request = () => assert.fail('no native request is needed');
+  const sources = matchCaptureSources(
+    [desktopSource('window:10:0', 'Target')],
+    [source({ isOnScreen: false })]
+  );
+  assert.ok(sources[0].thumbnail);
+  assert.equal(await bridge.addThumbnails(sources), sources);
+});
+test('native previews are matched by the full window identity and bounded for transport', async () => {
+  const original = source({ isOnScreen: false, captureId: undefined });
+  await Promise.all(
+    [
+      { nativeId: 11 },
+      { ownerPid: 99 },
+      { bundleId: 'com.apple.Terminal' },
+      { thumbnail: `data:image/jpeg;base64,${'a'.repeat(40000)}` },
+      { thumbnail: 'https://example.com/image.jpg' },
+    ].map(async (changed) => {
+      const bridge = new NativeWindowBridge('unused');
+      bridge.request = () =>
+        Promise.resolve([
+          {
+            ...original,
+            thumbnail: 'data:image/jpeg;base64,bmF0aXZl',
+            ...changed,
+          },
+        ]);
+      const [result] = await bridge.addThumbnails([original]);
+      assert.equal(result, original);
+    })
+  );
+});
+test('a failed or partial native preview batch preserves the window list', async () => {
+  const bridge = new NativeWindowBridge('unused');
+  const sources = [source(), source({ nativeId: 11 })];
+  bridge.request = () => Promise.resolve([]);
+  assert.deepEqual(await bridge.addThumbnails(sources), sources);
+  bridge.request = () =>
+    Promise.reject(new Error('ScreenCaptureKit unavailable'));
+  assert.equal(await bridge.addThumbnails(sources), sources);
 });
 test('viewing an available window and refreshing the all-Spaces list do not change focus', async () => {
   const h = harness();

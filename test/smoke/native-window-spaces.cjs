@@ -5,6 +5,7 @@ const {
   app,
   BrowserWindow,
   desktopCapturer,
+  nativeImage,
   systemPreferences,
 } = require('electron');
 const load = require('./load-source.cjs');
@@ -122,6 +123,47 @@ app.whenReady().then(async () => {
       'normal window on another Space'
     );
     assert.equal(offscreen.captureId, undefined);
+    const [preview] = await native.addThumbnails([
+      { ...offscreen, thumbnail: '' },
+    ]);
+    const image = nativeImage.createFromDataURL(preview.thumbnail);
+    assert.equal(image.isEmpty(), false, 'native other-Space preview exists');
+    const { width, height } = image.getSize();
+    assert.ok(width <= 320 && height <= 180);
+    const pixels = image.toBitmap();
+    const offset =
+      (Math.floor(height * 0.7) * width + Math.floor(width / 2)) * 4;
+    assert.ok(pixels[offset + 1] > 80);
+    assert.ok(pixels[offset + 1] > pixels[offset + 2]);
+    assert.ok(
+      (await list()).some((w) => w.id === normal.source.id && !w.isOnScreen),
+      'preview does not switch to the target desktop'
+    );
+    assert.equal(fullscreen.window.isFocused(), true);
+    console.log(
+      'PASS native other-Space preview pixels without switching desktop or focus'
+    );
+    if (process.env.SMOKE_PREVIEWS_ONLY === 'true') {
+      await normal.window.webContents.executeJavaScript(
+        'document.body.style.background = "#b34b63"'
+      );
+      await delay(200);
+      const [updated] = await native.addThumbnails([
+        { ...offscreen, thumbnail: '' },
+      ]);
+      const changed = nativeImage
+        .createFromDataURL(updated.thumbnail)
+        .toBitmap();
+      assert.ok(changed[offset + 2] > changed[offset + 1]);
+      assert.equal(fullscreen.window.isFocused(), true);
+      assert.ok(
+        (await list()).some((w) => w.id === normal.source.id && !w.isOnScreen)
+      );
+      console.log(
+        'PASS refreshed other-Space preview reflects new window content'
+      );
+      return;
+    }
     await verifyCapture(offscreen, 1);
     console.log(
       'PASS all-Spaces listing, switch to exact normal window, and capture pixels'
