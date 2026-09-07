@@ -37,6 +37,40 @@ SMOKE_TURN=true node test/smoke/business-flow.mjs
 
 ## 实际中继验收
 
+### 本地 Cloudflare 烟测
+
+在 `containers/backend/turn.env` 中配置配套的 TURN Key ID 和专用 API Token。此文件应由 Git 忽略。凭据只由测试后端读取；网页进程不加载该文件。使用空闲端口启动：
+
+```bash
+SMOKE_BACKEND_SOURCE=/absolute/path/to/backend \
+SMOKE_BACKEND_PORT=4302 SMOKE_WEB_PORT=5195 \
+SMOKE_TURN_ENV_FILE=containers/backend/turn.env SMOKE_TURN_TTL=600 \
+node containers/test/smoke-backend.mjs
+```
+
+```bash
+SMOKE_BACKEND_PORT=4302 SMOKE_WEB_PORT=5195 node containers/test/smoke-web.mjs
+```
+
+`SMOKE_TURN_TTL` 仅覆盖测试进程的 TTL。内存 Redis 使用实际时间过期，不修改生产服务或凭据文件。然后运行：
+
+```bash
+SMOKE_CLIENT_URL=http://127.0.0.1:5195 \
+SMOKE_ARTIFACT_DIR=.local/turn-cloudflare/tls \
+SMOKE_RELAY_TRANSPORT=tls SMOKE_TURN_SOAK=true \
+node test/smoke/business-flow.mjs
+```
+
+将 `SMOKE_RELAY_TRANSPORT` 改为 `udp` 或 `tcp` 并使用独立的输出目录，可以单独验证自有域名 UDP/TCP 3478。测试仅在浏览器入口限制 ICE 配置：创建和更新连接时均强制 `relay`，只保留指定传输的 URL；应用的鉴权、凭据获取、协商、续期及数据通道照常执行。不要同时启用使用测试缓存失效接口的 `SMOKE_TURN=true`。
+
+系统代理可能影响浏览器的 UDP TURN 解析和通信。排查时可设置 `SMOKE_NO_PROXY=true`，只为测试 Chrome 添加 `--no-proxy-server`，不修改系统设置。应分别记录代理与直连网络的结果；候选收集出现 `701` 不代表所有传输都不可用，以实际选中候选和媒体传输为准。
+
+`SMOKE_RELAY_TRANSPORT=all` 保留后端返回的完整 ICE 列表，仅强制中继，用于验证浏览器在当前网络中选择可用传输。
+
+`SMOKE_TURN_SOAK=true` 会运行约 11 分钟，持续记录两端选中的中继候选、传输字节数和解码帧数，确认自动领取了新凭据、执行了 ICE restart，并在两端原始凭据到期后继续验证视频和文字输入。`turn-relay.json` 及失败时的 `relay-failure-*.json` 只记录脱敏诊断，不含凭据、会话令牌或 SDP。默认业务回归仍使用本地测试凭据和直连；必须显式设置中继模式才能声称验证了 TURN。
+
+### 部署和实机
+
 Cloudflare 正式密钥只配置在服务器。部署前后端后，用电脑与手机蜂窝网络完成连接，检查 `getStats()` 的选中 candidate pair 是否包含 `relay`，同时确认视频持续解码、文字和触摸输入正常。
 
 需要排除直连时，可在独立测试页面于创建 offer 前设置 `iceTransportPolicy: 'relay'`。分别测试 UDP 与只保留 `turns:turn.cloudflare.com:443?transport=tcp` 的 TLS 路径。CNAME 必须为灰云，TLS 路径不能替换成自有域名。

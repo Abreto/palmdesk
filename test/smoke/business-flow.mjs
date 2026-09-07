@@ -4,11 +4,13 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { exerciseQrConnection } from './qr-connection.mjs';
+import { exerciseRelay, forceRelay, relayDiagnostics } from './turn-relay.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
 const base = process.env.SMOKE_CLIENT_URL || 'http://localhost:5173';
 const hostBase = process.env.SMOKE_HOST_URL || base;
+const relayTransport = process.env.SMOKE_RELAY_TRANSPORT;
 const artifacts = path.resolve(
   process.env.SMOKE_ARTIFACT_DIR || 'docs/smoke-artifacts'
 );
@@ -18,7 +20,10 @@ const browser = await chromium.launch({
     process.env.SMOKE_BROWSER_EXECUTABLE ||
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,
-  args: ['--autoplay-policy=no-user-gesture-required'],
+  args: [
+    '--autoplay-policy=no-user-gesture-required',
+    ...(process.env.SMOKE_NO_PROXY === 'true' ? ['--no-proxy-server'] : []),
+  ],
 });
 const errors = [];
 const results = [];
@@ -30,6 +35,7 @@ try {
   const hostContext = await browser.newContext({
     viewport: { width: 1280, height: 900 },
   });
+  if (relayTransport) await forceRelay(hostContext, relayTransport);
   // Only native capture and OS input are substituted. Both real Vue routes,
   // device APIs, signaling, WebRTCClass and DataChannels run unchanged.
   await hostContext.addInitScript(() => {
@@ -275,6 +281,7 @@ try {
     hasTouch: true,
     deviceScaleFactor: 1,
   });
+  if (relayTransport) await forceRelay(phoneContext, relayTransport);
   const phone = await phoneContext.newPage();
   phone.on('pageerror', (error) => errors.push(`phone: ${error.message}`));
   await phone.goto(base);
@@ -358,7 +365,10 @@ try {
       return { expiresAt: rtc.remoteConnection.session.config.expiresAt,
         sdp: rtc.peerConnection.localDescription.sdp };
     });
-    const expire = await fetch('http://127.0.0.1:4300/__smoke/expire-ice', { method: 'POST' });
+    const expire = await fetch(
+      `${process.env.SMOKE_BACKEND_URL || 'http://127.0.0.1:4300'}/__smoke/expire-ice`,
+      { method: 'POST' }
+    );
     assert.equal(expire.status, 200);
     await host.evaluate(async () => {
       const { useNetworkStore } = await import('/src/store/network/index.ts');
@@ -481,6 +491,16 @@ try {
   pass(
     `real business WebRTC video decoded (${decoded.width}x${decoded.height})`
   );
+  if (relayTransport) {
+    await exerciseRelay({
+      host,
+      phone,
+      transport: relayTransport,
+      artifacts,
+      pass,
+      soak: process.env.SMOKE_TURN_SOAK === 'true',
+    });
+  }
   if (process.env.SMOKE_TURN === 'true') await exerciseTurnRenewal();
 
   await phone.getByLabel('发送到电脑的文字').fill('你好 Codex\n通过手机发送');
@@ -910,6 +930,8 @@ try {
       {
         scope:
           'Real Vue business workflow, official local backend, synthetic native capture and IPC driver',
+        relayTransport: relayTransport || null,
+        noProxy: process.env.SMOKE_NO_PROXY === 'true',
         results,
         decoded,
         errors,
@@ -923,6 +945,16 @@ try {
   console.error('Page errors:', errors);
   for (const context of browser.contexts()) {
     const page = context.pages()[0];
+    if (page && relayTransport) {
+      const diagnostic = await relayDiagnostics(page).catch(() => ({
+        unavailable: true,
+      }));
+      console.error('Relay diagnostics:', JSON.stringify(diagnostic));
+      await writeFile(
+        path.join(artifacts, `relay-failure-${browser.contexts().indexOf(context)}.json`),
+        JSON.stringify(diagnostic, null, 2)
+      );
+    }
     if (page)
       await page
         .screenshot({
