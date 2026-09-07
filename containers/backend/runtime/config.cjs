@@ -57,8 +57,9 @@ function readConfig(env = process.env) {
 }
 
 function isAllowedOrigin(value, config) {
+  // Electron file pages use null for fetch and file:// for WebSocket upgrades.
   return value === undefined || value === '' ||
-    (value === 'null' && config.allowElectronOrigin) || config.allowedOrigins.has(value);
+    ((value === 'null' || value === 'file://') && config.allowElectronOrigin) || config.allowedOrigins.has(value);
 }
 
 module.exports = { readConfig, isAllowedOrigin, origin, port, secret };

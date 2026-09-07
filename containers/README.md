@@ -14,6 +14,11 @@ the exact commit in `backend.lock.json`. Its deployment adapter exposes device
 routes and remote-desktop signaling, and preserves existing database tables
 during initialization. The backend still requires MySQL and Redis.
 
+`ALLOW_ELECTRON_ORIGIN=true` (the default) permits the exact `null` and
+`file://` origins used by packaged Electron HTTP requests and WebSocket
+upgrades. Setting it to `false` rejects both; other origins must match the
+configured web origins. This compatibility setting is not authentication.
+
 After the first publish, set each package's visibility to **Public** in its
 GitHub package settings to allow anonymous pulls from a VPS. Container packages
 are initially private even when their source repository is public.
