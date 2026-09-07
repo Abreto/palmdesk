@@ -56,6 +56,14 @@ Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop
 NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-shell.mjs
 ```
 
+macOS 辅助进程回归测试要求已运行 `pnpm build:desktop`、没有其他打包版实例运行，且已有屏幕录制授权：
+
+```bash
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/native-helper.mjs
+```
+
+测试只截取临时测试窗口，验证生成缩略图后和空闲时辅助进程均不出现在 Dock，并检查命令响应、退出和重启。传入 `native-bin/codex-window` 可检查开发版辅助程序。辅助程序启动时显式设置后台策略，避免沿用主应用的前台身份；主应用的名称、标识及权限归属保持原样。
+
 扫码流程使用同一个烟测入口，指定可达的局域网地址（不要用回环地址）：
 
 ```bash

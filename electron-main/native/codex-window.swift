@@ -3,6 +3,9 @@ import ApplicationServices
 import Foundation
 import ScreenCaptureKit
 
+// Packaged helpers inherit the host's foreground identity when AppKit initializes.
+NSApplication.shared.setActivationPolicy(.prohibited)
+
 struct Bounds: Codable {
     let x: Double
     let y: Double
