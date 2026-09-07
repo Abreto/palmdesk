@@ -1,0 +1,16 @@
+**
+!web/**
+!nginx/**
+!backend/**
+!.sources/frontend/**
+!.sources/backend/**
+**/.git
+**/node_modules
+**/.env*
+**/dist
+**/dist-electron
+**/release
+**/.pnpm-store
+**/secret.ts
+**/secret.js
+!backend/overlay/secret.ts
