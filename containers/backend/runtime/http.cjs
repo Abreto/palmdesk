@@ -62,12 +62,12 @@ function engineCors(config) {
 const deskEvents = new Set([
   'billdDeskJoin', 'billdDeskUpdateUser', 'billdDeskStartRemote',
   'billdDeskBehavior', 'nativeWebRtcOffer', 'nativeWebRtcAnswer',
-  'nativeWebRtcCandidate', 'heartbeat',
+  'nativeWebRtcCandidate', 'nativeWebRtcRestart', 'billdDeskEndRemote', 'heartbeat',
 ]);
 
 function deskPackets(socket, next) {
   socket.use(([event, payload], proceed) => {
-    if (!deskEvents.has(event) || !payload || typeof payload.data !== 'object' || !payload.data) {
+    if (!deskEvents.has(event) || !payload || typeof payload.data !== 'object' || !payload.data || Array.isArray(payload.data)) {
       socket.disconnect(true);
       return;
     }

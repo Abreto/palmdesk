@@ -25,13 +25,18 @@ are initially private even when their source repository is public.
 
 The production Compose configuration, `.env`, database passwords, Tunnel
 credentials, TURN credentials, and persistent data remain on the deployment
-host. Builds need no production credentials. Public HTTPS and TURN are separate
-deployment services; these images do not configure either service.
+host. Builds need no production credentials. Public HTTPS is configured on the
+deployment host. The backend can issue Cloudflare or coturn credentials at runtime;
+see [turn.env.example](backend/turn.env.example) and the
+[service configuration guide](../docs/SERVICE_CONFIGURATION.md#turn).
+The default `TURN_PROVIDER=none` permits local direct-connection development.
+Remote sessions currently require one backend process; Redis alone does not
+provide multi-process Socket.IO routing.
 
 To build locally with Node.js 22.16+, Git, tar, and Docker:
 
 ```bash
-node --test containers/test/deployment.test.mjs
+node --test containers/test/*.test.mjs
 node containers/prepare.mjs /tmp/palmdesk-image-context
 docker build --platform linux/amd64 -f /tmp/palmdesk-image-context/backend/Dockerfile -t palmdesk-backend:local /tmp/palmdesk-image-context
 docker build --platform linux/amd64 -f /tmp/palmdesk-image-context/web/Dockerfile -t palmdesk-web:local /tmp/palmdesk-image-context

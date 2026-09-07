@@ -18,3 +18,4 @@ native-bin
 *.key
 *.p12
 *.pfx
+turn.env
