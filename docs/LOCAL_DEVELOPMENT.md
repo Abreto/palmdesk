@@ -92,6 +92,16 @@ Remove-Item Env:PALMDESK_NATIVE_SMOKE
 node --test test/smoke/signaling.test.mjs
 ```
 
+连接已部署的后端时，`SMOKE_BACKEND_URL` 指定信令 origin；API 使用单独路径时，通过 `SMOKE_API_BASE_URL` 指定完整 API 基址：
+
+```powershell
+$env:SMOKE_BACKEND_URL = 'https://remote.example.com'
+$env:SMOKE_API_BASE_URL = 'https://remote.example.com/api'
+node --test test/smoke/signaling.test.mjs
+```
+
+该测试使用客户端实际的 `nativeWebRtcOffer`、`nativeWebRtcAnswer` 和 `nativeWebRtcCandidate` 事件。Node.js 测试不验证浏览器或 Electron 的 Origin 限制，仍需使用实际客户端确认连接。
+
 ## 浏览器与 Electron 烟测
 
 烟测使用 Playwright 和本机 Chrome。把额外依赖装在被 Git 忽略的目录：
