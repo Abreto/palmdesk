@@ -21,9 +21,9 @@ test('configuration rejects missing secrets, non-HTTPS public origins and unsafe
 
 test('origin policy permits the configured web and Electron, and rejects suffix spoofing', () => {
   const config = readConfig({ ...valid(), EXTRA_ALLOWED_ORIGINS: 'http://localhost:5173' });
-  for (const origin of ['https://remote.example.com', 'null', undefined, '', 'http://localhost:5173']) assert.equal(isAllowedOrigin(origin, config), true);
-  for (const origin of ['https://remote.example.com.evil.test', 'https://evil.test', 'http://remote.example.com']) assert.equal(isAllowedOrigin(origin, config), false);
-  assert.equal(isAllowedOrigin('null', readConfig({ ...valid(), ALLOW_ELECTRON_ORIGIN: 'false' })), false);
+  for (const origin of ['https://remote.example.com', 'null', 'file://', undefined, '', 'http://localhost:5173']) assert.equal(isAllowedOrigin(origin, config), true);
+  for (const origin of ['https://remote.example.com.evil.test', 'https://evil.test', 'http://remote.example.com', 'file://evil.test', 'file:///tmp/app.html']) assert.equal(isAllowedOrigin(origin, config), false);
+  for (const origin of ['null', 'file://']) assert.equal(isAllowedOrigin(origin, readConfig({ ...valid(), ALLOW_ELECTRON_ORIGIN: 'false' })), false);
 });
 
 test('repeated initialization preserves existing tables and customized configuration', async () => {
@@ -55,7 +55,7 @@ test('failed initialization propagates without continuing to seed data', async (
 });
 
 test('API preflight handles Electron without allowing arbitrary browser origins', async () => {
-  for (const [origin, status] of [['null', 204], ['https://evil.test', 403]]) {
+  for (const [origin, status] of [['null', 204], ['file://', 204], ['https://evil.test', 403]]) {
     const headers = {};
     const ctx = { method: 'OPTIONS', get: () => origin, vary: () => {}, set: (key, value) => { headers[key] = value; } };
     await cors(readConfig(valid()))(ctx, () => assert.fail('preflight must not reach routes'));
@@ -65,11 +65,21 @@ test('API preflight handles Electron without allowing arbitrary browser origins'
 });
 
 test('WebSocket upgrade applies the same origin policy', () => {
-  const response = { setHeader: () => {} };
   let calls = 0;
-  engineCors(readConfig(valid()))({ headers: { origin: 'null' }, method: 'GET' }, response, (error) => { assert.equal(error, undefined); calls++; });
-  engineCors(readConfig(valid()))({ headers: { origin: 'https://evil.test' }, method: 'GET' }, response, (error) => { assert.ok(error); calls++; });
-  assert.equal(calls, 2);
+  for (const [origin, enabled, allowed] of [
+    ['null', 'true', true], ['file://', 'true', true],
+    ['null', 'false', false], ['file://', 'false', false],
+    ['https://evil.test', 'true', false], ['file://evil.test', 'true', false],
+  ]) {
+    const headers = {};
+    const response = { setHeader: (key, value) => { headers[key] = value; } };
+    engineCors(readConfig({ ...valid(), ALLOW_ELECTRON_ORIGIN: enabled }))(
+      { headers: { origin }, method: 'GET' }, response,
+      (error) => { assert.equal(Boolean(error), !allowed); calls++; }
+    );
+    assert.equal(headers['Access-Control-Allow-Origin'], allowed ? origin : undefined);
+  }
+  assert.equal(calls, 6);
 });
 
 test('deployment excludes legacy live events while preserving desk signaling', () => {
