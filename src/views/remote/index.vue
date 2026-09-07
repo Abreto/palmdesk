@@ -270,7 +270,7 @@
       </div>
 
       <div
-        v-if="ipcRenderer"
+        v-if="ipcRenderer && permissions.platform === 'darwin'"
         class="permissions"
       >
         <div>
@@ -581,6 +581,7 @@ let windowSelection: symbol | undefined;
 let captureOwner = '';
 let captureGeneration = 0;
 const permissions = ref({
+  platform: '',
   screen: 'unknown',
   accessibility: false,
   targetApps: [] as string[],

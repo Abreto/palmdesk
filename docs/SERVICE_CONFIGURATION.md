@@ -59,6 +59,8 @@ npm run build:prod
 
 BilldDesk 服务端也要允许该网页的 origin；本次固定后端快照默认只适配了本地开发域名。手机和电脑需能访问相同的信令/API 地址。
 
+Windows 打包版 Electron 的 WebSocket 握手使用 `Origin: file://`。服务端若校验 WebSocket 来源（例如 Socket.IO 的 `allowRequest`），需显式允许 `file://`；允许字符串 `null` 不能替代它。API 登录成功但 WebSocket 握手返回 HTTP 400 时，应检查这项配置。开发客户端则使用实际页面 origin，例如 `http://127.0.0.1:5173`，也需要被允许。
+
 ## TURN
 
 例如：

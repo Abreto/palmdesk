@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 View and control a selected desktop window from your phone's browser.
 
-PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It lets you choose a regular macOS application window, including Codex, ChatGPT, Claude, or a terminal, from your phone. A desktop browser can also act as the controller.
+PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It lets you choose a regular macOS or Windows application window, including Codex, ChatGPT, Claude, or a terminal, from your phone. A desktop browser can also act as the controller.
 
 **Status: experimental prototype, with no stable release yet.** You need to deploy your own backend and select a window after connecting. Automatically reopening the last selected window is planned. Known dependency warnings and release prerequisites are tracked in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
 
@@ -18,17 +18,19 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 - Disconnect and choose another window while retaining device connection details. Codex and ChatGPT windows appear first, with the original order preserved within each group.
 - Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
-- Identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
+- On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
+- On Windows, identify the target by HWND, process ID, executable path, and process start time. Support regular windows on the current virtual desktop, restoring a selected minimized window, and physical coordinates across high-DPI and multiple displays.
+- Send literal Unicode text on Windows, preserving Chinese and English text without conversion by the host's input method.
 - Stop input and release held keys when the window disappears, capture ends, or the connection closes.
 - Configure API, signaling, and TURN services. Browser clients use the current origin by default.
 
-**Host support is currently limited to macOS.** Windows and Linux have no native host adapter and reject capture and input. This host restriction does not apply to browser controllers. Video uses a window source, but input still relies on system focus and mouse/keyboard APIs; it does not provide operating-system-level input isolation.
+**Hosts support macOS and Windows.** Linux has no native host adapter and rejects capture and input. This host restriction does not apply to browser controllers. Video uses a window source, but input still relies on system focus and mouse/keyboard APIs; it does not provide operating-system-level input isolation.
 
 ## Getting Started
 
 ### Prerequisites
 
-The verified development environment is macOS on Apple Silicon, Node.js 22.16.0, and pnpm 11.19.0. Desktop development also requires Xcode Command Line Tools.
+The client requires Node.js 22.16.0 or later and pnpm 11.19.0. macOS desktop development requires Xcode Command Line Tools. Windows hosts require Windows 10 1903 or later / Windows 11 x64 with Windows Graphics Capture available. The helper uses the system .NET Framework 4.x compiler; Visual Studio is not required.
 
 **Deploy the backend separately before connecting devices.** Both clients must use the same [BilldDesk API / Socket.IO backend](https://github.com/galaxy-s10/billd-desk-server). This repository does not include the backend or database and does not provide a public connection service. Follow the [local development guide](docs/LOCAL_DEVELOPMENT.md) for backend setup and deployment order.
 
@@ -40,9 +42,11 @@ cp .env.example .env.local
 pnpm dev:desktop
 ```
 
+In Windows PowerShell, copy the environment file with `Copy-Item .env.example .env.local`. The first launch compiles `native-bin/palmdesk-window.exe` and starts Electron. See the [Windows desktop guide](docs/LOCAL_DEVELOPMENT.md#windows-桌面) for development and testing. Use `pnpm dev:desktop:lan` to expose the development page to phones on the local network.
+
 Configure your service addresses in `.env.local` or the client's connection settings. See the [service configuration guide](docs/SERVICE_CONFIGURATION.md) for API, signaling, HTTPS, and TURN settings.
 
-The development script compiles the Swift window helper and creates a separately identified, locally signed Electron application:
+On macOS, the development script compiles the Swift window helper and creates a separately identified, locally signed Electron application:
 
 ```text
 .local/electron-dev/Electron.app
@@ -54,7 +58,7 @@ Grant **Screen Recording** and **Accessibility** permissions to PalmDesk Dev in 
 - Screen Recording is required to view a window that is available for capture on the current desktop.
 - Accessibility is required to switch Spaces, restore windows, and send input. Automatic window activation needs this permission even in read-only mode.
 
-You may need to restart the application after granting Screen Recording access. See [Application Identity and Permissions](#application-identity-and-permissions) for worktree builds, migration, and permission recovery.
+You may need to restart the application after granting Screen Recording access. See [Application Identity and Permissions](#macos-application-identity-and-permissions) for worktree builds, migration, and permission recovery.
 
 ### Open the Web Client
 
@@ -76,7 +80,7 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 
 ### Connect and Select a Window
 
-1. Open the application window you want to view or control on the Mac. It can be on any Space.
+1. Open the application window you want to view or control on the computer. It can be on any macOS Space, or on the current Windows virtual desktop.
 2. Open the PalmDesk web client on your phone. The desktop and web clients must both use this version and connect to the same backend.
 3. Enter the device code and password displayed by the desktop client, or use its QR code.
 4. After authentication, select a window on the phone. The host activates it and starts capture once it is available.
@@ -85,11 +89,11 @@ To enable QR connections, configure the phone-accessible web client homepage in 
 
 ## Window Selection and Session Behavior
 
-The window list travels over the authenticated connection's WebRTC DataChannel, so no BilldDesk server changes are needed. It includes regular application windows across the current user's macOS Spaces and excludes PalmDesk itself, desktop elements, and entire displays.
+The window list travels over the authenticated connection's WebRTC DataChannel, so no BilldDesk server changes are needed. It includes regular application windows across the current user's macOS Spaces, or on the current Windows virtual desktop, and excludes PalmDesk itself, desktop elements, and entire displays.
 
 Windows on other Spaces, hidden windows, and minimized windows are marked as not visible on the current desktop. They remain selectable and may have thumbnails. On macOS 14 and later, ScreenCaptureKit fills in missing Electron previews using single-window snapshots without activating the window or switching Spaces. If the system cannot provide a preview, the selectable entry remains.
 
-Selecting a window activates it and switches Spaces as needed. If it is minimized, only the selected window is restored. Capture starts only when that window appears in the capture source list. Selection fails if the system or application rejects activation or the target cannot be uniquely identified.
+Selecting a window activates it and, on macOS, switches Spaces as needed. If it is minimized, only the selected window is restored. Capture starts only when that window appears in the capture source list. Selection fails if the system or application rejects activation or the target cannot be uniquely identified.
 
 Refreshing the list does not switch Spaces. If the selected window closes, leaves the capturable desktop, or changes identity, the session ends. PalmDesk does not automatically select another window. Use the controller's disconnect-and-reselect action to fetch a new list while keeping the device connection details.
 
@@ -101,7 +105,7 @@ Native Accessibility window IDs distinguish windows with identical titles and si
 
 System input depends on foreground focus. Concurrent local use or system shortcuts can still change that focus.
 
-## Application Identity and Permissions
+## macOS Application Identity and Permissions
 
 The main workspace uses `PalmDesk Dev` with bundle ID `io.github.abreto.palmdesk.dev` for development. Linked worktrees automatically use `PalmDesk WT <id> Dev` and `io.github.abreto.palmdesk.worktree.<id>.dev`. Packaged builds also use separate identities per worktree to avoid overwriting the main application's system permissions and configuration. See the [application identity guide](docs/LOCAL_DEVELOPMENT.md#应用身份) for details and repair steps for existing permission entries.
 
@@ -121,14 +125,14 @@ pnpm typecheck
 pnpm build:prod
 ```
 
-Build the native helper and desktop application on macOS:
+Build the native helper and desktop application on macOS or Windows:
 
 ```bash
 pnpm build:native
 pnpm build:desktop
 ```
 
-Local desktop artifacts are written to `electron-release/`. These commands do not publish a GitHub Release. Distributing installers still requires resolving dependency warnings, confirming icon provenance and third-party licenses, and completing application signing and notarization.
+`build:native` and `build:desktop` select the current host platform. Local desktop artifacts are written to `electron-release/`, with the Windows executable under `win-unpacked/`. On Windows, `pnpm build:desktop:win` explicitly builds the Windows version. These commands do not publish a GitHub Release. Distributing installers still requires resolving dependency warnings, confirming icon provenance and third-party licenses, and completing application signing; macOS also requires notarization.
 
 With the backend running, run the signaling integration test:
 
@@ -136,13 +140,15 @@ With the backend running, run the signaling integration test:
 node --test test/smoke/signaling.test.mjs
 ```
 
-GitHub Actions is configured to run unit tests, type checking, the web build, and macOS helper compilation. It does not cover live remote control or public deployment. Additional browser and Electron smoke-test setup is documented in the [development guide](docs/LOCAL_DEVELOPMENT.md).
+GitHub Actions runs unit tests, type checking, and the web build on Linux, macOS, and Windows, plus native helper compilation on macOS and Windows. It does not cover live remote control or public deployment. Additional browser and Electron smoke-test setup is documented in the [development guide](docs/LOCAL_DEVELOPMENT.md).
 
 GitHub Actions in the main repository can build the web client and the backend with its deployment adapter as Docker images and publish them to GHCR. See [Container Images](containers/README.md) for image names, the pinned backend version, and build instructions. Production credentials, databases, and the tunnel are managed by the deployment environment.
 
 ### Validation Coverage
 
 Existing smoke tests exercise real Vue pages, the official backend running locally, Socket.IO, WebRTC video decoding, and the input DataChannel. Native video sources and system input use test doubles in those tests. Historical results are in the [validation report](docs/CODEX_REMOTE_REPAIR_RESULTS.md); references to Codex Remote in reports and screenshots use the project's former name.
+
+Separate Windows native tests verify real window capture and input. The [public backend verification](docs/smoke-artifacts/public-backend-2026-09-08.md) records a packaged Windows host with real WGC video and Win32 input, followed by user-confirmed testing from a physical phone. Cross-network TURN behavior remains unverified.
 
 Window-picker smoke tests cover deferred capture, selection across applications, search and refresh, permission errors, empty lists, windows closing before selection, disconnecting and reselecting, video pixel checks, and mobile portrait and landscape layouts. Unit tests cover selection identifier isolation, invalid identifiers, and window identity checks before capture.
 

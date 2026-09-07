@@ -115,7 +115,7 @@ const vite = path.join(
 );
 const child = spawn(
   process.execPath,
-  [vite, '--host', '127.0.0.1', ...process.argv.slice(2)],
+  [vite, ...process.argv.slice(2)],
   { cwd: root, env, stdio: 'inherit' }
 );
 ['SIGINT', 'SIGTERM'].forEach((signal) =>

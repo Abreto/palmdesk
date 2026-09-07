@@ -39,11 +39,15 @@ module.exports = {
     target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
   },
   win: {
+    extraResources: [
+      {
+        from: 'native-bin/palmdesk-window.exe',
+        to: 'native/palmdesk-window.exe',
+      },
+    ],
     artifactName:
       '${productName}-win-${platform}-${version}-${arch}-installer.${ext}',
-    // highestAvailable，可用的最高权限
-    // requireAdministrator，管理员权限
-    requestedExecutionLevel: 'requireAdministrator',
+    requestedExecutionLevel: 'asInvoker',
     target: [
       {
         // portable、nsis

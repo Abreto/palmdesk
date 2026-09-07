@@ -4,9 +4,10 @@ import test from 'node:test';
 import { io } from 'socket.io-client';
 
 const endpoint = process.env.SMOKE_BACKEND_URL || 'http://127.0.0.1:4300';
+const apiEndpoint = process.env.SMOKE_API_BASE_URL || endpoint;
 
 async function api(path, body) {
-  const response = await fetch(`${endpoint}${path}`, {
+  const response = await fetch(`${apiEndpoint}${path}`, {
     method: body === undefined ? 'GET' : 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -40,7 +41,7 @@ function send(socket, event, data) {
   });
 }
 
-test('local backend registers devices, authenticates and relays WebRTC signaling', async (t) => {
+test('backend registers devices, authenticates and relays WebRTC signaling', async (t) => {
   const target = (await api('/desk_user/create', {})).data;
   const controller = (await api('/desk_user/create', {})).data;
   assert.ok(target.uuid && target.password && controller.uuid);
@@ -119,9 +120,19 @@ test('local backend registers devices, authenticates and relays WebRTC signaling
   send(b, 'billdDeskStartRemote', connection);
   for (const result of await accepted) assert.equal(result.code, 0);
   for (const [sender, receiver, event, value] of [
-    [a, b, 'srsOffer', { sdp: { type: 'offer', sdp: 'smoke-offer' } }],
-    [b, a, 'srsAnswer', { sdp: { type: 'answer', sdp: 'smoke-answer' } }],
-    [a, b, 'srsCandidate', { candidate: { candidate: 'smoke-candidate' } }],
+    [a, b, 'nativeWebRtcOffer', { sdp: { type: 'offer', sdp: 'smoke-offer' } }],
+    [
+      b,
+      a,
+      'nativeWebRtcAnswer',
+      { sdp: { type: 'answer', sdp: 'smoke-answer' } },
+    ],
+    [
+      a,
+      b,
+      'nativeWebRtcCandidate',
+      { candidate: { candidate: 'smoke-candidate' } },
+    ],
   ]) {
     const received = next(receiver, event);
     send(sender, event, {

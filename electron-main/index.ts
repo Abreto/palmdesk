@@ -25,6 +25,8 @@ import {
   NativeWindowBridge,
   NativeWindowError,
   matchCaptureSources,
+  nativeHelperPath,
+  enableWindowsCapture,
 } from './native-window';
 
 import type { ApplicationIdentity } from './app-identity';
@@ -33,6 +35,9 @@ import type { nutjsTs } from './types';
 import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
 let nutjs: nutjsTs;
+
+const windowsCaptureEnabled =
+  platform !== 'win32' || enableWindowsCapture(app.commandLine);
 
 // 该版本electron所对应的node版本
 console.log('process.version', process.version);
@@ -73,22 +78,29 @@ let winBounds: Electron.Rectangle | null;
 const mainWindowId = WINDOW_ID_ENUM.remote;
 const windowMap = new Map<number, BrowserWindow>();
 const nativeWindows = new NativeWindowBridge(
-  path.join(
-    app.isPackaged
-      ? path.join(process.resourcesPath, '..', 'MacOS')
-      : path.join(__dirname, '..', 'native-bin'),
-    'codex-window'
+  nativeHelperPath(
+    platform,
+    __dirname,
+    app.isPackaged ? process.resourcesPath : undefined
   )
 );
 
 async function listCaptureSources(): Promise<ICaptureSource[]> {
-  if (platform !== 'darwin') throw new Error('当前单窗口控制支持 macOS');
+  if (platform !== 'darwin' && platform !== 'win32')
+    throw new Error('当前单窗口控制支持 macOS 和 Windows');
+  if (!windowsCaptureEnabled)
+    throw new Error(
+      'Windows Graphics Capture 已禁用，无法保证窗口控制坐标准确'
+    );
   const sources = await desktopCapturer.getSources({
     types: ['window'],
     thumbnailSize: { width: 320, height: 180 },
     fetchWindowIcons: true,
   });
-  if (systemPreferences.getMediaAccessStatus('screen') !== 'granted') {
+  if (
+    platform === 'darwin' &&
+    systemPreferences.getMediaAccessStatus('screen') !== 'granted'
+  ) {
     throw new Error(`请为 ${appName} 开启屏幕录制权限并重启应用`);
   }
   const owners = await nativeWindows.request<NativeWindow[]>('list');
@@ -119,7 +131,15 @@ const captureSession = new CaptureSession(
       if (direction === 'left') return nutjs.mouse.scrollLeft(amount);
       return nutjs.mouse.scrollRight(amount);
     },
-    text: (value) => nutjs.keyboard.type(value),
+    text: (value, source) =>
+      platform === 'win32'
+        ? nativeWindows.request('text', {
+            nativeId: source.nativeId,
+            ownerPid: source.ownerPid,
+            bundleId: source.bundleId,
+            text: value,
+          })
+        : nutjs.keyboard.type(value),
     keysDown: (keys) => nutjs.keyboard.pressKey(...keys),
     keysUp: (keys) => nutjs.keyboard.releaseKey(...keys),
     validKey: (key) =>
@@ -127,7 +147,10 @@ const captureSession = new CaptureSession(
   },
   listCaptureSources,
   async (source) => {
-    if (!systemPreferences.isTrustedAccessibilityClient(false)) {
+    if (
+      platform === 'darwin' &&
+      !systemPreferences.isTrustedAccessibilityClient(false)
+    ) {
       throw new InputUnavailableError(`请为 ${appName} 开启辅助功能权限`);
     }
     try {
@@ -139,7 +162,10 @@ const captureSession = new CaptureSession(
       return { ...source, ...refreshed };
     } catch (error) {
       const inputErrors: Record<string, string> = {
-        permission: `原生窗口服务没有辅助功能权限，请在电脑上重新授权 ${appName} 并重启`,
+        permission:
+          platform === 'win32'
+            ? 'Windows 不允许控制此窗口，请使用相同权限级别运行目标应用和 PalmDesk 后重试'
+            : `原生窗口服务没有辅助功能权限，请在电脑上重新授权 ${appName} 并重启`,
         ambiguous:
           '无法识别选定窗口的辅助功能信息，请在电脑上打开该窗口后重试控制',
         focus: '无法聚焦选定窗口，请在电脑上将该窗口切到前台后重试控制',
@@ -718,24 +744,35 @@ function main() {
   );
   captureHandler(IPC_EVENT.capturePermissions, async () => {
     const nativePermissions =
-      platform === 'darwin'
-        ? await nativeWindows.request<{ accessibility: boolean }>('permissions')
-        : { accessibility: false };
+      platform === 'darwin' || platform === 'win32'
+        ? await nativeWindows.request<{
+            accessibility: boolean;
+            captureSupported?: boolean;
+          }>('permissions')
+        : { accessibility: false, captureSupported: false };
     const diagnostics =
-      platform === 'darwin'
+      platform === 'darwin' || platform === 'win32'
         ? await nativeWindows.request<{ applications: { bundleId: string }[] }>(
             'diagnostics'
           )
         : { applications: [] };
+    const defaultScreenStatus =
+      platform === 'win32' &&
+      nativePermissions.captureSupported &&
+      windowsCaptureEnabled
+        ? 'granted'
+        : 'unsupported';
     return {
       screen:
         platform === 'darwin'
           ? systemPreferences.getMediaAccessStatus('screen')
-          : 'unsupported',
+          : defaultScreenStatus,
       accessibility:
-        platform === 'darwin' &&
-        systemPreferences.isTrustedAccessibilityClient(false) &&
-        nativePermissions.accessibility,
+        nativePermissions.accessibility &&
+        (platform === 'win32' ||
+          (platform === 'darwin' &&
+            systemPreferences.isTrustedAccessibilityClient(false))),
+      platform,
       appName: app.getName(),
       packaged: app.isPackaged,
       targetApps: diagnostics.applications.map(

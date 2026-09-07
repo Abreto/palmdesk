@@ -16,7 +16,11 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
     fs.mkdirSync(bundle);
     fs.mkdirSync(duplicate, { recursive: true });
     const alias = path.join(root, 'alias.app');
-    fs.symlinkSync(bundle, alias);
+    fs.symlinkSync(
+      bundle,
+      alias,
+      process.platform === 'win32' ? 'junction' : 'dir'
+    );
     const identity = {
       bundleId: 'io.github.abreto.palmdesk',
       bundlePath: bundle,
@@ -94,6 +98,7 @@ test('startup validates identity before singleton handoff or loading the permiss
         },
       },
       './native-window': {
+        nativeHelperPath: () => '/unused-native-helper',
         NativeWindowBridge: class {
           async request(command) {
             calls.push(command);

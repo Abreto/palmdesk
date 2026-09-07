@@ -1,4 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import path from 'node:path';
 import { createInterface } from 'node:readline';
 
 import type { ICaptureBounds, ICaptureSource } from '../src/pure-interface';
@@ -17,6 +18,33 @@ type WindowIdentity = Pick<NativeWindow, 'nativeId' | 'ownerPid' | 'bundleId'>;
 type WindowThumbnail = WindowIdentity & { thumbnail: string };
 
 export const TARGET_BUNDLES = new Set(['com.openai.codex', 'com.openai.chat']);
+
+export function enableWindowsCapture(commandLine: Electron.CommandLine) {
+  const feature = 'AllowWgcWindowCapturer';
+  const disabled = commandLine.getSwitchValue('disable-features').split(',');
+  if (disabled.some((value) => value.split(/[<:]/)[0].trim() === feature))
+    return false;
+  const enabled = commandLine
+    .getSwitchValue('enable-features')
+    .split(',')
+    .filter(Boolean);
+  if (!enabled.some((value) => value.split(/[<:]/)[0].trim() === feature))
+    enabled.push(feature);
+  commandLine.appendSwitch('enable-features', enabled.join(','));
+  return true;
+}
+
+export function nativeHelperPath(
+  platform: NodeJS.Platform,
+  mainDirectory: string,
+  resourcesDirectory?: string
+) {
+  const windows = platform === 'win32';
+  const directory = resourcesDirectory
+    ? path.join(resourcesDirectory, windows ? 'native' : '../MacOS')
+    : path.join(mainDirectory, '../native-bin');
+  return path.join(directory, windows ? 'palmdesk-window.exe' : 'codex-window');
+}
 
 export class NativeWindowError extends Error {
   constructor(
@@ -52,7 +80,9 @@ export function matchCaptureSources(
           : '',
       appIcon:
         source?.appIcon?.resize({ width: 32, height: 32 }).toDataURL() || '',
-      isCodex: TARGET_BUNDLES.has(owner.bundleId),
+      isCodex:
+        TARGET_BUNDLES.has(owner.bundleId) ||
+        /^win32:.*[\\/](codex|chatgpt)\.exe#[a-f0-9]+$/i.test(owner.bundleId),
       boundsSource: 'window' as const,
       inputScale: 1,
     };
@@ -72,7 +102,10 @@ export class NativeWindowBridge {
     }
   >();
 
-  constructor(private executable: string) {}
+  constructor(
+    private executable: string,
+    private platform: NodeJS.Platform = process.platform
+  ) {}
 
   async addThumbnails(sources: ICaptureSource[]): Promise<ICaptureSource[]> {
     const missing = sources.filter((source) => !source.thumbnail);
@@ -109,16 +142,20 @@ export class NativeWindowBridge {
 
   request<T>(
     command: string,
-    target?: Partial<NativeWindow> & { windows?: WindowIdentity[] }
+    target?: Partial<NativeWindow> & {
+      windows?: WindowIdentity[];
+      text?: string;
+    }
   ): Promise<T> {
-    if (process.platform !== 'darwin') {
+    if (this.platform !== 'darwin' && this.platform !== 'win32') {
       return Promise.reject(
-        new Error('当前单窗口控制支持 macOS；此平台尚无应用身份验证适配器')
+        new Error('当前单窗口控制支持 macOS 和 Windows；此平台尚无原生适配器')
       );
     }
     if (!this.child) {
       const child = spawn(this.executable, [], {
         stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
       });
       this.child = child;
       const lines = createInterface({ input: child.stdout });
@@ -153,7 +190,7 @@ export class NativeWindowBridge {
     return new Promise<T>((resolve, reject) => {
       this.sequence += 1;
       const requestId = this.sequence;
-      // Lists can queue behind AX activation and its Space transition in the helper.
+      // Lists can queue behind native activation and desktop transitions.
       const timer = setTimeout(() => this.close(), 12000);
       this.pending.set(requestId, { resolve, reject, timer });
       this.child!.stdin.write(
