@@ -349,6 +349,34 @@ try {
     );
     await phone.getByLabel('发送文字', { exact: true }).waitFor();
   }
+  async function exerciseTurnRenewal() {
+    const unauthorized = await phone.evaluate(async () => (await fetch('/api/webrtc/ice-servers', { method: 'POST' })).status);
+    assert.equal(unauthorized, 401);
+    const before = await host.evaluate(async () => {
+      const { useNetworkStore } = await import('/src/store/network/index.ts');
+      const rtc = [...useNetworkStore().rtcMap.values()][0];
+      return { expiresAt: rtc.remoteConnection.session.config.expiresAt,
+        sdp: rtc.peerConnection.localDescription.sdp };
+    });
+    const expire = await fetch('http://127.0.0.1:4300/__smoke/expire-ice', { method: 'POST' });
+    assert.equal(expire.status, 200);
+    await host.evaluate(async () => {
+      const { useNetworkStore } = await import('/src/store/network/index.ts');
+      const rtc = [...useNetworkStore().rtcMap.values()][0];
+      rtc.remoteConnection.session.config.refreshAfter = 0;
+      await rtc.remoteConnection.offer(true);
+    });
+    await host.waitForFunction(async (old) => {
+      const { useNetworkStore } = await import('/src/store/network/index.ts');
+      const rtc = [...useNetworkStore().rtcMap.values()][0];
+      return rtc?.peerConnection.signalingState === 'stable' &&
+        rtc.peerConnection.iceConnectionState === 'connected' &&
+        rtc.remoteConnection.session.config.expiresAt > old.expiresAt &&
+        rtc.peerConnection.localDescription.sdp !== old.sdp;
+    }, before);
+    await waitForVideo();
+    pass('session-authenticated credential renewal and ICE restart preserve real video and DataChannels');
+  }
   if (process.env.SMOKE_QR === 'true') {
     await exerciseQrConnection({ host, phone, device, base, artifacts, pass });
     await host.evaluate(() => {
@@ -453,6 +481,7 @@ try {
   pass(
     `real business WebRTC video decoded (${decoded.width}x${decoded.height})`
   );
+  if (process.env.SMOKE_TURN === 'true') await exerciseTurnRenewal();
 
   await phone.getByLabel('发送到电脑的文字').fill('你好 Codex\n通过手机发送');
   assert.equal(

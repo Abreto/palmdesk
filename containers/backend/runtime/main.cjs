@@ -2,6 +2,8 @@ const http = require('node:http');
 const { readConfig } = require('./config.cjs');
 const { initializeDatabase } = require('./init.cjs');
 const { cors, errors, engineCors, deskPackets } = require('./http.cjs');
+const { createDeskSessions } = require('./desk-sessions.cjs');
+const { createTurnService, iceRoute } = require('./turn.cjs');
 
 async function main() {
   const mode = process.argv[2];
@@ -28,7 +30,12 @@ async function main() {
   const Koa = require('koa');
   const bodyParser = require('koa-bodyparser');
   const deskRouter = require('../dist/router/deskUser.router').default;
-  const { connectWebSocket, wsSocket } = require('../dist/config/websocket');
+  const { Server } = require('socket.io');
+  const users = require('../dist/service/deskUser.service').default;
+  const { REDIS_PREFIX: prefixes } = require('../dist/constant');
+  const io = new Server({ maxHttpBufferSize: 1024 * 1024 });
+  const sessions = createDeskSessions({ io, redis: redisClient, users, prefixes, ttl: config.turn.ttl });
+  const turn = createTurnService({ config: config.turn, redis: redisClient });
   const app = new Koa();
   app.proxy = true;
   app.use(errors);
@@ -39,6 +46,7 @@ async function main() {
     ctx.body = { status: 'ok' };
   });
   app.use(bodyParser({ enableTypes: ['json'], jsonLimit: '64kb' }));
+  app.use(iceRoute({ sessions, turn, redis: redisClient }));
   app.use(deskRouter.routes());
   app.use(deskRouter.allowedMethods());
   app.use(async (ctx) => {
@@ -48,10 +56,11 @@ async function main() {
     }
   });
   const server = http.createServer(app.callback());
-  connectWebSocket(server);
-  wsSocket.io.engine.use(engineCors(config));
-  wsSocket.io.use(deskPackets);
-  wsSocket.io.of('/live').use((_socket, next) => next(new Error('Namespace disabled')));
+  io.attach(server);
+  io.engine.use(engineCors(config));
+  io.use(deskPackets);
+  io.on('connection', sessions.attach);
+  io.of('/live').use((_socket, next) => next(new Error('Namespace disabled')));
 
   let stopping = false;
   async function shutdown() {
@@ -59,7 +68,7 @@ async function main() {
     stopping = true;
     const timeout = setTimeout(() => process.exit(1), 15000);
     timeout.unref();
-    await new Promise((resolve) => wsSocket.io.close(resolve));
+    await new Promise((resolve) => io.close(resolve));
     await Promise.all([redisClient.quit(), sequelize.close()]);
     clearTimeout(timeout);
   }

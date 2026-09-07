@@ -2,6 +2,7 @@ export * from '@/pure-constant';
 import { Key } from '@nut-tree-fork/shared';
 
 import type { BilldHtmlWebpackPluginLog } from '@/interface';
+import { serviceDefaults } from '@/utils/service-defaults';
 
 export const PROJECT_GITHUB = 'https://github.com/Abreto/palmdesk';
 export const UPSTREAM_GITHUB = 'https://github.com/galaxy-s10/billd-desk';
@@ -50,11 +51,15 @@ export const COTURN_URL = import.meta.env.VITE_TURN_URL || '';
 
 export const WEBSOCKET_URL =
   import.meta.env.VITE_SIGNALING_URL ||
-  (location.protocol === 'file:' ? 'http://127.0.0.1:4300' : location.origin);
+  serviceDefaults(location.protocol, location.origin).signaling;
 
 export const AXIOS_BASEURL =
   import.meta.env.VITE_API_BASE_URL ||
-  (location.protocol === 'file:' ? 'http://127.0.0.1:4300' : '/api');
+  serviceDefaults(location.protocol, location.origin).api;
+
+export const CLIENT_BASE_URL =
+  import.meta.env.VITE_CLIENT_BASE_URL ||
+  serviceDefaults(location.protocol, location.origin).client;
 
 // ======线上正式=====
 

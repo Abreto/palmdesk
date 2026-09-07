@@ -5,6 +5,7 @@ import {
 } from '@/interface';
 import { ILiveRoom, LiveRoomTypeEnum } from '@/types/ILiveRoom';
 import { IUser } from '@/types/IUser';
+import type { RemoteSessionAccess } from '@/utils/network/remote-session';
 
 /** websocket连接状态 */
 export enum WsConnectStatusEnum {
@@ -70,6 +71,7 @@ export enum WsMsgTypeEnum {
   nativeWebRtcOffer = 'nativeWebRtcOffer',
   nativeWebRtcAnswer = 'nativeWebRtcAnswer',
   nativeWebRtcCandidate = 'nativeWebRtcCandidate',
+  nativeWebRtcRestart = 'nativeWebRtcRestart',
 
   msrBlob = 'msrBlob',
   batchSendOffer = 'batchSendOffer',
@@ -86,6 +88,9 @@ export enum WsMsgTypeEnum {
   billdDeskUpdateUser = 'billdDeskUpdateUser',
   billdDeskStartRemote = 'billdDeskStartRemote',
   billdDeskStartRemoteResult = 'billdDeskStartRemoteResult',
+  billdDeskEndRemote = 'billdDeskEndRemote',
+  billdDeskSessionEnded = 'billdDeskSessionEnded',
+  billdDeskSessionError = 'billdDeskSessionError',
   billdDeskBehavior = 'billdDeskBehavior',
   remoteWindowsRequest = 'remoteWindowsRequest',
   remoteWindowsResult = 'remoteWindowsResult',
@@ -299,6 +304,8 @@ export type WsMsrBlobType = IWsFormat<{
 }>;
 
 export type WsOfferType = IReqWsFormat<{
+  sessionId?: string;
+  iceRestart?: boolean;
   live_room: ILiveRoom;
   sdp: any;
   sender: string;
@@ -308,6 +315,7 @@ export type WsOfferType = IReqWsFormat<{
 }>;
 
 export type WsAnswerType = IReqWsFormat<{
+  sessionId?: string;
   sdp: any;
   sender: string;
   receiver: string;
@@ -315,6 +323,7 @@ export type WsAnswerType = IReqWsFormat<{
 }>;
 
 export type WsCandidateType = IReqWsFormat<{
+  sessionId?: string;
   live_room_id: number | string;
   candidate: RTCIceCandidate;
   receiver: string;
@@ -386,6 +395,7 @@ export type WsBilldDeskJoinedType = IResWsFormat<{
 }>;
 
 export type WsBilldDeskStartRemoteResult = IResWsFormat<{
+  session?: RemoteSessionAccess;
   code: number;
   msg: string;
   data?: WsBilldDeskStartRemote['data'];

@@ -38,7 +38,7 @@ pnpm dev:desktop
 
 Windows PowerShell 将复制环境文件的命令替换为 `Copy-Item .env.example .env.local`。首次运行会编译 `native-bin/palmdesk-window.exe`，随后启动 Electron。使用 `pnpm dev:desktop:lan` 可开放开发网页供局域网手机访问。Windows 运行和测试说明见 [Windows 桌面](docs/LOCAL_DEVELOPMENT.md#windows-桌面)。
 
-**服务端需单独部署。** 两端必须连接同一个 [BilldDesk API / Socket.IO 后端](https://github.com/galaxy-s10/billd-desk-server)，本仓库不包含后端和数据库，也不提供公共连接服务。部署顺序和浏览器测试方法见 [开发环境](docs/LOCAL_DEVELOPMENT.md)，地址、HTTPS 和 TURN 配置见 [服务配置](docs/SERVICE_CONFIGURATION.md)。
+打包后的桌面客户端默认连接 `https://palmdesk.abreto.icu`，手机邀请网页也使用该地址。网页构建默认同源，开发模式使用本地后端代理，两端必须连接同一个服务。自部署可使用本仓库的 [容器适配层](containers/README.md)，它基于固定 BilldDesk 后端快照提供会话认证和 Cloudflare/coturn 临时凭据，需要 MySQL 和 Redis。部署顺序和浏览器测试方法见 [开发环境](docs/LOCAL_DEVELOPMENT.md)，地址、HTTPS 和 TURN 配置见 [服务配置](docs/SERVICE_CONFIGURATION.md)。
 
 macOS 开发脚本编译 Swift 窗口辅助程序，并创建、本地签名独立的 Electron 应用：
 

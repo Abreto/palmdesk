@@ -8,6 +8,8 @@ import {
   WsMsgTypeEnum,
 } from '@/types/websocket';
 
+import { clearRemoteSessions } from './remote-session';
+
 export function prettierReceiveWsMsg(...arg) {
   console.warn('【websocket】收到消息', ...arg);
 }
@@ -92,6 +94,7 @@ export class WebSocketClass {
   // 手动关闭websocket连接
   close = () => {
     console.warn('手动关闭websocket连接', this.socketIo?.id);
+    if (this.socketIo?.id) clearRemoteSessions(this.socketIo.id);
     this.socketIo?.close();
   };
 }

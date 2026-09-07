@@ -23,7 +23,7 @@
         <dt>信令地址</dt>
         <dd>{{ getWssUrl() || WEBSOCKET_URL }}</dd>
         <dt>中继地址</dt>
-        <dd>{{ getCoturnUrl() || COTURN_URL || '未配置' }}</dd>
+        <dd>{{ getCoturnUrl() || COTURN_URL || '自动' }}</dd>
       </dl>
     </section>
     <section v-if="ipcRenderer">

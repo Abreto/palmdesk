@@ -1086,7 +1086,7 @@ function handleWsMsg() {
   ws?.socketIo?.on(
     WsMsgTypeEnum.billdDeskStartRemoteResult,
     (data: WsBilldDeskStartRemoteResult['data']) => {
-      console.log('收到billdDeskStartRemoteResult', data);
+      console.log('收到billdDeskStartRemoteResult', data.code);
       if (data.code !== 0) {
         useTip({
           content: data.msg,
@@ -1202,7 +1202,7 @@ async function handleRTC(receiver) {
       roomId: roomId.value,
       anchorStream: undefined,
     });
-    rtc.value = webRtcRemoteDesk.newWebRtc({
+    rtc.value = await webRtcRemoteDesk.newWebRtc({
       // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
       // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
       sender: mySocketId.value,

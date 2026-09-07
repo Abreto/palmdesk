@@ -7,6 +7,9 @@ import { WsCandidateType, WsMsgTypeEnum } from '@/types/websocket';
 
 import { getIceServers } from './iceServers';
 
+import type { RemoteConnection } from './remote-connection';
+import type { Raw } from 'vue';
+
 export class WebRTCClass {
   roomId = '';
   sender = '';
@@ -20,7 +23,10 @@ export class WebRTCClass {
   dataChannel: RTCDataChannel | null = null;
   cbDataChannel: RTCDataChannel | null = null;
   pendingCandidates: RTCIceCandidateInit[] = [];
+  awaitingRemoteDescription = false;
   closed = false;
+  iceServers?: RTCIceServer[];
+  remoteConnection?: Raw<RemoteConnection>;
 
   /** 最大码率 */
   maxBitrate = -1;
@@ -51,6 +57,7 @@ export class WebRTCClass {
     deskUserUuid?: string;
     remoteDeskUserUuid?: string;
     localStream?: MediaStream;
+    iceServers?: RTCIceServer[];
   }) {
     this.roomId = data.roomId;
     this.videoEl = data.videoEl;
@@ -60,6 +67,7 @@ export class WebRTCClass {
     this.deskUserUuid = data.deskUserUuid || '';
     this.remoteDeskUserUuid = data.remoteDeskUserUuid || '';
     this.localStream = data.localStream;
+    this.iceServers = data.iceServers;
     if (data.maxBitrate) {
       this.maxBitrate = data.maxBitrate;
     }
@@ -70,7 +78,10 @@ export class WebRTCClass {
       this.maxFramerate = data.maxFramerate;
     }
     this.isSRS = data.isSRS;
-    console.warn('new webrtc参数:', data);
+    console.warn('new webrtc:', {
+      sender: this.sender,
+      receiver: this.receiver,
+    });
     this.createPeerConnection();
   }
 
@@ -206,7 +217,10 @@ export class WebRTCClass {
 
   /** 处理candidate */
   addIceCandidate = async (candidate: RTCIceCandidateInit) => {
-    if (!this.peerConnection?.remoteDescription) {
+    if (
+      this.awaitingRemoteDescription ||
+      !this.peerConnection?.remoteDescription
+    ) {
       if (!this.closed && this.pendingCandidates.length < 256)
         this.pendingCandidates.push(candidate);
       return;
@@ -379,6 +393,7 @@ export class WebRTCClass {
             sender: this.sender,
             receiver: this.receiver,
             live_room_id: this.roomId,
+            sessionId: this.remoteConnection?.session.access.id,
           },
         });
       } else {
@@ -400,6 +415,7 @@ export class WebRTCClass {
         // https://developer.mozilla.org/zh-CN/docs/Web/API/RTCPeerConnection/connectionState
         const iceConnectionState = event.currentTarget.iceConnectionState;
         if (iceConnectionState === 'connected') {
+          this.remoteConnection?.connected();
           // ICE 代理至少对每个候选发现了一个可用的连接，此时仍然会继续测试远程候选以便发现更优的连接。同时可能在继续收集候选。
           this.prettierLog({
             msg: 'iceConnectionState:connected',
@@ -413,6 +429,7 @@ export class WebRTCClass {
           this.update();
         }
         if (iceConnectionState === 'completed') {
+          this.remoteConnection?.connected();
           // ICE 代理已经发现了可用的连接，不再测试远程候选。
           this.prettierLog({
             msg: 'iceConnectionState:completed',
@@ -425,7 +442,8 @@ export class WebRTCClass {
             msg: 'iceConnectionState:failed',
             type: 'error',
           });
-          this.close();
+          if (this.remoteConnection) this.remoteConnection.recover(true);
+          else this.close();
         }
         if (iceConnectionState === 'disconnected') {
           // 测试不再活跃，这可能是一个暂时的状态，可以自我恢复。
@@ -433,7 +451,8 @@ export class WebRTCClass {
             msg: 'iceConnectionState:disconnected',
             type: 'error',
           });
-          this.close();
+          if (this.remoteConnection) this.remoteConnection.recover();
+          else this.close();
         }
         if (iceConnectionState === 'closed') {
           // ICE 代理关闭，不再应答任何请求。
@@ -458,6 +477,7 @@ export class WebRTCClass {
           type: 'warn',
         });
         if (connectionState === 'connected') {
+          this.remoteConnection?.connected();
           // 表示每一个 ICE 连接要么正在使用（connected 或 completed 状态），要么已被关闭（closed 状态）；并且，至少有一个连接处于 connected 或 completed 状态。
           this.prettierLog({
             msg: 'connectionState:connected',
@@ -476,7 +496,8 @@ export class WebRTCClass {
             msg: 'connectionState:disconnected',
             type: 'error',
           });
-          this.close();
+          if (this.remoteConnection) this.remoteConnection.recover();
+          else this.close();
         }
         if (connectionState === 'closed') {
           // 表示 RTCPeerConnection 已关闭。
@@ -491,7 +512,8 @@ export class WebRTCClass {
             msg: 'connectionState:failed',
             type: 'error',
           });
-          this.close();
+          if (this.remoteConnection) this.remoteConnection.recover(true);
+          else this.close();
         }
       }
     );
@@ -501,6 +523,7 @@ export class WebRTCClass {
       type: 'warn',
     });
     this.peerConnection.addEventListener('negotiationneeded', () => {
+      if (this.remoteConnection) void this.remoteConnection.offer();
       this.prettierLog({
         msg: 'pc收到negotiationneeded',
         type: 'warn',
@@ -549,7 +572,7 @@ export class WebRTCClass {
       return;
     }
     if (!this.peerConnection) {
-      const iceServers = this.isSRS ? [] : getIceServers();
+      const iceServers = this.isSRS ? [] : (this.iceServers ?? getIceServers());
       this.peerConnection = new RTCPeerConnection({
         iceServers,
       });
@@ -592,6 +615,7 @@ export class WebRTCClass {
   close = () => {
     if (this.closed) return;
     this.closed = true;
+    this.remoteConnection?.close();
     clearInterval(this.loopGetStatsTimer);
     this.pendingCandidates = [];
     try {

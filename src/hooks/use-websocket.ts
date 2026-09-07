@@ -31,6 +31,7 @@ import {
   WsAnswerType,
   WsBilldDeskBehaviorType,
   WsBilldDeskJoinType,
+  WsBilldDeskStartRemoteResult,
   WsCandidateType,
   WsConnectStatusEnum,
   WsDisableSpeakingType,
@@ -47,6 +48,12 @@ import {
 } from '@/types/websocket';
 import { createNullVideo, handleUserMedia } from '@/utils';
 import { getWssUrl } from '@/utils/localStorage/app';
+import {
+  clearRemoteSessions,
+  getRemoteSession,
+  registerRemoteSession,
+  removeRemoteSession,
+} from '@/utils/network/remote-session';
 import {
   WebSocketClass,
   prettierReceiveWsMsg,
@@ -258,8 +265,48 @@ export const useWebsocket = () => {
   function initReceive() {
     const ws = networkStore.wsMap.get(roomId.value);
     if (!ws?.socketIo) return;
+    let connectedSocketId = '';
+    ws.socketIo.on(
+      WsMsgTypeEnum.billdDeskStartRemoteResult,
+      (result: WsBilldDeskStartRemoteResult['data']) => {
+        const access = result.session;
+        if (result.code !== 0 || !access || access.socketId !== ws.socketIo?.id)
+          return;
+        const previous = networkStore.rtcMap.get(access.peerId);
+        if (
+          previous &&
+          previous.remoteConnection?.session.access.id !== access.id
+        )
+          previous.close();
+        registerRemoteSession(access);
+      }
+    );
+    ws.socketIo.on(
+      WsMsgTypeEnum.billdDeskSessionEnded,
+      (data: { sessionId: string; peerId: string }) => {
+        const session = getRemoteSession(connectedSocketId, data.peerId);
+        if (session?.access.id !== data.sessionId) return;
+        networkStore.removeRtc(data.peerId);
+        removeRemoteSession(connectedSocketId, data.peerId, data.sessionId);
+      }
+    );
+    ws.socketIo.on(WsMsgTypeEnum.billdDeskSessionError, () => {
+      window.$message?.error('远控会话认证失败，请重新连接');
+    });
+    ws.socketIo.on(
+      WsMsgTypeEnum.nativeWebRtcRestart,
+      (data: { sender: string; receiver: string; sessionId: string }) => {
+        const rtc = networkStore.rtcMap.get(data.sender);
+        if (
+          data.receiver === connectedSocketId &&
+          rtc?.remoteConnection?.session.access.id === data.sessionId
+        )
+          void rtc.remoteConnection.offer(true);
+      }
+    );
     // websocket连接成功
     ws.socketIo.on(WsConnectStatusEnum.connect, () => {
+      connectedSocketId = ws.socketIo?.id || '';
       prettierReceiveWsMsg(WsConnectStatusEnum.connect, ws.socketIo);
       handleHeartbeat();
       if (!ws) return;
@@ -271,6 +318,10 @@ export const useWebsocket = () => {
 
     // websocket连接断开
     ws.socketIo.on(WsConnectStatusEnum.disconnect, (err) => {
+      clearRemoteSessions(connectedSocketId);
+      networkStore.rtcMap.forEach((rtc) => {
+        if (rtc.sender === connectedSocketId) rtc.close();
+      });
       prettierReceiveWsMsg(WsConnectStatusEnum.disconnect, ws);
       console.error('websocket连接断开', err);
       if (!ws) return;
@@ -346,28 +397,35 @@ export const useWebsocket = () => {
         console.log('收到nativeWebRtcOffer', data);
         if (data.isRemoteDesk) {
           if (data.receiver === mySocketId.value) {
-            console.warn('是发给我的nativeWebRtcOffer-isRemoteDesk');
-            updateWebRtcRemoteDeskConfig({
-              roomId: roomId.value,
-              userStream: userStream.value,
-              anchorStream: canvasVideoStream.value,
-            });
-            if (!networkStore.rtcMap.has(data.sender))
-              webRtcRemoteDesk.newWebRtc({
-                // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
-                // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
-                sender: mySocketId.value,
-                receiver: data.sender,
-                videoEl: createNullVideo(),
-                deskUserUuid: deskUserUuid.value,
-                remoteDeskUserUuid: remoteDeskUserUuid.value,
+            const session = getRemoteSession(mySocketId.value, data.sender);
+            if (data.sessionId && session?.access.id !== data.sessionId) return;
+            try {
+              console.warn('是发给我的nativeWebRtcOffer-isRemoteDesk');
+              updateWebRtcRemoteDeskConfig({
+                roomId: roomId.value,
+                userStream: userStream.value,
+                anchorStream: canvasVideoStream.value,
               });
-            await webRtcRemoteDesk.sendAnswer({
-              sender: mySocketId.value,
-              // data.data.receiver是接收者；我们现在new pc，发送者是自己，接收者肯定是房主，不能是data.data.receiver，因为data.data.receiver是自己
-              receiver: data.sender,
-              sdp: data.sdp,
-            });
+              if (!networkStore.rtcMap.has(data.sender))
+                await webRtcRemoteDesk.newWebRtc({
+                  // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
+                  // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
+                  sender: mySocketId.value,
+                  receiver: data.sender,
+                  videoEl: createNullVideo(),
+                  deskUserUuid: deskUserUuid.value,
+                  remoteDeskUserUuid: remoteDeskUserUuid.value,
+                });
+              await webRtcRemoteDesk.sendAnswer({
+                sender: mySocketId.value,
+                // data.data.receiver是接收者；我们现在new pc，发送者是自己，接收者肯定是房主，不能是data.data.receiver，因为data.data.receiver是自己
+                receiver: data.sender,
+                sdp: data.sdp,
+                iceRestart: data.iceRestart,
+              });
+            } catch {
+              window.$message?.error('远程连接已结束，请重新连接');
+            }
           } else {
             console.error('不是发给我的nativeWebRtcOffer-isRemoteDesk');
           }
@@ -503,7 +561,10 @@ export const useWebsocket = () => {
           console.warn('是发给我的nativeWebRtcAnswer');
           const rtc = networkStore.rtcMap.get(data.sender);
           if (rtc) {
-            await rtc.setRemoteDescription(data.sdp);
+            if (rtc.remoteConnection) {
+              if (rtc.remoteConnection.session.access.id === data.sessionId)
+                await rtc.remoteConnection.acceptAnswer(data.sdp);
+            } else await rtc.setRemoteDescription(data.sdp);
           }
         } else {
           console.error('不是发给我的nativeWebRtcAnswer');
@@ -518,8 +579,16 @@ export const useWebsocket = () => {
         console.log('收到nativeWebRtcCandidate', data);
         if (data.receiver === mySocketId.value) {
           console.warn('是发给我的nativeWebRtcCandidate');
+          const session = getRemoteSession(mySocketId.value, data.sender);
+          if (data.sessionId && session?.access.id !== data.sessionId) return;
           const rtc = networkStore.rtcMap.get(data.sender);
-          rtc?.addIceCandidate(data.candidate);
+          if (rtc) void rtc.addIceCandidate(data.candidate);
+          else if (
+            session &&
+            !session.closed &&
+            session.candidates.length < 256
+          )
+            session.candidates.push(data.candidate);
         } else {
           console.error('不是发给我的nativeWebRtcCandidate');
         }

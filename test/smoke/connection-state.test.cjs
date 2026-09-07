@@ -3,7 +3,7 @@ const { test } = require('node:test');
 const { computed, markRaw, reactive } = require('vue');
 const loadSource = require('./load-source.cjs');
 
-test('controller becomes connected when the native connection event follows DataChannel open', (t) => {
+test('controller becomes connected when the native connection event follows DataChannel open', async (t) => {
   const network = { rtcMap: reactive(new Map()) };
   const app = { setLiveLine() {}, remoteDesk: new Map() };
   class Connection extends EventTarget {
@@ -53,6 +53,11 @@ test('controller becomes connected when the native connection event follows Data
   rtc.peerConnection.connectionState = 'connected';
   rtc.peerConnection.dispatchEvent(new Event('connectionstatechange'));
   assert.equal(connected.value, true);
+  rtc.peerConnection.remoteDescription = { type: 'answer', sdp: 'previous-generation' };
+  rtc.peerConnection.addIceCandidate = () => assert.fail('must queue while a new remote description is pending');
+  rtc.awaitingRemoteDescription = true;
+  await rtc.addIceCandidate({ candidate: 'new-generation-candidate' });
+  assert.equal(rtc.pendingCandidates.length, 1);
   const native = rtc.peerConnection;
   rtc.close();
   native.dispatchEvent(new Event('connectionstatechange'));

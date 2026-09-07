@@ -1,20 +1,23 @@
 import { getRandomString } from 'billd-utils';
-import { ref } from 'vue';
+import { markRaw, ref } from 'vue';
 
-import { useRTCParams } from '@/hooks/use-rtcParams';
 import { useAppStore } from '@/store/app';
 import { useNetworkStore } from '@/store/network';
 import { WsAnswerType, WsMsgTypeEnum, WsOfferType } from '@/types/websocket';
+import { getIceServers } from '@/utils/network/iceServers';
+import {
+  DIRECT_ICE_SERVERS,
+  RemoteConnection,
+} from '@/utils/network/remote-connection';
+import { getRemoteSession } from '@/utils/network/remote-session';
 import { WebRTCClass } from '@/utils/network/webRTC';
+
+const creating = new Map<string, Promise<WebRTCClass>>();
 
 export const useWebRtcRemoteDesk = () => {
   const appStore = useAppStore();
   const networkStore = useNetworkStore();
 
-  const { maxBitrate, maxFramerate, resolutionRatio } = useRTCParams();
-  const currentMaxBitrate = ref(maxBitrate.value[3].value);
-  const currentMaxFramerate = ref(maxFramerate.value[2].value);
-  const currentResolutionRatio = ref(resolutionRatio.value[3].value);
   const roomId = ref('');
   const anchorStream = ref<MediaStream>();
   const userStream = ref<MediaStream>();
@@ -30,30 +33,86 @@ export const useWebRtcRemoteDesk = () => {
   }
 
   const webRtcRemoteDesk = {
-    newWebRtc: (data: {
+    newWebRtc: async (data: {
       sender: string;
       receiver: string;
       videoEl: HTMLVideoElement;
       deskUserUuid: string;
       remoteDeskUserUuid: string;
     }) => {
-      console.log({
-        maxBitrate: currentMaxBitrate.value,
-        maxFramerate: currentMaxFramerate.value,
-        resolutionRatio: currentResolutionRatio.value,
-      });
-      return new WebRTCClass({
-        // maxBitrate: currentMaxBitrate.value,
-        // maxFramerate: currentMaxFramerate.value,
-        // resolutionRatio: currentResolutionRatio.value,
-        isSRS: false,
-        roomId: roomId.value,
-        videoEl: data.videoEl,
-        sender: data.sender,
-        receiver: data.receiver,
-        deskUserUuid: data.deskUserUuid,
-        remoteDeskUserUuid: data.remoteDeskUserUuid,
-      });
+      const existing = networkStore.rtcMap.get(data.receiver);
+      if (existing && !existing.closed) return existing;
+      const key = `${data.sender}:${data.receiver}`;
+      const pending = creating.get(key);
+      if (pending) return pending;
+      const ws = networkStore.wsMap.get(roomId.value);
+      const session = getRemoteSession(data.sender, data.receiver);
+      const report = (message: string) => window.$message?.warning(message);
+      const job = (async () => {
+        const manualServers = getIceServers();
+        let iceServers = manualServers;
+        if (session && !manualServers.length) {
+          try {
+            iceServers = (await session.getConfig()).iceServers;
+            if (
+              !iceServers.some((server) =>
+                (Array.isArray(server.urls) ? server.urls : [server.urls]).some(
+                  (url) => url.startsWith('turn')
+                )
+              )
+            )
+              report('当前服务未配置中继，正在尝试直连');
+          } catch {
+            iceServers = DIRECT_ICE_SERVERS;
+            if (!session.closed) report('中继服务暂不可用，正在尝试直连');
+          }
+        }
+        if (
+          session?.closed ||
+          !ws?.socketIo?.connected ||
+          ws.socketIo.id !== data.sender
+        )
+          throw new Error('连接已结束');
+        const rtc = new WebRTCClass({
+          ...data,
+          isSRS: false,
+          roomId: roomId.value,
+          iceServers,
+        });
+        if (session) {
+          rtc.pendingCandidates.push(...session.candidates.splice(0));
+          rtc.remoteConnection = markRaw(
+            new RemoteConnection(
+              rtc,
+              session,
+              (msgType, payload) => {
+                ws.send({
+                  requestId: getRandomString(8),
+                  msgType,
+                  data: {
+                    ...payload,
+                    sender: data.sender,
+                    receiver: data.receiver,
+                    live_room_id: rtc.roomId,
+                    sessionId: session.access.id,
+                    isRemoteDesk: true,
+                  },
+                });
+              },
+              report,
+              manualServers
+            )
+          );
+          rtc.update();
+        }
+        return rtc;
+      })();
+      creating.set(key, job);
+      try {
+        return await job;
+      } finally {
+        creating.delete(key);
+      }
     },
     /**
      * 主播发offer给观众
@@ -74,6 +133,18 @@ export const useWebRtcRemoteDesk = () => {
         if (!ws) return;
         const rtc = networkStore.rtcMap.get(receiver);
         if (rtc) {
+          if (rtc.remoteConnection) {
+            const pc = rtc.peerConnection!;
+            const existingTracks = new Set(
+              pc.getSenders().map((item) => item.track)
+            );
+            anchorStream.value?.getTracks().forEach((track) => {
+              if (!existingTracks.has(track))
+                pc.addTrack(track, anchorStream.value!);
+            });
+            await rtc.remoteConnection.offer();
+            return;
+          }
           anchorStream.value?.getTracks().forEach((track) => {
             if (anchorStream.value) {
               console.log('remoteDesk的sendOffer插入track', track.kind, track);
@@ -113,10 +184,12 @@ export const useWebRtcRemoteDesk = () => {
       sdp,
       sender,
       receiver,
+      iceRestart = false,
     }: {
       sdp: RTCSessionDescriptionInit;
       sender: string;
       receiver: string;
+      iceRestart?: boolean;
     }) => {
       console.log('remoteDesk的sendAnswer', {
         sender,
@@ -127,6 +200,10 @@ export const useWebRtcRemoteDesk = () => {
         if (!ws) return;
         const rtc = networkStore.rtcMap.get(receiver);
         if (rtc) {
+          if (rtc.remoteConnection) {
+            await rtc.remoteConnection.answer(sdp, iceRestart);
+            return;
+          }
           await rtc.setRemoteDescription(sdp);
           userStream.value?.getTracks().forEach((track) => {
             if (userStream.value) {

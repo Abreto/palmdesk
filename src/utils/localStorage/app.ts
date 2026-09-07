@@ -1,4 +1,4 @@
-import { LS_KEY } from '@/constant';
+import { CLIENT_BASE_URL, LS_KEY } from '@/constant';
 import cache from '@/utils/cache';
 
 export const getAxiosBaseUrl = () => {
@@ -41,8 +41,6 @@ export const setCoturnCredential = (value: string) =>
   cache.setStorage(LS_KEY.coturnCredential, value);
 
 export const getClientUrl = () =>
-  cache.getStorage<string>(LS_KEY.clientUrl) ||
-  import.meta.env.VITE_CLIENT_BASE_URL ||
-  '';
+  cache.getStorage<string>(LS_KEY.clientUrl) || CLIENT_BASE_URL || '';
 export const setClientUrl = (value: string) =>
   cache.setStorage(LS_KEY.clientUrl, value);

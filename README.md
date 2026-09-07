@@ -32,7 +32,7 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 
 The client requires Node.js 22.16.0 or later and pnpm 11.19.0. macOS desktop development requires Xcode Command Line Tools. Windows hosts require Windows 10 1903 or later / Windows 11 x64 with Windows Graphics Capture available. The helper uses the system .NET Framework 4.x compiler; Visual Studio is not required.
 
-**Deploy the backend separately before connecting devices.** Both clients must use the same [BilldDesk API / Socket.IO backend](https://github.com/galaxy-s10/billd-desk-server). This repository does not include the backend or database and does not provide a public connection service. Follow the [local development guide](docs/LOCAL_DEVELOPMENT.md) for backend setup and deployment order.
+Packaged desktop builds default to `https://palmdesk.abreto.icu`, including the phone invitation homepage. Browser builds use their current origin; development uses the local backend proxy. Both clients must connect to the same service. For self-hosting, the [container adapter](containers/README.md) builds the pinned BilldDesk backend with PalmDesk session authentication and Cloudflare/coturn credential issuance; MySQL and Redis are required. See the [local development guide](docs/LOCAL_DEVELOPMENT.md) and [service configuration](docs/SERVICE_CONFIGURATION.md).
 
 ### Start the Desktop Client
 

@@ -1,3 +1,5 @@
+const { readTurnConfig } = require('./turn.cjs');
+
 function required(env, key) {
   const value = env[key];
   if (typeof value !== 'string' || !value.trim()) throw new Error(`${key} is required`);
@@ -43,6 +45,7 @@ function readConfig(env = process.env) {
     allowElectronOrigin: electron === 'true',
     port: port(env.NODE_APP_RELEASE_PROJECT_PORT, 4300),
     jwtSecret: secret(env, 'JWT_SECRET'),
+    turn: readTurnConfig(env),
     mysql: {
       host: env.MYSQL_HOST || 'mysql',
       port: port(env.MYSQL_PORT, 3306),

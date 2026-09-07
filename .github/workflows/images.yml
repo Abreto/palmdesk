@@ -35,7 +35,7 @@ jobs:
         with:
           node-version: '22'
       - name: Check deployment adapter
-        run: node --test containers/test/deployment.test.mjs
+        run: node --test containers/test/*.test.mjs
       - name: Prepare pinned sources and build context
         run: node containers/prepare.mjs "$RUNNER_TEMP/palmdesk-images"
       - name: Build Linux x86_64 image
