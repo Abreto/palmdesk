@@ -38,6 +38,39 @@ test('explicitly disabled WGC cannot silently fall back to incompatible capture 
   );
 });
 
+test('whitespace around disabled WGC cannot permit fallback capture', () => {
+  const { enableWindowsCapture } = load('electron-main/native-window.ts');
+  for (const disabled of [
+    'Other, AllowWgcWindowCapturer',
+    'AllowWgcWindowCapturer ,Other',
+    'Other,\tAllowWgcWindowCapturer<Trial ',
+  ]) {
+    assert.equal(
+      enableWindowsCapture({
+        getSwitchValue: (key) => (key === 'disable-features' ? disabled : ''),
+        appendSwitch: () => assert.fail('disabled WGC must reject capture'),
+      }),
+      false
+    );
+  }
+});
+
+test('whitespace around enabled WGC preserves its parameters without duplication', () => {
+  const { enableWindowsCapture } = load('electron-main/native-window.ts');
+  const configured = 'Other, AllowWgcWindowCapturer:mode/value ';
+  let enabled = configured;
+  assert.equal(
+    enableWindowsCapture({
+      getSwitchValue: (key) => (key === 'enable-features' ? enabled : ''),
+      appendSwitch: (_key, value) => {
+        enabled = value;
+      },
+    }),
+    true
+  );
+  assert.equal(enabled, configured);
+});
+
 test('helper paths distinguish Windows resources from the macOS executable directory', () => {
   const { nativeHelperPath } = load('electron-main/native-window.ts');
   const main = path.resolve('electron-dist');

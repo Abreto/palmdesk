@@ -86,6 +86,32 @@ func windows() -> [TargetWindow] {
     }
 }
 
+func applicationIdentity() throws -> [String: Any] {
+    guard let parent = NSRunningApplication(processIdentifier: getppid()),
+          let bundleId = parent.bundleIdentifier,
+          let bundleURL = parent.bundleURL,
+          let executableURL = parent.executableURL else { throw WindowError.invalid }
+    let registered: [URL]
+    if #available(macOS 12.0, *) {
+        registered = NSWorkspace.shared.urlsForApplications(withBundleIdentifier: bundleId)
+    } else {
+        registered = LSCopyApplicationURLsForBundleIdentifier(bundleId as CFString, nil)?.takeRetainedValue() as? [URL] ?? []
+    }
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).compactMap { $0.bundleURL }
+    let paths = (registered + running + [bundleURL]).filter {
+        // LaunchServices can retain renamed .app.disabled bundles that Bundle(url:) won't recognize.
+        guard let bytes = try? Data(contentsOf: $0.appendingPathComponent("Contents/Info.plist")),
+              let info = try? PropertyListSerialization.propertyList(from: bytes, format: nil) as? [String: Any] else { return false }
+        return info["CFBundleIdentifier"] as? String == bundleId
+    }.map { $0.resolvingSymlinksInPath().standardizedFileURL.path }
+    return [
+        "bundleId": bundleId,
+        "bundlePath": bundleURL.resolvingSymlinksInPath().path,
+        "executablePath": executableURL.resolvingSymlinksInPath().path,
+        "registeredPaths": Array(Set(paths)).sorted()
+    ]
+}
+
 func attribute(_ element: AXUIElement, _ name: CFString) -> CFTypeRef? {
     var value: CFTypeRef?
     guard AXUIElementCopyAttributeValue(element, name, &value) == .success else { return nil }
@@ -352,6 +378,8 @@ while let line = readLine() {
         requestId = request["requestId"] ?? NSNull()
         let data: Any
         switch command {
+        case "appIdentity":
+            data = try applicationIdentity()
         case "list":
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(listedWindows()))
         case "thumbnails":

@@ -6,6 +6,7 @@ import {
   app,
   BrowserWindow,
   desktopCapturer,
+  dialog,
   ipcMain,
   Menu,
   powerMonitor,
@@ -18,6 +19,7 @@ import {
 import { IPC_EVENT } from '../src/event';
 import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
+import { assertUniqueApplicationIdentity } from './app-identity';
 import { CaptureSession, InputUnavailableError } from './capture-session';
 import {
   NativeWindowBridge,
@@ -27,11 +29,12 @@ import {
   enableWindowsCapture,
 } from './native-window';
 
+import type { ApplicationIdentity } from './app-identity';
 import type { NativeWindow } from './native-window';
 import type { nutjsTs } from './types';
 import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
-const nutjs: nutjsTs = require('@nut-tree-fork/nut-js');
+let nutjs: nutjsTs;
 
 const windowsCaptureEnabled =
   platform !== 'win32' || enableWindowsCapture(app.commandLine);
@@ -69,11 +72,6 @@ const userData = path.join(app.getPath('appData'), appName);
 mkdirSync(userData, { recursive: true });
 app.setPath('userData', userData);
 app.setPath('sessionData', userData);
-
-if (!app.requestSingleInstanceLock()) {
-  app.quit();
-  process.exit(0);
-}
 
 const windowNormalParams = { width: 960, height: 720 };
 let winBounds: Electron.Rectangle | null;
@@ -924,7 +922,35 @@ function main() {
   );
 }
 
-app.on('ready', () => {
+app.on('ready', async () => {
+  try {
+    if (platform === 'darwin') {
+      const identity =
+        await nativeWindows.request<ApplicationIdentity>('appIdentity');
+      assertUniqueApplicationIdentity(
+        identity,
+        process.execPath,
+        app.isPackaged
+      );
+      console.log('Desktop permission identity:', identity);
+    }
+  } catch (error) {
+    nativeWindows.close();
+    dialog.showErrorBox(
+      'PalmDesk 应用身份冲突',
+      error instanceof Error ? error.message : String(error)
+    );
+    app.exit(1);
+    return;
+  }
+  // Validate before the singleton handoff and before native modules can request access.
+  if (!app.requestSingleInstanceLock()) {
+    nativeWindows.close();
+    app.quit();
+    return;
+  }
+  // eslint-disable-next-line global-require -- Keep native bindings external and initialize only after identity validation.
+  nutjs = require('@nut-tree-fork/nut-js');
   powerMonitor.on('suspend', () => {
     windowMap.forEach((item) => {
       const windowId = item.id;

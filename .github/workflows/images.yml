@@ -1,0 +1,63 @@
+name: Container Images
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [web, backend]
+    env:
+      SERVICE: ${{ matrix.service }}
+      REGISTRY_OWNER: ${{ github.repository_owner }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Check deployment adapter
+        run: node --test containers/test/deployment.test.mjs
+      - name: Prepare pinned sources and build context
+        run: node containers/prepare.mjs "$RUNNER_TEMP/palmdesk-images"
+      - name: Build Linux x86_64 image
+        shell: bash
+        run: |
+          image="ghcr.io/${REGISTRY_OWNER,,}/palmdesk-${SERVICE}"
+          echo "IMAGE=$image" >> "$GITHUB_ENV"
+          docker build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "$image:sha-${GITHUB_SHA}" \
+            --file "$RUNNER_TEMP/palmdesk-images/$SERVICE/Dockerfile" \
+            "$RUNNER_TEMP/palmdesk-images"
+      - name: Publish to GitHub Container Registry
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          trap 'docker logout ghcr.io >/dev/null 2>&1' EXIT
+          printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          docker push "$IMAGE:sha-${GITHUB_SHA}"
+          docker tag "$IMAGE:sha-${GITHUB_SHA}" "$IMAGE:latest"
+          docker push "$IMAGE:latest"

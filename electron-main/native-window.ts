@@ -22,13 +22,13 @@ export const TARGET_BUNDLES = new Set(['com.openai.codex', 'com.openai.chat']);
 export function enableWindowsCapture(commandLine: Electron.CommandLine) {
   const feature = 'AllowWgcWindowCapturer';
   const disabled = commandLine.getSwitchValue('disable-features').split(',');
-  if (disabled.some((value) => value.split(/[<:]/)[0] === feature))
+  if (disabled.some((value) => value.split(/[<:]/)[0].trim() === feature))
     return false;
   const enabled = commandLine
     .getSwitchValue('enable-features')
     .split(',')
     .filter(Boolean);
-  if (!enabled.some((value) => value.split(/[<:]/)[0] === feature))
+  if (!enabled.some((value) => value.split(/[<:]/)[0].trim() === feature))
     enabled.push(feature);
   commandLine.appendSwitch('enable-features', enabled.join(','));
   return true;

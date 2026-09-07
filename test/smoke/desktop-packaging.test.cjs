@@ -47,6 +47,8 @@ function harness(
     'build-native.mjs',
     'before-pack.cjs',
     'build-desktop.mjs',
+    'check-desktop-identity.cjs',
+    'desktop-identity.cjs',
   ]) {
     const filename = path.join(root, 'scripts', name);
     if (fs.existsSync(filename)) {
