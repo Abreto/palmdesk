@@ -76,7 +76,7 @@ Remove-Item Env:PALMDESK_NATIVE_SMOKE
 
 开发程序仍在运行时，未修改原生源码的构建会复用已有辅助程序。修改了 C# 源码后，先退出开发版 PalmDesk 再编译，避免 Windows 的可执行文件占用限制。
 
-打包版的窗口视频和输入烟测不需要后端。在可解析 `playwright` 的环境中，先执行 `pnpm build:desktop:win`，然后运行：
+打包版的窗口视频和输入烟测不需要后端。在可解析 `playwright` 的环境中，先执行 `pnpm build:desktop:win`，完全退出同一应用身份的 PalmDesk 打包版，然后运行：
 
 ```powershell
 $env:PALMDESK_NATIVE_SMOKE = 'true'
@@ -84,7 +84,7 @@ node test/smoke/electron-window-windows.mjs
 Remove-Item Env:PALMDESK_NATIVE_SMOKE
 ```
 
-该测试使用临时配置目录和两个开启输入法的测试窗口，验证打包版主进程、原生窗口源、解码像素与尺寸、鼠标点击、中英文混合文字和无效会话拒绝；结束后停止视频并关闭测试进程。可用 `SMOKE_ELECTRON_EXECUTABLE` 指定其他打包版路径；`SMOKE_DESKTOP_DEV=true` 使用已构建的开发版主进程和本地辅助程序。它不覆盖手机浏览器、网络传输或混合缩放的多显示器实机组合。
+该测试创建两个开启输入法的临时测试窗口，验证打包版主进程、原生窗口源、解码像素与尺寸、鼠标点击、中英文混合文字和无效会话拒绝；结束后停止视频并关闭测试进程。Windows 的 Electron 应用配置路径不受测试进程的 `APPDATA` / `LOCALAPPDATA` 环境变量覆盖影响，打包测试沿用该应用身份的配置目录；已有同身份实例会使测试实例因单实例锁而提前退出。可用 `SMOKE_ELECTRON_EXECUTABLE` 指定其他打包版路径；`SMOKE_DESKTOP_DEV=true` 使用已构建的开发版主进程、本地辅助程序和独立的测试应用名。它不覆盖手机浏览器、网络传输或混合缩放的多显示器实机组合。
 
 后端启动后运行信令测试：
 
