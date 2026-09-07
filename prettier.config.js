@@ -8,6 +8,7 @@ console.log(
  * @type {import("prettier").Config}
  */
 const config = {
+  endOfLine: 'auto',
   bracketSpacing: true, // 默认为true。即要求：{ foo: bar }；可改为false，即要求{foo: bar}
   singleQuote: true, // 默认为false。即要求：const a = "1"；可改为true，即要求const a = '1'
   semi: true, // 默认值true，即要求在所有代码语句的末尾添加分号；可改为false，即要求仅在可能导致 ASI 失败的行的开头添加分号。

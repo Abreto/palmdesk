@@ -21,7 +21,7 @@ export interface InputDriver {
     direction: 'up' | 'down' | 'left' | 'right',
     amount: number
   ) => Promise<unknown>;
-  text: (value: string) => Promise<unknown>;
+  text: (value: string, source: ICaptureSource) => Promise<unknown>;
   keysDown: (keys: number[]) => Promise<unknown>;
   keysUp: (keys: number[]) => Promise<unknown>;
   validKey: (key: number) => boolean;
@@ -113,7 +113,7 @@ export class CaptureSession {
         const focused = await this.focus(source);
         if (generation !== this.generation) throw new Error('捕获请求已取消');
         if (!sameWindow(source, focused)) throw new Error('选定窗口身份已变化');
-        // Electron only exposes windows on an active Space. Wait for its catalog to catch up.
+        // Restored windows and desktop transitions can reach Electron's catalog later.
         const deadline = Date.now() + 2000;
         for (;;) {
           const current = (await this.list()).find(
@@ -249,7 +249,7 @@ export class CaptureSession {
               input.text.length > 4096
             )
               throw new Error('文字长度须为 1 至 4096');
-            await this.driver.text(input.text);
+            await this.driver.text(input.text, source);
             break;
           case 'keysDown':
           case 'keysUp': {

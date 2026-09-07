@@ -95,7 +95,7 @@ test('changing branches and moving a worktree preserves its permission identity'
   first = moved;
   assert.deepEqual(getDesktopIdentity(first), before);
   const alias = path.join(temporary, 'worktree alias');
-  symlinkSync(first, alias);
+  symlinkSync(first, alias, process.platform === 'win32' ? 'junction' : 'dir');
   assert.deepEqual(getDesktopIdentity(alias), before);
 });
 

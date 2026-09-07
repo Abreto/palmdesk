@@ -2,7 +2,7 @@
 
 从手机浏览器观看并操作电脑上的指定窗口。
 
-PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。支持从手机端选择 macOS 普通应用窗口，包括 Codex、ChatGPT、Claude 和终端，电脑浏览器也可作为控制端。
+PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。支持从手机端选择 macOS 和 Windows 普通应用窗口，包括 Codex、ChatGPT、Claude 和终端，电脑浏览器也可作为控制端。
 
 **状态：实验原型，尚未发布稳定版。** 当前需要自行部署后端、连接设备后在手机端选择窗口；“打开即恢复到上次窗口”属于后续计划。已知依赖告警和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
 
@@ -17,14 +17,16 @@ PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](htt
 - 点击、双击、长按右键、拖拽、滚动、缩放、平移与只读模式。
 - 本地中文输入框、发送文字、回车、常用按键和硬件键盘。
 - macOS 按应用 bundle ID、PID 和原生窗口 ID 识别目标；输入前刷新边界并验证聚焦。
+- Windows 按 HWND、PID、可执行文件路径和进程启动时间识别目标；支持当前虚拟桌面的普通窗口、指定窗口最小化还原，以及高 DPI 和多显示器物理坐标。
+- Windows 发送文字使用原生 Unicode 输入，保留中英文原文，避免中文输入法把英文转成候选词。
 - 窗口消失、捕获结束、连接断开时停止输入并释放按键。
 - 可配置 API、信令和 TURN；浏览器默认使用当前域名。
 
-Windows / Linux 暂无原生主机适配器，会拒绝捕获和输入。浏览器控制端不受此主机限制。视频采用窗口源，但输入仍依赖系统焦点和鼠标键盘接口，不等于操作系统级的输入隔离。
+Linux 暂无原生主机适配器，会拒绝捕获和输入。浏览器控制端不受此主机限制。视频采用窗口源，但输入仍依赖系统焦点和鼠标键盘接口，不等于操作系统级的输入隔离。
 
 ## 本地启动
 
-已验证开发环境为 Node.js 22.16.0、pnpm 11.19.0、macOS / Apple Silicon。桌面端需要 Xcode Command Line Tools。
+客户端需要 Node.js 22.16.0 及以上、pnpm 11.19.0。macOS 桌面端需要 Xcode Command Line Tools；Windows 10 1903 及以上 / Windows 11 x64 使用系统 .NET Framework 4.x 编译器，无需额外安装 Visual Studio，运行时需要可用的 Windows Graphics Capture。
 
 ```bash
 pnpm install --frozen-lockfile
@@ -32,9 +34,11 @@ cp .env.example .env.local
 pnpm dev:desktop
 ```
 
+Windows PowerShell 将复制环境文件的命令替换为 `Copy-Item .env.example .env.local`。首次运行会编译 `native-bin/palmdesk-window.exe`，随后启动 Electron。Windows 运行和测试说明见 [Windows 桌面](docs/LOCAL_DEVELOPMENT.md#windows-桌面)。
+
 **服务端需单独部署。** 两端必须连接同一个 [BilldDesk API / Socket.IO 后端](https://github.com/galaxy-s10/billd-desk-server)，本仓库不包含后端和数据库，也不提供公共连接服务。部署顺序和浏览器测试方法见 [开发环境](docs/LOCAL_DEVELOPMENT.md)，地址、HTTPS 和 TURN 配置见 [服务配置](docs/SERVICE_CONFIGURATION.md)。
 
-开发脚本编译 Swift 窗口辅助程序，并创建、本地签名独立的 Electron 应用：
+macOS 开发脚本编译 Swift 窗口辅助程序，并创建、本地签名独立的 Electron 应用：
 
 ```text
 .local/electron-dev/Electron.app
@@ -71,7 +75,7 @@ pnpm build:native
 pnpm build:desktop
 ```
 
-`build:native` 和 `build:desktop` 的主机目标是 macOS；本地应用输出在 `electron-release/`，构建命令不发布 GitHub Release。正式安装包分发仍需处理依赖告警、图标来源、第三方许可、应用签名与公证。
+`build:native` 和 `build:desktop` 按当前主机选择 macOS 或 Windows；本地应用输出在 `electron-release/`，Windows 可运行目录为其中的 `win-unpacked/`。在 Windows 上运行 `pnpm build:desktop:win` 可显式构建 Windows 版本。构建命令不发布 GitHub Release。正式安装包分发仍需处理依赖告警、图标来源、第三方许可和应用签名；macOS 还需要公证。
 
 没有签名证书时，桌面构建会为整个应用及其辅助程序执行本地 ad-hoc 签名并校验，确保 macOS 能识别 PalmDesk 的应用身份；这不替代分发签名。明确配置的证书不可用时构建会失败。
 
@@ -83,7 +87,7 @@ pnpm build:desktop
 node --test test/smoke/signaling.test.mjs
 ```
 
-GitHub Actions 配置包含单元测试、类型检查、网页构建及 macOS 辅助程序编译，不覆盖真实远控或公网部署。
+GitHub Actions 配置包含 Linux、macOS、Windows 单元测试、类型检查和网页构建，以及 macOS / Windows 辅助程序编译，不覆盖真实远控或公网部署。
 
 ## 验证边界与计划
 

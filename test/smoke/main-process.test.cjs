@@ -37,7 +37,7 @@ function harness() {
     buttonUp: record('up'),
     click: record('click'),
     scroll: record('scroll'),
-    text: record('text'),
+    text: (value) => record('text')(value),
     keysDown: record('keysDown'),
     keysUp: record('keysUp'),
     validKey: (key) => Number.isInteger(key) && key >= 0 && key <= 200,
@@ -69,6 +69,20 @@ const desktopSource = (id, name) => ({
   display_id: '1',
   thumbnail: { isEmpty: () => false, toJPEG: () => Buffer.from('thumbnail') },
   appIcon: null,
+});
+
+test('native text injection receives the freshly verified window identity', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  const refreshed = source({
+    bounds: { x: 300, y: 100, width: 400, height: 300 },
+  });
+  h.sources = [refreshed];
+  h.session.driver.text = async (value, target) => {
+    assert.equal(value, 'literal text');
+    assert.deepEqual(target, refreshed);
+  };
+  await h.session.input(sessionId, { action: 'text', text: 'literal text' });
 });
 
 test('native owner identity admits ordinary app windows without trusting their titles', () => {
