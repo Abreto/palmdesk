@@ -46,4 +46,4 @@ critical 公告涉及 [form-data](https://github.com/advisories/GHSA-fjxv-7rqg-7
 - [ ] 完成自己的 macOS 签名和公证，再发布面向普通用户的安装包。
 - [ ] 对外托管时补齐后端鉴权审查、HTTPS、TURN 短期凭据和资源配额。
 
-手机选窗、Claude Desktop 等普通应用窗口和跨 macOS Spaces 选择已纳入当前实现，实际验证范围见 [README](../README.md#验证边界与计划)。保存目标后自动直达、重连恢复仍属后续计划。
+手机选窗、Claude Desktop 等普通应用窗口和跨 macOS Spaces 选择已纳入当前实现，实际验证范围见 [中文 README](../README.zh-CN.md#验证边界与计划)。保存目标后自动直达、重连恢复仍属后续计划。

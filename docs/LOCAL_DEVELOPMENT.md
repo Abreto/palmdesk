@@ -93,7 +93,11 @@ node test/smoke/business-flow.mjs
 
 `node scripts/dev.mjs --prepare-only` 可只生成开发应用，用于核对 `Info.plist` 和签名，不启动窗口或申请权限。原生及桌面烟测应使用当前 worktree 的开发应用，不能借用主工作区的 Electron，否则权限申请仍会归属被借用的应用。
 
-worktree 的打包产物位于 `electron-release/<version>/worktree-<id>/`。准备开发应用并完成打包后，可运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录；测试仅加载空白页面，不申请屏幕录制或辅助功能权限。
+worktree 的打包产物位于 `electron-release/<version>/worktree-<id>/`。主工作区和 linked worktree 都可在准备开发应用并完成打包后，运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
+
+隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；重新构建 `main` 或仅重置 TCC 都不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留。保留备份时应将旧包压缩归档，再移除原始目录；仅移动目录、改显示名称或改后缀都无法消除身份冲突。
+
+macOS 启动时通过原生辅助程序读取父进程的真实 bundle ID、可执行文件路径和该 ID 的所有有效注册路径。在加载输入模块、获取单实例锁和创建窗口之前完成检查；发现多个副本时显示具体冲突路径并退出，不继续申请权限。别名和符号链接会按真实路径去重。此检查也覆盖 worktree 之外的旧副本；因此同一身份日常只保留一个可启动的安装位置。
 
 ### 重建与权限恢复
 
@@ -103,7 +107,15 @@ worktree 的打包产物位于 `electron-release/<version>/worktree-<id>/`。准
 CSC_NAME='证书名称或 SHA-1 指纹' pnpm build:desktop
 ```
 
-已有权限条目指向错误副本时，先退出相关 PalmDesk 应用，移走或重新构建仍使用正式版 bundle ID 的旧 worktree 副本。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 PalmDesk 条目，再添加固定位置的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `PalmDesk WT <id>` 条目。
+已有权限条目指向错误副本时，先退出相关 PalmDesk 应用，运行 `pnpm doctor:desktop`。归档并移除仍使用正式版 bundle ID 的旧副本，随后针对旧路径取消 LaunchServices 注册，再注册保留的正式版路径：
+
+```bash
+lsregister_bin=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
+"$lsregister_bin" -u '/旧路径/PalmDesk.app'
+"$lsregister_bin" -f '/保留路径/PalmDesk.app'
+```
+
+再次运行 `pnpm doctor:desktop` 应通过。旧分支必须合入身份隔离修复后才能重新构建使用，解压旧备份也会重新引入冲突。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 PalmDesk 条目，再添加保留的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `PalmDesk WT <id>` 条目。不要全局重建 LaunchServices 数据库或重置其他应用的权限。
 
 若仍需通过命令清理旧授权，只重置 PalmDesk 的对应权限，然后重新授权：
 

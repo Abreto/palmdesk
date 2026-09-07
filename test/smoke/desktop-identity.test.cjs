@@ -3,6 +3,7 @@ const { execFileSync } = require('node:child_process');
 const {
   mkdtempSync,
   mkdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -11,6 +12,7 @@ const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { getDesktopIdentity } = require('../../scripts/desktop-identity.cjs');
+const { findLegacyApps } = require('../../scripts/check-desktop-identity.cjs');
 
 let temporary;
 let main;
@@ -24,7 +26,9 @@ function git(root, ...args) {
   });
 }
 test.before(() => {
-  temporary = mkdtempSync(path.join(os.tmpdir(), 'palmdesk-identity-'));
+  temporary = realpathSync(
+    mkdtempSync(path.join(os.tmpdir(), 'palmdesk-identity-'))
+  );
   main = path.join(temporary, 'main checkout');
   first = path.join(temporary, 'worktree one');
   second = path.join(temporary, 'worktree two');
@@ -118,3 +122,66 @@ test('packaging embeds the same isolated identity in its bundle and runtime meta
   assert.equal(config.productName, expected.productName);
   assert.equal(config.extraMetadata.productName, expected.productName);
 });
+
+test(
+  'build preflight finds old app artifacts even when their worktree source has not been upgraded',
+  { skip: process.platform !== 'darwin' },
+  () => {
+    function bundle(root, relative, appId) {
+      const directory = path.join(root, relative);
+      mkdirSync(path.join(directory, 'Contents'), { recursive: true });
+      writeFileSync(
+        path.join(directory, 'Contents/Info.plist'),
+        JSON.stringify({ CFBundleIdentifier: appId })
+      );
+      return directory;
+    }
+    const release = 'electron-release/0.0.1/mac-arm64/PalmDesk.app';
+    bundle(main, release, getDesktopIdentity(main).appId);
+    const legacy = bundle(first, release, getDesktopIdentity(main).appId);
+    const renamed = bundle(
+      first,
+      '.local/PalmDesk-before-isolation.app.disabled',
+      getDesktopIdentity(main).appId
+    );
+    bundle(
+      first,
+      '.local/FocusFixture.app',
+      'io.github.abreto.palmdesk.focus-fixture'
+    );
+    const isolated = getDesktopIdentity(first);
+    bundle(
+      first,
+      `electron-release/0.0.1/worktree-${isolated.worktreeId}/PalmDesk.app`,
+      isolated.appId
+    );
+    bundle(second, release, getDesktopIdentity(second).appId);
+    const development = bundle(
+      second,
+      '.local/electron-dev/Electron.app',
+      getDesktopIdentity(main, { development: true }).appId
+    );
+
+    assert.deepEqual(findLegacyApps(main), [
+      {
+        bundle: legacy,
+        actual: getDesktopIdentity(main).appId,
+        expected: isolated.appId,
+      },
+      {
+        bundle: renamed,
+        actual: getDesktopIdentity(main).appId,
+        expected: isolated.appId,
+      },
+      {
+        bundle: development,
+        actual: getDesktopIdentity(main, { development: true }).appId,
+        expected: getDesktopIdentity(second, { development: true }).appId,
+      },
+    ]);
+    rmSync(legacy, { recursive: true });
+    rmSync(renamed, { recursive: true });
+    rmSync(development, { recursive: true });
+    assert.deepEqual(findLegacyApps(main), []);
+  }
+);
