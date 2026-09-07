@@ -85,6 +85,8 @@ node --test test/smoke/signaling.test.mjs
 
 GitHub Actions 配置包含单元测试、类型检查、网页构建及 macOS 辅助程序编译，不覆盖真实远控或公网部署。
 
+网页和部署适配后的后端可通过主仓库的 GitHub Actions 构建为 Docker 镜像，并发布到 GHCR。镜像名称、固定后端版本及构建方式见 [容器镜像](containers/README.md)；生产凭据、数据库和 Tunnel 由部署环境管理。
+
 ## 验证边界与计划
 
 已有烟测覆盖真实 Vue 页面、官方本地后端、Socket.IO、WebRTC 视频解码和输入 DataChannel，其中原生视频源与系统输入使用测试替身。历史结果见 [验证报告](docs/CODEX_REMOTE_REPAIR_RESULTS.md)，报告与截图中的 Codex Remote 是项目旧名称。
