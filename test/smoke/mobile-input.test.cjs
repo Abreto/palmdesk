@@ -97,13 +97,27 @@ test('touch scrolling carries a point within the selected video and no mouse pre
   const h = controller(t);
   h.mode = 'scroll';
   h.pointer.down(event());
-  h.pointer.move(event(220, 110));
-  h.pointer.up(event(220, 110));
+  h.pointer.move(event(220, 116));
+  h.pointer.up(event(220, 116));
   assert.deepEqual(
     h.messages.map((m) => m.type),
     [Behavior.scrollDown]
   );
   assert.equal(h.messages[0].x, 500);
+  assert.equal(h.messages[0].amount, 8);
+});
+test('touch scrolling accumulates small pointer movements before sending ticks', (t) => {
+  const h = controller(t);
+  h.mode = 'scroll';
+  h.pointer.down(event());
+  h.pointer.move(event(220, 139));
+  h.pointer.move(event(220, 138));
+  h.pointer.move(event(220, 137));
+  h.pointer.up(event(220, 137));
+  assert.deepEqual(
+    h.messages.map((m) => [m.type, m.amount]),
+    [[Behavior.scrollDown, 1]]
+  );
 });
 test('cancel releases a held button even after switching to watch mode', (t) => {
   const h = controller(t);

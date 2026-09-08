@@ -12,6 +12,30 @@ type Pointer = {
 };
 type Send = (data: Partial<WsBilldDeskBehaviorType['data']>) => void;
 
+// A desktop wheel tick covers more content than a phone pixel. Keep touch
+// scrolling responsive by mapping roughly three touch pixels to one tick.
+const TOUCH_SCROLL_PIXELS_PER_TICK = 3;
+
+type ScrollAccumulator = {
+  direction: number;
+  distance: number;
+};
+
+function scrollAmount(delta: number, accumulator: ScrollAccumulator) {
+  const direction = Math.sign(delta);
+  if (!direction) return 0;
+  if (accumulator.direction !== direction) {
+    accumulator.direction = direction;
+    accumulator.distance = 0;
+  }
+  accumulator.distance += Math.abs(delta);
+  const amount = Math.floor(
+    accumulator.distance / TOUCH_SCROLL_PIXELS_PER_TICK
+  );
+  accumulator.distance %= TOUCH_SCROLL_PIXELS_PER_TICK;
+  return amount;
+}
+
 export function createPointerController(options: {
   send: Send;
   enabled: () => boolean;
@@ -29,6 +53,8 @@ export function createPointerController(options: {
         y: number;
         pressed: boolean;
         moved: boolean;
+        scrollX: ScrollAccumulator;
+        scrollY: ScrollAccumulator;
       }
     | undefined;
   let tapTimer: ReturnType<typeof setTimeout> | undefined;
@@ -65,6 +91,8 @@ export function createPointerController(options: {
         y: event.clientY,
         pressed: options.mode() === 'drag',
         moved: false,
+        scrollX: { direction: 0, distance: 0 },
+        scrollY: { direction: 0, distance: 0 },
       };
       if (active.pressed) emit(Behavior.pressButtonLeft, point);
       if (event.pointerType === 'touch' && options.mode() === 'tap') {
@@ -88,23 +116,30 @@ export function createPointerController(options: {
       }
       const dx = event.clientX - active.x;
       const dy = event.clientY - active.y;
-      if (Math.hypot(dx, dy) < 4 && !active.moved) return;
+      if (
+        Math.hypot(dx, dy) < 4 &&
+        !active.moved &&
+        options.mode() !== 'scroll'
+      )
+        return;
       active.moved = true;
       clearTimeout(holdTimer);
       clearTimeout(tapTimer);
       tapTimer = undefined;
       if (options.mode() === 'scroll') {
-        if (Math.abs(dy) >= 2)
+        const verticalAmount = scrollAmount(dy, active.scrollY);
+        if (verticalAmount)
           emit(
             dy > 0 ? Behavior.scrollUp : Behavior.scrollDown,
             active.start,
-            Math.max(1, Math.round(Math.abs(dy) / 12))
+            verticalAmount
           );
-        if (Math.abs(dx) >= 2)
+        const horizontalAmount = scrollAmount(dx, active.scrollX);
+        if (horizontalAmount)
           emit(
             dx > 0 ? Behavior.scrollLeft : Behavior.scrollRight,
             active.start,
-            Math.max(1, Math.round(Math.abs(dx) / 12))
+            horizontalAmount
           );
       } else {
         if (!active.pressed) {
