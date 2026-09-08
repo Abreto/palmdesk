@@ -23,8 +23,7 @@ module.exports = {
     sign: './scripts/sign-macos.cjs',
     extraFiles: [{ from: 'native-bin/codex-window', to: 'MacOS/codex-window' }],
     target: ['dmg'],
-    artifactName:
-      '${productName}-mac-${platform}-${version}-${arch}-installer.${ext}',
+    artifactName: '${productName}-${version}-mac-${arch}.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
       NSScreenCaptureUsageDescription:
@@ -45,8 +44,7 @@ module.exports = {
         to: 'native/palmdesk-window.exe',
       },
     ],
-    artifactName:
-      '${productName}-win-${platform}-${version}-${arch}-installer.${ext}',
+    artifactName: '${productName}-${version}-windows-${arch}.${ext}',
     requestedExecutionLevel: 'asInvoker',
     target: [
       {

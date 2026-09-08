@@ -323,6 +323,37 @@ test('desktop build rejects unsupported arguments before invoking build tools', 
   assert.equal(calls.length, 0);
 });
 
+for (const [platform, requested, target] of [
+  ['darwin', '--mac', ['--mac']],
+  ['win32', '--win', ['--win', '--x64']],
+]) {
+  test(`installer build on ${platform} builds desktop code and leaves publishing to the caller`, async (t) => {
+    const { calls, run } = harness(t, platform, {
+      args: [requested, '--installer'],
+    });
+    await run('build-desktop.mjs');
+    assert.equal(calls.length, 2);
+    assert.equal(calls[0].options.env.VITE_APP_RELEASE_PROJECT_ISWEB, 'false');
+    assert.deepEqual(calls[1].args.slice(1), [...target, '--publish', 'never']);
+  });
+}
+
+test('installer builds reject conflicting platforms before invoking build tools', async (t) => {
+  const { calls, run } = harness(t, 'darwin', {
+    args: ['--mac', '--win', '--installer'],
+  });
+  await assert.rejects(run('build-desktop.mjs'), /Usage:/);
+  assert.equal(calls.length, 0);
+});
+
+test('installer builds reject a mismatched host before invoking build tools', async (t) => {
+  const { calls, run } = harness(t, 'darwin', {
+    args: ['--win', '--installer'],
+  });
+  await assert.rejects(run('build-desktop.mjs'), /matching.*host/i);
+  assert.equal(calls.length, 0);
+});
+
 test('packaging includes the Windows helper as a resource without elevation', () => {
   const config = require('../../electron-builder.cjs');
   assert.deepEqual(config.win.extraResources, [
@@ -350,6 +381,14 @@ test('the desktop package command delegates to host selection', () => {
   assert.equal(
     manifest.scripts['build:desktop:win'],
     'node scripts/build-desktop.mjs --win'
+  );
+  assert.equal(
+    manifest.scripts['dist:mac'],
+    'node scripts/build-desktop.mjs --mac --installer'
+  );
+  assert.equal(
+    manifest.scripts['dist:win'],
+    'node scripts/build-desktop.mjs --win --installer'
   );
 });
 

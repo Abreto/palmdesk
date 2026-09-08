@@ -35,6 +35,8 @@
     "build:native": "node scripts/build-native.mjs",
     "build:desktop": "node scripts/build-desktop.mjs",
     "build:desktop:win": "node scripts/build-desktop.mjs --win",
+    "dist:mac": "node scripts/build-desktop.mjs --mac --installer",
+    "dist:win": "node scripts/build-desktop.mjs --win --installer",
     "doctor:desktop": "node scripts/check-desktop-identity.cjs",
     "typecheck": "vue-tsc --noEmit",
     "test:smoke": "node --test test/smoke/*.test.cjs",

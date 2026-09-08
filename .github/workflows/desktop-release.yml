@@ -1,0 +1,164 @@
+name: Desktop Prerelease
+run-name: Desktop prerelease ${{ inputs.tag }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag matching package.json version (for example, v0.0.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-prerelease-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Validate version and tag
+        id: release
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: node scripts/desktop-release.cjs validate
+
+  build:
+    needs: validate
+    name: Build ${{ matrix.platform }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-15
+            platform: mac
+            arch: arm64
+            native_arch: arm64
+            app_directory: mac-arm64
+            command: dist:mac
+            extension: dmg
+          - os: macos-15-intel
+            platform: mac
+            arch: x64
+            native_arch: x86_64
+            app_directory: mac
+            command: dist:mac
+            extension: dmg
+          - os: windows-2022
+            platform: windows
+            arch: x64
+            command: dist:win
+            extension: exe
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      EXPECTED_ARCH: ${{ matrix.arch }}
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          architecture: ${{ matrix.arch }}
+      - uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+      - name: Check build architecture
+        run: node -e "require('node:assert/strict').equal(process.arch, process.env.EXPECTED_ARCH)"
+      - name: Install desktop dependencies
+        run: pnpm install --frozen-lockfile
+      - run: pnpm test:smoke
+      - run: pnpm typecheck
+      - name: Build installer
+        run: pnpm ${{ matrix.command }}
+      - name: Verify macOS binaries and local signature
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          APP_DIRECTORY: ${{ matrix.app_directory }}
+          NATIVE_ARCH: ${{ matrix.native_arch }}
+        run: |
+          app="electron-release/$RELEASE_VERSION/$APP_DIRECTORY/PalmDesk.app"
+          lipo "$app/Contents/MacOS/PalmDesk" -verify_arch "$NATIVE_ARCH"
+          lipo "$app/Contents/MacOS/codex-window" -verify_arch "$NATIVE_ARCH"
+          codesign --verify --deep --strict "$app"
+      - name: Verify Windows helper is packaged
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $app = "electron-release/$env:RELEASE_VERSION/win-unpacked"
+          foreach ($file in @('PalmDesk.exe', 'resources/native/palmdesk-window.exe')) {
+            if (!(Test-Path "$app/$file" -PathType Leaf)) {
+              throw "Missing packaged file: $file"
+            }
+          }
+      - name: Upload installer
+        uses: actions/upload-artifact@v7
+        with:
+          name: installer-${{ matrix.platform }}-${{ matrix.arch }}
+          path: electron-release/${{ needs.validate.outputs.version }}/PalmDesk-${{ needs.validate.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.${{ matrix.extension }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+      - name: Recheck release tag
+        run: node scripts/desktop-release.cjs validate
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: installer-*
+          merge-multiple: true
+          path: release-assets
+      - name: Verify installers and generate checksums
+        run: node scripts/desktop-release.cjs assets release-assets
+      - name: Publish prerelease
+        shell: bash
+        run: |
+          gh release create "$RELEASE_TAG" \
+            release-assets/*.dmg \
+            release-assets/*.exe \
+            release-assets/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "PalmDesk $RELEASE_TAG (Preview)" \
+            --notes-file .github/desktop-prerelease-notes.md \
+            --prerelease \
+            --latest=false
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
