@@ -951,6 +951,8 @@ app.on('ready', async () => {
   }
   // eslint-disable-next-line global-require -- Keep native bindings external and initialize only after identity validation.
   nutjs = require('@nut-tree-fork/nut-js');
+  // Remote pointer events already arrive at the user's gesture cadence.
+  nutjs.mouse.config.autoDelayMs = 0;
   powerMonitor.on('suspend', () => {
     windowMap.forEach((item) => {
       const windowId = item.id;
