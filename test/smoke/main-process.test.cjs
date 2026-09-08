@@ -18,6 +18,8 @@ const source = (extra = {}) => ({
   name: 'Project notes',
   thumbnail: '',
   appIcon: '',
+  isAiTarget: true,
+  // Legacy wire alias retained while older controllers are still supported.
   isCodex: true,
   bounds: { x: 100, y: 200, width: 600, height: 400 },
   boundsSource: 'window',
@@ -100,20 +102,49 @@ test('native owner identity admits ordinary app windows without trusting their t
   assert.equal(result[0].id, 'window:10:0');
   assert.equal(result[0].ownerPid, 42);
   assert.equal(result[1].bundleId, 'com.google.Chrome');
+  assert.equal(result[1].isAiTarget, false);
   assert.equal(result[1].isCodex, false);
 });
-test('ChatGPT is supported and windows without native identities are excluded', () => {
+test('AI agent client bundle IDs are preferred and titles do not affect ranking', () => {
   const result = matchCaptureSources(
-    [desktopSource('window:12:0', '')],
-    [source({ nativeId: 12, bundleId: 'com.openai.chat' })]
+    [
+      desktopSource('window:11:0', 'Codex'),
+      desktopSource('window:12:0', 'Claude'),
+      desktopSource('window:13:0', 'Kimi'),
+      desktopSource('window:14:0', 'ZCode'),
+      desktopSource('window:15:0', 'Not an agent'),
+    ],
+    [
+      source({ nativeId: 11, bundleId: 'com.openai.chat' }),
+      source({
+        nativeId: 12,
+        bundleId: 'com.anthropic.claudefordesktop',
+      }),
+      source({ nativeId: 13, bundleId: 'com.moonshot.kimichat' }),
+      source({ nativeId: 14, bundleId: 'dev.zcode.app' }),
+      source({ nativeId: 15, bundleId: 'com.apple.Terminal' }),
+    ]
+  );
+  assert.deepEqual(
+    result.map((item) => item.nativeId),
+    [11, 12, 13, 14, 15]
+  );
+  assert.deepEqual(
+    result.slice(0, 4).map((item) => item.isAiTarget),
+    [true, true, true, true]
   );
   assert.equal(result[0].bundleId, 'com.openai.chat');
+  assert.equal(result[1].bundleId, 'com.anthropic.claudefordesktop');
+  assert.equal(result[2].bundleId, 'com.moonshot.kimichat');
+  assert.equal(result[3].bundleId, 'dev.zcode.app');
+  assert.equal(result[4].isAiTarget, false);
+  assert.equal(result[4].isCodex, false);
   assert.equal(
     matchCaptureSources([desktopSource('window:13:0', 'OpenAI')], []).length,
     0
   );
 });
-test('all-Spaces catalog includes windows Electron omits and keeps Codex first', () => {
+test('all-Spaces catalog includes windows Electron omits and keeps AI targets first', () => {
   const result = matchCaptureSources(
     [
       desktopSource('window:11:7', 'Terminal'),
@@ -132,14 +163,14 @@ test('all-Spaces catalog includes windows Electron omits and keeps Codex first',
   );
   assert.deepEqual(
     result.map((item) => item.nativeId),
-    [12, 13, 11, 14]
+    [12, 13, 14, 11]
   );
   assert.equal(result[0].id, 'window:12:0');
   assert.equal(result[0].captureId, undefined);
   assert.equal(result[0].thumbnail, '');
   assert.equal(result[0].isOnScreen, false);
-  assert.equal(result[2].id, 'window:11:0');
-  assert.equal(result[2].captureId, 'window:11:7');
+  assert.equal(result[3].id, 'window:11:0');
+  assert.equal(result[3].captureId, 'window:11:7');
 });
 test('offscreen metadata and empty thumbnails do not create usable capture sources', () => {
   const empty = desktopSource('window:10:0', 'Target');

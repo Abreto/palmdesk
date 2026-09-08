@@ -146,7 +146,7 @@ test('unsupported hosts never launch a native helper', async () => {
   await assert.rejects(bridge.request('list'), /macOS.*Windows/);
 });
 
-test('Windows app preference comes from executable identity, not a window title', () => {
+test('Windows AI app preference comes from executable identity, not a window title', () => {
   const { matchCaptureSources } = load('electron-main/native-window.ts');
   const owner = (nativeId, bundleId) => ({
     nativeId,
@@ -162,13 +162,19 @@ test('Windows app preference comes from executable identity, not a window title'
       owner(1, 'win32:c:\\apps\\editor.exe#123'),
       owner(2, 'win32:c:\\apps\\Codex.exe#456'),
       owner(3, 'win32:c:\\apps\\ChatGPT.exe#789'),
+      owner(4, 'win32:c:\\apps\\Claude.exe#890'),
+      owner(5, 'win32:c:\\apps\\Kimi Work.exe#901'),
+      owner(6, 'win32:c:\\apps\\ZCode.exe#abc'),
     ]
   );
   assert.deepEqual(
     windows.map((item) => item.nativeId),
-    [2, 3, 1]
+    [2, 3, 4, 5, 6, 1]
   );
-  assert.equal(windows[2].isCodex, false);
+  assert.equal(windows[0].isAiTarget, true);
+  assert.equal(windows[4].isAiTarget, true);
+  assert.equal(windows[5].isCodex, false);
+  assert.equal(windows[5].isAiTarget, false);
   assert.equal(windows[0].inputScale, 1);
   assert.equal(windows[0].bounds.x, -1500);
   assert.equal(windows[0].captureId, undefined);

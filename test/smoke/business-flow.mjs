@@ -71,6 +71,7 @@ try {
       boundsSource: 'window',
       bounds: { x: 100, y: 100, width: 960, height: 600 },
       inputScale: 1,
+      isAiTarget: true,
       isCodex: true,
     };
     const sources = [
@@ -84,6 +85,7 @@ try {
         bundleId: 'com.apple.Terminal',
         appName: 'Terminal',
         name: 'Agent CLI - workspace',
+        isAiTarget: false,
         isCodex: false,
       },
       {
@@ -94,7 +96,8 @@ try {
         bundleId: 'com.anthropic.claudefordesktop',
         appName: 'Claude',
         name: 'Project planning - a long window title for responsive layout verification',
-        isCodex: false,
+        isAiTarget: true,
+        isCodex: true,
       },
     ];
     for (const [index, item] of sources.entries()) {
@@ -301,7 +304,7 @@ try {
     'mobile service settings reject invalid URLs and apply saved configuration after reload'
   );
   await phone.getByLabel('远程设备代码').fill(device.uuid);
-  assert.equal(await phone.locator('.codex-target').count(), 0);
+  assert.equal(await phone.locator('.ai-target').count(), 0);
   assert.equal(await phone.locator('.local-device').count(), 0);
   await phone.screenshot({ path: path.join(artifacts, 'mobile-connect.png') });
   pass(

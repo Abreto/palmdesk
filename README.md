@@ -4,7 +4,7 @@ English | [简体中文](README.zh-CN.md)
 
 AI-native remote control for desktop apps: stream one macOS or Windows window to your phone for agent-ready workflows.
 
-PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It is designed around AI-agent workflows: choose an existing application window, keep that window as the session context, and interact with Codex, ChatGPT, Claude, or a terminal from a phone browser. A desktop browser can also act as the controller.
+PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It is designed around AI-agent workflows: choose an existing application window, keep that window as the session context, and interact with Codex, ChatGPT, Claude, Kimi, ZCode, or a terminal from a phone browser. A desktop browser can also act as the controller.
 
 **Status: experimental prototype, with no stable release yet.** PalmDesk connects to the official backend at [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu) by default. After connecting, select a window to start capture. Automatically reopening the last selected window is planned. Known dependency warnings and release prerequisites are tracked in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
 
@@ -15,7 +15,7 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 - Connect using a device code and password, or scan the desktop's QR code with a camera or an image. Connection links open the window picker automatically after authentication.
 - Browse application windows across macOS Spaces, search by application name or window title, view thumbnails, and refresh the list. Capture starts only after you select a window.
 - Activate windows on other Spaces or restore a selected minimized window before capture begins.
-- Disconnect and choose another window while retaining device connection details. Codex and ChatGPT windows appear first, with the original order preserved within each group.
+- Disconnect and choose another window while retaining device connection details. AI agent clients such as Codex, ChatGPT, Claude, Kimi, and ZCode appear first, with the original order preserved within each group.
 - Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
 - On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.

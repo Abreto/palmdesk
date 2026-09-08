@@ -17,7 +17,32 @@ export interface NativeWindow {
 type WindowIdentity = Pick<NativeWindow, 'nativeId' | 'ownerPid' | 'bundleId'>;
 type WindowThumbnail = WindowIdentity & { thumbnail: string };
 
-export const TARGET_BUNDLES = new Set(['com.openai.codex', 'com.openai.chat']);
+/** macOS bundle IDs for desktop clients that are useful agent targets. */
+export const TARGET_BUNDLES = new Set([
+  'com.openai.codex',
+  'com.openai.chat',
+  'com.anthropic.claudefordesktop',
+  'com.moonshot.kimichat',
+  'dev.zcode.app',
+]);
+
+/** Windows executable names used by the same class of desktop clients. */
+const TARGET_EXECUTABLES = new Set([
+  'codex.exe',
+  'chatgpt.exe',
+  'claude.exe',
+  'kimi.exe',
+  'kimi desktop.exe',
+  'kimi work.exe',
+  'kimi-work.exe',
+  'zcode.exe',
+]);
+
+export function isAiTargetIdentity(identity: string) {
+  if (TARGET_BUNDLES.has(identity)) return true;
+  const match = /^win32:(?:.*[\\/])?([^\\/]+\.exe)#[a-f0-9]+$/i.exec(identity);
+  return !!match && TARGET_EXECUTABLES.has(match[1].toLowerCase());
+}
 
 export function enableWindowsCapture(commandLine: Electron.CommandLine) {
   const feature = 'AllowWgcWindowCapturer';
@@ -67,6 +92,7 @@ export function matchCaptureSources(
   );
   const matched = owners.map((owner) => {
     const source = available.get(owner.nativeId);
+    const isAiTarget = isAiTargetIdentity(owner.bundleId);
     return {
       ...owner,
       // Catalog identities remain stable when Electron omits an offscreen window.
@@ -80,14 +106,14 @@ export function matchCaptureSources(
           : '',
       appIcon:
         source?.appIcon?.resize({ width: 32, height: 32 }).toDataURL() || '',
-      isCodex:
-        TARGET_BUNDLES.has(owner.bundleId) ||
-        /^win32:.*[\\/](codex|chatgpt)\.exe#[a-f0-9]+$/i.test(owner.bundleId),
+      isAiTarget,
+      // Keep the old wire field for clients that have not migrated yet.
+      isCodex: isAiTarget,
       boundsSource: 'window' as const,
       inputScale: 1,
     };
   });
-  return matched.sort((a, b) => Number(b.isCodex) - Number(a.isCodex));
+  return matched.sort((a, b) => Number(b.isAiTarget) - Number(a.isAiTarget));
 }
 
 export class NativeWindowBridge {

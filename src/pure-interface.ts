@@ -29,7 +29,9 @@ export interface ICaptureSource {
   displayId?: string;
   thumbnail: string;
   appIcon: string;
-  isCodex: boolean;
+  isAiTarget: boolean;
+  /** @deprecated Use isAiTarget. Kept as a compatibility alias for older clients. */
+  isCodex?: boolean;
   bounds: ICaptureBounds | null;
   boundsSource: CaptureBoundsSource;
   /** 将窗口边界转换为 nut.js 屏幕坐标时使用的缩放比例。 */

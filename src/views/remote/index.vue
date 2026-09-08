@@ -202,7 +202,7 @@
 
       <div
         v-if="ipcRenderer"
-        class="codex-target"
+        class="ai-target"
       >
         <div class="target-heading">
           <div>
@@ -1868,7 +1868,7 @@ function handleDel(sender) {
         }
       }
     }
-    .codex-target {
+    .ai-target {
       margin-top: 18px;
       padding: 18px 0;
       border-top: 1px solid #e0e6e2;
@@ -2096,7 +2096,7 @@ function handleDel(sender) {
     height: 46px;
     padding-right: 38px;
   }
-  .remote-wrap .container .codex-target .capture-source-list {
+  .remote-wrap .container .ai-target .capture-source-list {
     grid-template-columns: minmax(0, 1fr);
   }
 }
