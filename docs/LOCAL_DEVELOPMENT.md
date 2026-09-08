@@ -4,7 +4,7 @@
 
 客户端使用 Node.js 22.16.0 及以上和 `package.json` 固定的 pnpm 版本；macOS 主机还需要 Xcode Command Line Tools。Windows 10 1903 及以上 / Windows 11 x64 使用系统 .NET Framework 4.x 编译器。浏览器前端可以独立启动，但设备注册和连接必须有后端。
 
-1. 在独立目录部署 [billd-desk-server](https://github.com/galaxy-s10/billd-desk-server)。历史烟测使用提交 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，参见 [对应服务端说明](https://github.com/galaxy-s10/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)。
+1. 在独立目录部署 PalmDesk 维护的 [billd-desk-server fork](https://github.com/Abreto/billd-desk-server)。当前固定提交为 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，参见 [对应服务端说明](https://github.com/Abreto/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)。
 2. 按服务端文档配置 MySQL、Redis 和服务端密钥，初始化数据库及 live 配置。服务端密钥留在服务端目录，不写入客户端的 `VITE_*` 变量。
 3. 将开发后端监听地址配置为 `127.0.0.1:4300`，并允许实际前端 origin。改用其他地址时，调整本项目 `vite.config.ts` 的开发代理或显式配置 API / 信令 URL。
 4. 在本仓库运行以下命令，再按 [服务配置](SERVICE_CONFIGURATION.md) 连接手机。

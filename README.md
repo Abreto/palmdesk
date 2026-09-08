@@ -2,11 +2,11 @@
 
 English | [简体中文](README.zh-CN.md)
 
-View and control a selected desktop window from your phone's browser.
+AI-native remote control for desktop apps: stream one macOS or Windows window to your phone for agent-ready workflows.
 
-PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It lets you choose a regular macOS or Windows application window, including Codex, ChatGPT, Claude, or a terminal, from your phone. A desktop browser can also act as the controller.
+PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). It is designed around AI-agent workflows: choose an existing application window, keep that window as the session context, and interact with Codex, ChatGPT, Claude, or a terminal from a phone browser. A desktop browser can also act as the controller.
 
-**Status: experimental prototype, with no stable release yet.** You need to deploy your own backend and select a window after connecting. Automatically reopening the last selected window is planned. Known dependency warnings and release prerequisites are tracked in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
+**Status: experimental prototype, with no stable release yet.** PalmDesk connects to the official backend at [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu) by default. After connecting, select a window to start capture. Automatically reopening the last selected window is planned. Known dependency warnings and release prerequisites are tracked in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
 
 ## Features
 

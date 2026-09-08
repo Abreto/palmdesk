@@ -2,11 +2,11 @@
 
 [English](README.md) | 简体中文
 
-从手机浏览器观看并操作电脑上的指定窗口。
+面向 AI agent 工作流优化的单窗口远程控制：从手机浏览器传输并操作 macOS 或 Windows 上的一个应用窗口。
 
-PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。支持从手机端选择 macOS 和 Windows 普通应用窗口，包括 Codex、ChatGPT、Claude 和终端，电脑浏览器也可作为控制端。
+PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。产品围绕 AI agent 交互设计：从手机端选择一个已有的 macOS 或 Windows 应用窗口，将它作为当前会话上下文，操作 Codex、ChatGPT、Claude 或终端；电脑浏览器也可作为控制端。
 
-**状态：实验原型，尚未发布稳定版。** 当前需要自行部署后端、连接设备后在手机端选择窗口；“打开即恢复到上次窗口”属于后续计划。已知依赖告警和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
+**状态：实验原型，尚未发布稳定版。** PalmDesk 默认连接官方后端 [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu)。连接设备后，在手机端选择窗口即可开始捕获；“打开即恢复到上次窗口”属于后续计划。已知依赖告警和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
 
 ## 当前能力
 

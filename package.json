@@ -2,7 +2,7 @@
   "name": "palmdesk",
   "version": "0.0.1",
   "private": true,
-  "description": "Control a selected desktop window from your phone.",
+  "description": "AI-native remote control for desktop apps: stream one macOS or Windows window to your phone for agent-ready workflows.",
   "packageManager": "pnpm@11.19.0",
   "engines": {
     "node": ">=22.16.0"
