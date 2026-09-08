@@ -54,7 +54,6 @@ function validateRelease(root, tag, expectedCommit) {
 async function prepareReleaseAssets(directory, { version, productName }) {
   const expected = [
     `${productName}-${version}-mac-arm64.dmg`,
-    `${productName}-${version}-mac-x64.dmg`,
     `${productName}-${version}-windows-x64.exe`,
   ];
   const installers = readdirSync(directory)
@@ -63,7 +62,7 @@ async function prepareReleaseAssets(directory, { version, productName }) {
   assert.deepEqual(
     installers,
     expected,
-    'Release requires exactly the three installers for this version.'
+    'Release requires exactly the Apple Silicon and Windows x64 installers for this version.'
   );
   const checksums = [];
   for (const name of expected) {

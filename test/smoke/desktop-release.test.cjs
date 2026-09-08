@@ -52,7 +52,6 @@ function assets(t) {
   const config = require('../../electron-builder.cjs');
   const names = [
     [config.mac.artifactName, 'arm64', 'dmg'],
-    [config.mac.artifactName, 'x64', 'dmg'],
     [config.win.artifactName, 'x64', 'exe'],
   ].map(([pattern, arch, ext]) =>
     pattern.replace(
@@ -114,13 +113,14 @@ test('release assets match the builder names and include verifiable SHA256 hashe
     const digest = createHash('sha256').update(`fixture ${name}`).digest('hex');
     assert.ok(checksums.includes(`${digest}  ${name}\n`));
   }
-  assert.equal(checksums.trim().split('\n').length, 3);
+  assert.equal(checksums.trim().split('\n').length, 2);
 });
 
 for (const kind of [
   'missing',
   'wrong version',
   'extra installer',
+  'Intel Mac installer',
   'empty',
   'directory',
 ]) {
@@ -137,6 +137,11 @@ for (const kind of [
     }
     if (kind === 'extra installer')
       writeFileSync(path.join(root, 'extra.exe'), 'extra');
+    if (kind === 'Intel Mac installer')
+      writeFileSync(
+        path.join(root, `PalmDesk-${manifest.version}-mac-x64.dmg`),
+        'unsupported architecture'
+      );
     if (kind === 'empty') writeFileSync(filename, '');
     if (kind === 'directory') {
       rmSync(filename);

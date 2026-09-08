@@ -134,7 +134,7 @@ pnpm build:desktop
 
 `build:native` and `build:desktop` select the current host platform. Local desktop artifacts are written to `electron-release/`, with the Windows executable under `win-unpacked/`. On Windows, `pnpm build:desktop:win` explicitly builds the Windows version. These commands do not publish a GitHub Release. Distributing installers still requires resolving dependency warnings, confirming icon provenance and third-party licenses, and completing application signing; macOS also requires notarization.
 
-Use `pnpm dist:mac` on a Mac or `pnpm dist:win` on Windows to create a local installer. The manually triggered **Desktop Prerelease** workflow builds Apple Silicon, Intel Mac and Windows x64 installers and publishes them together as a GitHub Prerelease with SHA256 checksums. These test packages are not distribution-signed or notarized. See [desktop releases](docs/DESKTOP_RELEASES.md) for version rules, triggering the workflow and installation limits.
+Use `pnpm dist:mac` on an Apple Silicon Mac or `pnpm dist:win` on Windows to create a local installer. The manually triggered **Desktop Prerelease** workflow builds Apple Silicon Mac and Windows x64 installers and publishes them together as a GitHub Prerelease with SHA256 checksums. Intel Mac installers are not currently supported. These test packages are not distribution-signed or notarized. See [desktop releases](docs/DESKTOP_RELEASES.md) for version rules, triggering the workflow and installation limits.
 
 With the backend running, run the signaling integration test:
 

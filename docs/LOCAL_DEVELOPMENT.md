@@ -35,7 +35,7 @@ pnpm build:prod
 
 macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`，构建当前主机平台的原生辅助程序和本地应用目录。GitHub Actions 工作流包含 Windows 源码检查和辅助程序编译，云端结果以实际运行记录为准。
 
-生成可发送的安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`。手动触发 GitHub Actions 构建并发布三个平台测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
+生成可发送的安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`。手动触发 GitHub Actions 构建并发布 Apple Silicon Mac 和 Windows x64 测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
 
 ## Windows 桌面
 

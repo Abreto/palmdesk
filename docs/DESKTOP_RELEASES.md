@@ -7,7 +7,7 @@
 1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号。
 2. 打开仓库 **Actions → Desktop Prerelease → Run workflow**。
 3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.1` 输入 `v0.0.1`，然后运行。
-4. 等待三个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传三个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。
+4. 等待两个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传两个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。
 
 也可通过 GitHub CLI 手动触发：
 
@@ -15,19 +15,18 @@
 gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.0.1
 ```
 
-| 平台                | Runner           | 安装包                               |
-| ------------------- | ---------------- | ------------------------------------ |
-| macOS Apple Silicon | `macos-15`       | `PalmDesk-<version>-mac-arm64.dmg`   |
-| macOS Intel         | `macos-15-intel` | `PalmDesk-<version>-mac-x64.dmg`     |
-| Windows x64         | `windows-2022`   | `PalmDesk-<version>-windows-x64.exe` |
+| 平台                | Runner         | 安装包                               |
+| ------------------- | -------------- | ------------------------------------ |
+| macOS Apple Silicon | `macos-15`     | `PalmDesk-<version>-mac-arm64.dmg`   |
+| Windows x64         | `windows-2022` | `PalmDesk-<version>-windows-x64.exe` |
 
-两个 Mac 包都在 macOS 15 构建，较早系统尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
+当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包在 macOS 15 构建，较早系统尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
 
 普通 push 和 pull request 不触发此发布流程。工作流固定构建触发时的提交；输入标签必须匹配该提交的版本，已有标签必须指向同一提交。标签不存在时，发布步骤为该提交创建标签。已存在的 Release 不覆盖；发布阶段失败若留下草稿，需先检查和处理该草稿再重跑，或者使用新版本。
 
 构建任务仅有仓库读取权限，发布任务使用 `contents: write` 的内置 `GITHUB_TOKEN`。当前流程不需要额外 PAT、签名证书或 Actions Secrets。所有构建成功后才进入发布任务；临时安装包也会在 Actions Artifacts 中保留 14 天。预发布不会标记为 Latest。
 
-发布前会检查三份安装包的名称、版本和非空文件状态，并生成 SHA256 校验和。macOS 还校验主程序及 Swift 辅助程序架构和应用本地签名，Windows 检查原生辅助程序已包含在包内。
+发布前会检查两份安装包的名称、版本和非空文件状态，并生成 SHA256 校验和。macOS 还校验主程序及 Swift 辅助程序架构和应用本地签名，Windows 检查原生辅助程序已包含在包内。
 
 ## 本地构建
 
@@ -45,7 +44,7 @@ pnpm install --frozen-lockfile
 pnpm dist:win
 ```
 
-命令会先构建桌面页面与 Electron 主进程，再编译原生辅助程序并生成安装包，本地构建不会上传 GitHub。macOS 构建当前主机架构；Intel 包在 Intel Mac 上构建，Apple Silicon 包在 Apple Silicon Mac 上构建。Windows 输出 x64 安装包。
+命令会先构建桌面页面与 Electron 主进程，再编译原生辅助程序并生成安装包，本地构建不会上传 GitHub。macOS 请在 Apple Silicon Mac 上构建；Intel Mac 安装包暂不支持。Windows 输出 x64 安装包。
 
 主工作区的安装包位于 `electron-release/<version>/`。linked worktree 会自动使用隔离的应用名称、bundle ID 和输出子目录，适合开发测试；对外发布使用主工作区或干净 clone 的正式身份。原有 `pnpm build:desktop` 和 `pnpm build:desktop:win` 仍只生成本地应用目录。
 

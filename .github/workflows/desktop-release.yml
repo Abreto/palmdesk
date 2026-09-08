@@ -55,13 +55,6 @@ jobs:
             app_directory: mac-arm64
             command: dist:mac
             extension: dmg
-          - os: macos-15-intel
-            platform: mac
-            arch: x64
-            native_arch: x86_64
-            app_directory: mac
-            command: dist:mac
-            extension: dmg
           - os: windows-2022
             platform: windows
             arch: x64
