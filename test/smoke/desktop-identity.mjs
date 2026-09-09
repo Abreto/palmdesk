@@ -12,6 +12,7 @@ import {
 import { existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { setTimeout as delay } from 'node:timers/promises';
 
 const require = createRequire(import.meta.url);
 const { _electron } = require('playwright');
@@ -39,6 +40,24 @@ async function runtimeIdentity(application, helper) {
     if (response.error) throw new Error(response.error);
     return response.data;
   }, helper);
+}
+
+async function waitForRegisteredBundle(application, helper, bundle) {
+  const target = realpathSync(bundle);
+  let actual;
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    actual = await runtimeIdentity(application, helper);
+    if (
+      actual.registeredPaths.some(
+        (registered) => realpathSync(registered) === target
+      )
+    )
+      return actual;
+    await delay(100);
+  }
+  assert.fail(
+    `Application registration did not appear: ${JSON.stringify(actual)}`
+  );
 }
 
 async function verifyDuplicateDetection(
@@ -72,23 +91,23 @@ async function verifyDuplicateDetection(
     );
     execFileSync('/usr/bin/plutil', ['-convert', 'xml1', info]);
     execFileSync('/usr/bin/codesign', ['--force', '--sign', '-', duplicate]);
-    const registration = execFileSync(lsregister, ['-f', '-v', duplicate], {
+    execFileSync(lsregister, ['-f', '-v', duplicate], {
       encoding: 'utf8',
     });
-    const actual = await runtimeIdentity(application, helper);
-    assert.ok(
-      actual.registeredPaths.includes(realpathSync(duplicate)),
-      JSON.stringify({ actual, registration })
+    const actual = await waitForRegisteredBundle(
+      application,
+      helper,
+      duplicate
     );
     assert.throws(
       () => assertUniqueApplicationIdentity(actual, executable, false),
       /注册了多个应用副本/
     );
     await rename(duplicate, renamed);
-    const afterRename = await runtimeIdentity(application, helper);
-    assert.ok(
-      afterRename.registeredPaths.includes(realpathSync(renamed)),
-      JSON.stringify(afterRename)
+    const afterRename = await waitForRegisteredBundle(
+      application,
+      helper,
+      renamed
     );
     assert.throws(
       () => assertUniqueApplicationIdentity(afterRename, executable, false),
@@ -191,7 +210,7 @@ for (const development of [true, false]) {
     );
     const nativeIdentity = await runtimeIdentity(application, helper);
     assert.equal(nativeIdentity.bundleId, identity.appId);
-    assert.equal(nativeIdentity.bundlePath, realpathSync(bundle));
+    assert.equal(realpathSync(nativeIdentity.bundlePath), realpathSync(bundle));
     assertUniqueApplicationIdentity(nativeIdentity, executable, !development);
     if (development) {
       await verifyDuplicateDetection(

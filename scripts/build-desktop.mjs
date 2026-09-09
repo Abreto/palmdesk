@@ -11,7 +11,7 @@ if (!target) {
   throw new Error('Desktop builds are supported on macOS and Windows hosts.');
 }
 const usage =
-  'Usage: node scripts/build-desktop.mjs [--mac|--win] [--installer]';
+  'Usage: node scripts/build-desktop.mjs [--mac|--win] [--installer] [--release]';
 let flags;
 try {
   ({ values: flags } = parseArgs({
@@ -19,6 +19,7 @@ try {
       mac: { type: 'boolean' },
       win: { type: 'boolean' },
       installer: { type: 'boolean' },
+      release: { type: 'boolean' },
     },
   }));
 } catch (error) {
@@ -46,7 +47,11 @@ const options = {
   cwd: root,
   stdio: 'inherit',
   windowsHide: true,
-  env: { ...process.env, VITE_APP_RELEASE_PROJECT_ISWEB: 'false' },
+  env: {
+    ...process.env,
+    VITE_APP_RELEASE_PROJECT_ISWEB: 'false',
+    PALMDESK_BUILD_CHANNEL: flags.release ? 'release' : 'local',
+  },
 };
 
 execFileSync(process.execPath, [vite, 'build'], options);

@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const {
+  copyFileSync,
   mkdtempSync,
   mkdirSync,
   realpathSync,
@@ -18,6 +19,7 @@ let temporary;
 let main;
 let first;
 let second;
+let clone;
 function git(root, ...args) {
   return execFileSync('git', ['-c', 'core.hooksPath=/dev/null', ...args], {
     cwd: root,
@@ -32,6 +34,7 @@ test.before(() => {
   main = path.join(temporary, 'main checkout');
   first = path.join(temporary, 'worktree one');
   second = path.join(temporary, 'worktree two');
+  clone = path.join(temporary, 'separate clone');
   mkdirSync(main);
   git(main, 'init', '-b', 'main');
   git(
@@ -48,32 +51,39 @@ test.before(() => {
   );
   git(main, 'worktree', 'add', '--detach', first);
   git(main, 'worktree', 'add', '--detach', second);
+  git(temporary, 'clone', '--local', main, clone);
 });
 test.after(() => rmSync(temporary, { recursive: true, force: true }));
 
-test('the primary checkout retains the production identity and separates development', () => {
-  assert.deepEqual(getDesktopIdentity(main), {
-    appId: 'io.github.abreto.palmdesk',
-    productName: 'PalmDesk',
-    worktreeId: '',
-  });
+test('the primary checkout isolates local packages and development from the release', () => {
+  const packaged = getDesktopIdentity(main);
+  assert.match(
+    packaged.appId,
+    /^io\.github\.abreto\.palmdesk\.local\.[a-f0-9]{10}$/
+  );
+  assert.equal(packaged.productName, `PalmDesk Local ${packaged.checkoutId}`);
+  assert.equal(packaged.worktreeId, '');
   assert.equal(
     getDesktopIdentity(main, { development: true }).appId,
-    'io.github.abreto.palmdesk.dev'
+    `${packaged.appId}.dev`
   );
   assert.equal(
     getDesktopIdentity(main, { development: true }).productName,
-    'PalmDesk Dev'
+    `${packaged.productName} Dev`
   );
 });
 
-test('different worktrees and build modes have distinct app IDs and names', () => {
+test('checkouts, clones and build modes have distinct app IDs and names', () => {
   const identities = [
     getDesktopIdentity(main),
     getDesktopIdentity(first),
     getDesktopIdentity(second),
+    getDesktopIdentity(clone),
+    getDesktopIdentity(main, { development: true }),
     getDesktopIdentity(first, { development: true }),
     getDesktopIdentity(second, { development: true }),
+    getDesktopIdentity(clone, { development: true }),
+    getDesktopIdentity(main, { release: true }),
   ];
   assert.equal(
     new Set(identities.map((identity) => identity.appId)).size,
@@ -90,6 +100,30 @@ test('different worktrees and build modes have distinct app IDs and names', () =
   assert.deepEqual(getDesktopIdentity(first), identities[1]);
 });
 
+test('only explicit release builds use the same production identity in every checkout', () => {
+  for (const checkout of [main, first, second, clone]) {
+    assert.deepEqual(getDesktopIdentity(checkout, { release: true }), {
+      appId: 'io.github.abreto.palmdesk',
+      productName: 'PalmDesk',
+      checkoutId: '',
+      worktreeId: '',
+    });
+    assert.throws(
+      () => getDesktopIdentity(checkout, { release: true, development: true }),
+      /development runtime cannot use the release identity/
+    );
+  }
+});
+
+test('branch changes and path aliases preserve the main checkout identity', () => {
+  const before = getDesktopIdentity(main);
+  git(main, 'checkout', '-b', 'main-identity-test');
+  assert.deepEqual(getDesktopIdentity(main), before);
+  const alias = path.join(temporary, 'main alias');
+  symlinkSync(main, alias, process.platform === 'win32' ? 'junction' : 'dir');
+  assert.deepEqual(getDesktopIdentity(alias), before);
+});
+
 test('changing branches and moving a worktree preserves its permission identity', () => {
   const before = getDesktopIdentity(first);
   git(first, 'checkout', '-b', 'identity-test');
@@ -103,10 +137,23 @@ test('changing branches and moving a worktree preserves its permission identity'
   assert.deepEqual(getDesktopIdentity(alias), before);
 });
 
-test('source archives use the primary identity but broken Git metadata fails the build', () => {
+test('source archives get isolated local identities but broken Git metadata fails the build', () => {
   const archive = path.join(temporary, 'archive');
+  const another = path.join(temporary, 'another archive');
   mkdirSync(archive);
-  assert.equal(getDesktopIdentity(archive).appId, 'io.github.abreto.palmdesk');
+  mkdirSync(another);
+  assert.match(
+    getDesktopIdentity(archive).appId,
+    /^io\.github\.abreto\.palmdesk\.local\.[a-f0-9]{10}$/
+  );
+  assert.notEqual(
+    getDesktopIdentity(archive).appId,
+    getDesktopIdentity(another).appId
+  );
+  assert.equal(
+    getDesktopIdentity(archive, { release: true }).appId,
+    'io.github.abreto.palmdesk'
+  );
   writeFileSync(
     path.join(archive, '.git'),
     'gitdir: /nonexistent-palmdesk-git-directory\n'
@@ -114,35 +161,82 @@ test('source archives use the primary identity but broken Git metadata fails the
   assert.throws(() => getDesktopIdentity(archive));
 });
 
-test('packaging embeds the same isolated identity in its bundle and runtime metadata', () => {
-  const root = path.resolve(__dirname, '../..');
-  const expected = getDesktopIdentity(root);
-  const config = require('../../electron-builder.cjs');
-  assert.equal(config.appId, expected.appId);
-  assert.equal(config.productName, expected.productName);
-  assert.equal(config.extraMetadata.productName, expected.productName);
+test('builder configuration isolates local artifacts and reserves the production metadata for releases', () => {
+  const source = path.resolve(__dirname, '../..');
+  for (const checkout of [main, first, clone]) {
+    mkdirSync(path.join(checkout, 'scripts'));
+    for (const filename of [
+      'electron-builder.cjs',
+      'scripts/desktop-identity.cjs',
+    ])
+      copyFileSync(path.join(source, filename), path.join(checkout, filename));
+    for (const channel of ['local', 'release']) {
+      const expected = getDesktopIdentity(checkout, {
+        release: channel === 'release',
+      });
+      const config = JSON.parse(
+        execFileSync(
+          process.execPath,
+          [
+            '-e',
+            'process.stdout.write(JSON.stringify(require(process.argv[1])))',
+            path.join(checkout, 'electron-builder.cjs'),
+          ],
+          {
+            encoding: 'utf8',
+            env: { ...process.env, PALMDESK_BUILD_CHANNEL: channel },
+          }
+        )
+      );
+      assert.equal(config.appId, expected.appId);
+      assert.equal(config.productName, expected.productName);
+      assert.equal(config.extraMetadata.productName, expected.productName);
+      assert.equal(config.mac.extendInfo.PalmDeskBuildChannel, channel);
+      assert.equal(
+        config.directories.output,
+        channel === 'release'
+          ? 'electron-release/${version}'
+          : `electron-release/\${version}/${expected.worktreeId ? 'worktree' : 'local'}-${expected.checkoutId}`
+      );
+    }
+  }
 });
 
 test(
   'build preflight finds old app artifacts even when their worktree source has not been upgraded',
   { skip: process.platform !== 'darwin' },
   () => {
-    function bundle(root, relative, appId) {
+    function bundle(root, relative, appId, extra = {}) {
       const directory = path.join(root, relative);
       mkdirSync(path.join(directory, 'Contents'), { recursive: true });
       writeFileSync(
         path.join(directory, 'Contents/Info.plist'),
-        JSON.stringify({ CFBundleIdentifier: appId })
+        JSON.stringify({ CFBundleIdentifier: appId, ...extra })
       );
       return directory;
     }
     const release = 'electron-release/0.0.1/mac-arm64/PalmDesk.app';
-    bundle(main, release, getDesktopIdentity(main).appId);
-    const legacy = bundle(first, release, getDesktopIdentity(main).appId);
+    const productionId = getDesktopIdentity(main, { release: true }).appId;
+    const legacyMain = bundle(main, release, productionId);
+    const legacyMainDev = bundle(
+      main,
+      '.local/electron-dev/Electron.app',
+      `${productionId}.dev`
+    );
+    for (const checkout of [main, first])
+      bundle(
+        checkout,
+        'electron-release/0.0.2/mac-arm64/PalmDesk.app',
+        productionId,
+        {
+          PalmDeskBuildChannel: 'release',
+        }
+      );
+    const legacy = bundle(first, release, productionId);
     const renamed = bundle(
       first,
       '.local/PalmDesk-before-isolation.app.disabled',
-      getDesktopIdentity(main).appId
+      productionId
     );
     bundle(
       first,
@@ -164,13 +258,23 @@ test(
 
     assert.deepEqual(findLegacyApps(main), [
       {
+        bundle: legacyMain,
+        actual: productionId,
+        expected: getDesktopIdentity(main).appId,
+      },
+      {
+        bundle: legacyMainDev,
+        actual: `${productionId}.dev`,
+        expected: getDesktopIdentity(main, { development: true }).appId,
+      },
+      {
         bundle: legacy,
-        actual: getDesktopIdentity(main).appId,
+        actual: productionId,
         expected: isolated.appId,
       },
       {
         bundle: renamed,
-        actual: getDesktopIdentity(main).appId,
+        actual: productionId,
         expected: isolated.appId,
       },
       {
@@ -179,6 +283,8 @@ test(
         expected: getDesktopIdentity(second, { development: true }).appId,
       },
     ]);
+    rmSync(legacyMain, { recursive: true });
+    rmSync(legacyMainDev, { recursive: true });
     rmSync(legacy, { recursive: true });
     rmSync(renamed, { recursive: true });
     rmSync(development, { recursive: true });

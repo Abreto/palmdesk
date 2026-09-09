@@ -35,7 +35,7 @@ pnpm build:prod
 
 macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`，构建当前主机平台的原生辅助程序和本地应用目录。GitHub Actions 工作流包含 Windows 源码检查和辅助程序编译，云端结果以实际运行记录为准。
 
-生成可发送的安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`。手动触发 GitHub Actions 构建并发布 Apple Silicon Mac 和 Windows x64 测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
+生成本地测试安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`，默认使用当前工作区的隔离身份。对外发布的固定身份须显式添加 `--release`。手动触发 GitHub Actions 构建并发布 Apple Silicon Mac 和 Windows x64 测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
 
 ## Windows 桌面
 
@@ -63,7 +63,7 @@ Windows 主机启用 Chromium 的 WGC 窗口捕获，并检查系统的 `Graphic
 pnpm build:desktop:win
 ```
 
-本地构建输出在 `electron-release/<version>/win-unpacked/`，可运行其中的 `PalmDesk.exe`。构建不发布安装包；发行签名和安装包分发需要另外配置。开发配置位于 `%APPDATA%\PalmDesk Dev`，打包版位于 `%APPDATA%\PalmDesk`，linked worktree 继续使用独立名称及配置目录。
+主工作区的本地构建输出在 `electron-release/<version>/local-<id>/win-unpacked/`，可运行其中的 `PalmDesk Local <id>.exe`；linked worktree 使用 `worktree-<id>/win-unpacked/PalmDesk WT <id>.exe`。构建不发布安装包；发行签名和安装包分发需要另外配置。配置位于 `%APPDATA%\<应用名称>`，热开发应用的名称再加 ` Dev`，各身份均独立于正式版 `%APPDATA%\PalmDesk`。
 
 原生集成烟测会创建两个临时同名窗口，检查 HWND 身份、边界刷新、指定窗口聚焦、最小化还原、失效身份和关闭窗口后的拒绝。它会短暂改变前台窗口，结束后清理测试窗口；只在解锁的交互式 Windows 会话中显式运行：
 
@@ -152,21 +152,35 @@ node test/smoke/business-flow.mjs
 
 ## 应用身份
 
-主工作区打包版为 `io.github.abreto.palmdesk`（PalmDesk），开发版为 `io.github.abreto.palmdesk.dev`（PalmDesk Dev）。linked worktree 自动使用 `io.github.abreto.palmdesk.worktree.<id>`，开发版再加 `.dev`，名称为 `PalmDesk WT <id>` 或 `PalmDesk WT <id> Dev`。`<id>` 根据该 worktree 的 Git 管理目录生成，重复构建、切换分支和 `git worktree move` 不会改变它。
+所有本地构建默认与正式版隔离，包括 `pnpm dev:desktop`、`pnpm build:desktop`、`pnpm dist:mac` 和 `pnpm dist:win`。`NODE_ENV=production` 或生成安装包不会自动选择正式身份。
 
-构建配置为 `electron-builder.cjs`，会同时设置 bundle ID、应用名称和包内运行时名称。`pnpm dev:desktop` 同样隔离主应用及 Electron Helper 的标识。各身份的配置、浏览器存储和单实例锁位于各自的 `~/Library/Application Support/<应用名称>` 目录。每个新身份需单独授予屏幕录制和辅助功能权限；开发版从过去与 PalmDesk 共用的数据目录迁移后，需要重新配置连接服务。
+| 构建                            | Bundle ID                                     | 应用名称                  |
+| ------------------------------- | --------------------------------------------- | ------------------------- |
+| 主工作区或普通 clone 的本地打包 | `io.github.abreto.palmdesk.local.<id>`        | `PalmDesk Local <id>`     |
+| 主工作区或普通 clone 的热开发   | `io.github.abreto.palmdesk.local.<id>.dev`    | `PalmDesk Local <id> Dev` |
+| linked worktree 的本地打包      | `io.github.abreto.palmdesk.worktree.<id>`     | `PalmDesk WT <id>`        |
+| linked worktree 的热开发        | `io.github.abreto.palmdesk.worktree.<id>.dev` | `PalmDesk WT <id> Dev`    |
+| 显式 `--release` 打包           | `io.github.abreto.palmdesk`                   | `PalmDesk`                |
+
+`<id>` 根据各自 Git 管理目录的真实路径生成，不同 clone 和 worktree 不共享身份。重复构建、切换分支和 linked worktree 的 `git worktree move` 不会改变它，符号链接也不会产生新身份。源码压缩包没有 Git 元数据时使用源码目录的真实路径；移动整个仓库或源码目录会产生新身份。已有 linked worktree 的 bundle ID 保持兼容。
+
+构建配置为 `electron-builder.cjs`，会同时设置 bundle ID、应用名称和包内运行时名称。`pnpm dev:desktop` 同样隔离主应用及 Electron Helper 的标识。各身份的配置、浏览器存储和单实例锁位于各自的 `~/Library/Application Support/<应用名称>` 目录。每个新身份需单独授予屏幕录制和辅助功能权限；主工作区迁移到新身份后，需要重新配置连接服务。
+
+`--release` 适用于 `build:desktop` 和 `dist:*`，无论从主工作区、clone 还是 worktree 执行，都使用固定的正式身份。只在准备发行产物时使用，例如 `pnpm dist:mac --release`。发布脚本将选择显式传给打包器；普通构建会覆盖继承的 `PALMDESK_BUILD_CHANNEL`，避免终端环境意外把开发包变成正式身份。直接调用 electron-builder 时默认仍为本地身份，只有 `PALMDESK_BUILD_CHANNEL=release` 才选择正式身份。
 
 `node scripts/dev.mjs --prepare-only` 可只生成开发应用，用于核对 `Info.plist` 和签名，不启动窗口或申请权限。原生及桌面烟测应使用当前 worktree 的开发应用，不能借用主工作区的 Electron，否则权限申请仍会归属被借用的应用。
 
-worktree 的打包产物位于 `electron-release/<version>/worktree-<id>/`。主工作区和 linked worktree 都可在准备开发应用并完成打包后，运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
+主工作区的本地打包产物位于 `electron-release/<version>/local-<id>/`，worktree 使用 `electron-release/<version>/worktree-<id>/`，显式发布构建使用 `electron-release/<version>/`。主工作区和 linked worktree 都可在准备开发应用并完成本地打包后，运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
 
-隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；重新构建 `main` 或仅重置 TCC 都不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留。保留备份时应将旧包压缩归档，再移除原始目录；仅移动目录、改显示名称或改后缀都无法消除身份冲突。
+隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；仅重置 TCC 不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。无 Git 元数据时检查当前源码目录。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留；显式发布构建写入 `PalmDeskBuildChannel=release`，用于与旧的本地正式身份产物区分。
+
+主工作区原有 `.local/electron-dev/Electron.app` 使用共享的 `io.github.abreto.palmdesk.dev`，需合入新规则后在主工作区执行 `node scripts/dev.mjs --prepare-only` 重建。其他旧包保留备份时应先压缩归档，再移除原始目录；仅移动目录、改显示名称或改后缀都无法消除身份冲突。
 
 macOS 启动时通过原生辅助程序读取父进程的真实 bundle ID、可执行文件路径和该 ID 的所有有效注册路径。在加载输入模块、获取单实例锁和创建窗口之前完成检查；发现多个副本时显示具体冲突路径并退出，不继续申请权限。别名和符号链接会按真实路径去重。此检查也覆盖 worktree 之外的旧副本；因此同一身份日常只保留一个可启动的安装位置。
 
 ### 重建与权限恢复
 
-隔离 bundle ID 解决不同构建互相覆盖的问题；ad-hoc 签名的 designated requirement 通常包含代码哈希，重建后同一个身份仍可能需要重新授权。日常使用的主工作区版本应保持固定安装位置，并使用固定的代码签名证书。已在钥匙串安装 Developer ID 或本机代码签名证书时，可以通过 `CSC_NAME` 指定，打包和开发应用都支持；证书不可用会使构建失败。
+隔离 bundle ID 解决不同构建互相覆盖的问题；ad-hoc 签名的 designated requirement 通常包含代码哈希，重建后同一个身份仍可能需要重新授权。日常使用的应用应保持固定安装位置，并使用固定的代码签名证书。已在钥匙串安装 Developer ID 或本机代码签名证书时，可以通过 `CSC_NAME` 指定，打包和开发应用都支持；证书不可用会使构建失败。
 
 ```bash
 CSC_NAME='证书名称或 SHA-1 指纹' pnpm build:desktop
@@ -182,11 +196,11 @@ lsregister_bin=/System/Library/Frameworks/CoreServices.framework/Frameworks/Laun
 
 再次运行 `pnpm doctor:desktop` 应通过。旧分支必须合入身份隔离修复后才能重新构建使用，解压旧备份也会重新引入冲突。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 PalmDesk 条目，再添加保留的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `PalmDesk WT <id>` 条目。不要全局重建 LaunchServices 数据库或重置其他应用的权限。
 
-若仍需通过命令清理旧授权，只重置 PalmDesk 的对应权限，然后重新授权：
+若仍需通过命令清理某个开发版的旧授权，使用其完整 bundle ID，只重置该身份的对应权限，然后重新授权。将以下 `<id>` 替换为实际标识，热开发应用还需加 `.dev`；不要用正式版的 ID 清理开发版权限：
 
 ```bash
-tccutil reset ScreenCapture io.github.abreto.palmdesk
-tccutil reset Accessibility io.github.abreto.palmdesk
+tccutil reset ScreenCapture 'io.github.abreto.palmdesk.local.<id>'
+tccutil reset Accessibility 'io.github.abreto.palmdesk.local.<id>'
 ```
 
 代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。

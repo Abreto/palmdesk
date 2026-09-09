@@ -4,7 +4,12 @@
  */
 const { getDesktopIdentity } = require('./scripts/desktop-identity.cjs');
 
-const identity = getDesktopIdentity(__dirname);
+const channel = process.env.PALMDESK_BUILD_CHANNEL || 'local';
+if (!['local', 'release'].includes(channel))
+  throw new Error('PALMDESK_BUILD_CHANNEL must be local or release.');
+const identity = getDesktopIdentity(__dirname, {
+  release: channel === 'release',
+});
 
 module.exports = {
   $schema:
@@ -14,8 +19,8 @@ module.exports = {
   extraMetadata: { productName: identity.productName },
   beforePack: './scripts/before-pack.cjs',
   directories: {
-    output: identity.worktreeId
-      ? `electron-release/\${version}/worktree-${identity.worktreeId}`
+    output: identity.checkoutId
+      ? `electron-release/\${version}/${identity.worktreeId ? 'worktree' : 'local'}-${identity.checkoutId}`
       : 'electron-release/${version}',
   },
   files: ['dist', 'electron-dist', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md'],
@@ -26,6 +31,7 @@ module.exports = {
     artifactName: '${productName}-${version}-mac-${arch}.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
+      PalmDeskBuildChannel: channel,
       NSScreenCaptureUsageDescription:
         '用于远程观察或控制时捕获选定的应用窗口。',
       NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
