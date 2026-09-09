@@ -281,6 +281,7 @@ for (const [platform, target] of [
     ]);
     assert.equal(calls[0].options.cwd, directory + path.sep);
     assert.equal(calls[1].options.cwd, directory + path.sep);
+    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
   });
 }
 
@@ -334,9 +335,33 @@ for (const [platform, requested, target] of [
     await run('build-desktop.mjs');
     assert.equal(calls.length, 2);
     assert.equal(calls[0].options.env.VITE_APP_RELEASE_PROJECT_ISWEB, 'false');
+    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
     assert.deepEqual(calls[1].args.slice(1), [...target, '--publish', 'never']);
   });
 }
+
+for (const installer of [false, true]) {
+  test(`explicit release ${installer ? 'installers' : 'directories'} select the release identity`, async (t) => {
+    const { calls, run } = harness(t, 'darwin', {
+      args: ['--release', ...(installer ? ['--installer'] : [])],
+    });
+    await run('build-desktop.mjs');
+    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'release');
+    assert.equal(calls[1].args.includes('--dir'), !installer);
+  });
+}
+
+test('local builds ignore an inherited release channel unless --release is passed', async (t) => {
+  const previous = process.env.PALMDESK_BUILD_CHANNEL;
+  t.after(() => {
+    if (previous === undefined) delete process.env.PALMDESK_BUILD_CHANNEL;
+    else process.env.PALMDESK_BUILD_CHANNEL = previous;
+  });
+  process.env.PALMDESK_BUILD_CHANNEL = 'release';
+  const { calls, run } = harness(t, 'win32', { args: ['--installer'] });
+  await run('build-desktop.mjs');
+  assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
+});
 
 test('installer builds reject conflicting platforms before invoking build tools', async (t) => {
   const { calls, run } = harness(t, 'darwin', {

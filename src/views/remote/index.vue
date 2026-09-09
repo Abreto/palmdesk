@@ -1238,11 +1238,27 @@ async function handleWindowRequest(
     if (listingPeers.has(peer.receiver)) return;
     listingPeers.add(peer.receiver);
     try {
+      if (request.data?.agentDiscovery === true) {
+        try {
+          const discovery = await invokeCapture(IPC_EVENT.getAgentApplications);
+          if (!current()) return;
+          if (discovery?.code !== 0)
+            throw new Error(discovery?.msg || '读取 Agent 失败');
+          discovery.data.agents.forEach((agent) =>
+            reply(WsMsgTypeEnum.remoteWindowsResult, { agent })
+          );
+        } catch (error) {
+          reply(WsMsgTypeEnum.remoteWindowsResult, {
+            discoveryError:
+              error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       const result = await invokeCapture(IPC_EVENT.getCaptureSources);
       if (!current()) return;
       if (result?.code !== 0) throw new Error(result?.msg || '读取窗口失败');
       captureSources.value = result.data.sources;
-      const catalog = new WindowCatalog();
+      const catalog = windowCatalogs.get(peer.receiver) || new WindowCatalog();
       windowCatalogs.set(peer.receiver, catalog);
       catalog.update(result.data.sources).forEach((source) => {
         reply(WsMsgTypeEnum.remoteWindowsResult, { source });

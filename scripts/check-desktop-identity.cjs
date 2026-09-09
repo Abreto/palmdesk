@@ -3,31 +3,27 @@ const { existsSync, readdirSync } = require('node:fs');
 const path = require('node:path');
 const { getDesktopIdentity } = require('./desktop-identity.cjs');
 
-function readAppId(bundle) {
-  const plist = JSON.parse(
+function readAppInfo(bundle) {
+  return JSON.parse(
     execFileSync(
       '/usr/bin/plutil',
       ['-convert', 'json', '-o', '-', path.join(bundle, 'Contents/Info.plist')],
       { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
     )
   );
-  return plist.CFBundleIdentifier;
 }
 
 function findLegacyApps(root) {
-  if (!existsSync(path.join(root, '.git'))) return [];
-  const worktrees = execFileSync(
-    'git',
-    ['worktree', 'list', '--porcelain', '-z'],
-    {
-      cwd: root,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    }
-  )
-    .split('\0')
-    .filter((field) => field.startsWith('worktree '))
-    .map((field) => field.slice('worktree '.length));
+  const worktrees = existsSync(path.join(root, '.git'))
+    ? execFileSync('git', ['worktree', 'list', '--porcelain', '-z'], {
+        cwd: root,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      })
+        .split('\0')
+        .filter((field) => field.startsWith('worktree '))
+        .map((field) => field.slice('worktree '.length))
+    : [root];
   const legacy = [];
   for (const worktree of worktrees) {
     if (!existsSync(worktree)) continue;
@@ -35,14 +31,18 @@ function findLegacyApps(root) {
       if (!existsSync(current)) return;
       // Renaming an app to .app.disabled does not retire its system identity.
       if (existsSync(path.join(current, 'Contents/Info.plist'))) {
-        const actual = readAppId(current);
+        const info = readAppInfo(current);
+        const actual = info.CFBundleIdentifier;
         if (
-          /^io\.github\.abreto\.palmdesk(?:\.worktree\.[a-f0-9]{10})?(?:\.dev)?$/.test(
+          /^io\.github\.abreto\.palmdesk(?:\.(?:local|worktree)\.[a-f0-9]{10})?(?:\.dev)?$/.test(
             actual
           )
         ) {
           const expected = getDesktopIdentity(worktree, {
             development: actual.endsWith('.dev'),
+            release:
+              actual === 'io.github.abreto.palmdesk' &&
+              info.PalmDeskBuildChannel === 'release',
           });
           if (actual !== expected.appId)
             legacy.push({ bundle: current, actual, expected: expected.appId });
@@ -69,7 +69,7 @@ function checkDesktopIdentity(root) {
   const legacy = findLegacyApps(root);
   if (legacy.length) {
     throw new Error(
-      "Legacy desktop apps still use another checkout's identity. Archive and remove these .app bundles, then unregister them from LaunchServices (see docs/LOCAL_DEVELOPMENT.md):\n" +
+      "Legacy desktop apps still use the release or another checkout's identity. Archive and remove these .app bundles, then unregister them from LaunchServices (see docs/LOCAL_DEVELOPMENT.md):\n" +
         legacy
           .map(
             ({ bundle, actual, expected }) =>

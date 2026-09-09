@@ -1,3 +1,5 @@
+import type { AgentId } from './utils/agent-registry';
+
 export interface IIpcRendererData {
   windowId: number;
   channel: any;
@@ -40,11 +42,18 @@ export interface ICaptureSource {
 
 export interface IRemoteWindow {
   id: string;
+  contextId?: string;
+  agentId?: AgentId;
   name: string;
   appName: string;
   thumbnail: string;
   appIcon: string;
   isOnScreen: boolean;
+}
+
+export interface IRemoteAgent {
+  id: AgentId;
+  name: string;
 }
 
 export interface RemoteInput {

@@ -12,10 +12,13 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 
 - Stream a single application window via Electron capture and WebRTC, with input sent over a DataChannel.
 - Connect from a mobile page with device history, portrait and landscape layouts, and quality and frame-rate controls.
-- Connect using a device code and password, or scan the desktop's QR code with a camera or an image. Connection links open the window picker automatically after authentication.
+- Connect using a device code and password, or scan the desktop's QR code with a camera or an image. Connection links open the Agent directory automatically after authentication.
 - Browse application windows across macOS Spaces, search by application name or window title, view thumbnails, and refresh the list. Capture starts only after you select a window.
+- Start with an Agent directory that discovers open Codex, Claude, ChatGPT, Kimi, and ZCode applications. A single window opens directly; multiple windows expand for selection. Running applications without an available window remain listed.
+- Pin agents and retain recently used agents per device. Other applications remain accessible, and terminal windows can be manually associated with an agent. Manual associations survive refresh within the current connection and must be recreated after reconnecting.
+- Agent discovery uses macOS bundle IDs or Windows executable identities. "Open" describes the application, not task execution. Agent sessions, project directories, and task states are not yet integrated.
 - Activate windows on other Spaces or restore a selected minimized window before capture begins.
-- Disconnect and choose another window while retaining device connection details. AI agent clients such as Codex, ChatGPT, Claude, Kimi, and ZCode appear first, with the original order preserved within each group.
+- Return to the Agent directory and choose another window while retaining device connection details. Windows within each agent retain their original order.
 - Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
 - On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
@@ -134,7 +137,7 @@ pnpm build:desktop
 
 `build:native` and `build:desktop` select the current host platform. Local desktop artifacts are written to `electron-release/`, with the Windows executable under `win-unpacked/`. On Windows, `pnpm build:desktop:win` explicitly builds the Windows version. These commands do not publish a GitHub Release. Distributing installers still requires resolving dependency warnings, confirming icon provenance and third-party licenses, and completing application signing; macOS also requires notarization.
 
-Use `pnpm dist:mac` on an Apple Silicon Mac or `pnpm dist:win` on Windows to create a local installer. The manually triggered **Desktop Prerelease** workflow builds Apple Silicon Mac and Windows x64 installers and publishes them together as a GitHub Prerelease with SHA256 checksums. Intel Mac installers are not currently supported. These test packages are not distribution-signed or notarized. See [desktop releases](docs/DESKTOP_RELEASES.md) for version rules, triggering the workflow and installation limits.
+Use `pnpm dist:mac` on an Apple Silicon Mac or `pnpm dist:win` on Windows to create a local installer. Local builds isolate each checkout's app identity, permissions and data from the release; add `--release` only when preparing an installer with the fixed release identity. The manually triggered **Desktop Prerelease** workflow builds Apple Silicon Mac and Windows x64 installers and publishes them together as a GitHub Prerelease with SHA256 checksums. Intel Mac installers are not currently supported. These test packages are not distribution-signed or notarized. See [desktop releases](docs/DESKTOP_RELEASES.md) for version rules, triggering the workflow and installation limits.
 
 With the backend running, run the signaling integration test:
 
