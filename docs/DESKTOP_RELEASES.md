@@ -2,17 +2,19 @@
 
 当前发行流程用于测试版：macOS 使用本地 ad-hoc 签名，不包含 Developer ID 签名和 Apple 公证；Windows 安装包未签名。系统可能提示或阻止打开。发行证书、自动更新和真实远控验收不包含在此流程中。
 
+当前使用 `0.0.x` 迭代 Preview；`0.1.0` 保留给完成打磨、可正式分发的里程碑。
+
 ## 手动触发 GitHub Actions
 
 1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号。
 2. 打开仓库 **Actions → Desktop Prerelease → Run workflow**。
-3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.1` 输入 `v0.0.1`，然后运行。
+3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.2` 输入 `v0.0.2`，然后运行。
 4. 等待两个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传两个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。
 
 也可通过 GitHub CLI 手动触发：
 
 ```bash
-gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.0.1
+gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.0.2
 ```
 
 | 平台                | Runner         | 安装包                               |

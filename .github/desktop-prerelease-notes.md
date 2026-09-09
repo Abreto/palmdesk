@@ -1,5 +1,19 @@
 Experimental PalmDesk desktop installers for testing.
 
+## What's new in v0.0.2
+
+- The phone now opens an Agent directory that recognizes running Codex, Claude, ChatGPT, Kimi and ZCode apps on macOS and Windows. Open a single window directly or choose among multiple windows; apps without an available window still keep an entry.
+- Pin Agents per device and sort by recent use. Other applications remain available, and terminal or other windows can be manually linked to an Agent. These links survive refreshes within the current connection and reset after reconnecting.
+- Improve mobile scrolling responsiveness and sensitivity in both directions, accumulate small touch movements, remove the default mouse input delay and speed up macOS focus checks when the target window is already focused.
+- Isolate local desktop builds by checkout, including application identity, permissions and data. Distribution builds explicitly use `--release` to retain the PalmDesk release identity.
+- Add Chinese installation notes and update backend source references to the PalmDesk-maintained fork.
+
+Agent discovery identifies running applications; it does not read Agent sessions, project directories or task status.
+
+[Changes since v0.0.1](https://github.com/Abreto/palmdesk/compare/v0.0.1...v0.0.2)
+
+## Installation
+
 | Download            | Computer                          |
 | ------------------- | --------------------------------- |
 | `*-mac-arm64.dmg`   | Apple Silicon Mac                 |
@@ -22,6 +36,20 @@ This prerelease does not resolve the known dependency and license review items i
 ## 中文说明
 
 供测试使用的 PalmDesk 桌面安装包。
+
+### v0.0.2 更新内容
+
+- 手机连接后进入 Agent 目录，自动识别 macOS 和 Windows 上已打开的 Codex、Claude、ChatGPT、Kimi 和 ZCode。单窗口直接进入，多窗口展开选择；没有可用窗口的应用仍保留入口。
+- 支持按设备置顶 Agent、按最近使用排序；“其他应用”保留通用窗口控制，并可将终端等窗口手动关联到 Agent。关联在本次连接内刷新后保留，重新连接后需重新关联。
+- 改善手机横向和纵向滚动的响应与灵敏度，累积细微触摸位移、移除默认鼠标输入延迟，并优化 macOS 目标窗口已聚焦时的检查流程。
+- 本地桌面构建按工作区隔离应用身份、权限和数据；发行构建显式使用 `--release`，保持 PalmDesk 正式身份。
+- 补充中文安装说明，将后端源码引用更新为 PalmDesk 维护的 fork。
+
+Agent 识别仅表示检测到已打开的应用，尚不读取真实会话、项目目录或任务状态。
+
+[查看自 v0.0.1 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.1...v0.0.2)
+
+### 安装说明
 
 | 下载                 | 适用设备                          |
 | -------------------- | --------------------------------- |

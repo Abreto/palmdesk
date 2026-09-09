@@ -1,6 +1,6 @@
 {
   "name": "palmdesk",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "AI-native remote control for desktop apps: stream one macOS or Windows window to your phone for agent-ready workflows.",
   "packageManager": "pnpm@11.19.0",
