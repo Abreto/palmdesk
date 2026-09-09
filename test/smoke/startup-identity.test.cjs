@@ -53,14 +53,33 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
         /当前进程不一致/
       );
     }
-    assertUniqueApplicationIdentity(
-      {
-        ...identity,
-        bundleId: 'io.github.abreto.palmdesk.worktree.0123456789.dev',
-      },
-      process.execPath,
-      false
+    assert.throws(
+      () =>
+        assertUniqueApplicationIdentity(
+          { ...identity, bundleId: 'io.github.abreto.palmdesk.dev' },
+          process.execPath,
+          false
+        ),
+      /当前进程不一致/
     );
+    for (const scope of ['local', 'worktree']) {
+      for (const packaged of [true, false]) {
+        const isolated = {
+          ...identity,
+          bundleId: `io.github.abreto.palmdesk.${scope}.0123456789${packaged ? '' : '.dev'}`,
+        };
+        assertUniqueApplicationIdentity(isolated, process.execPath, packaged);
+        assert.throws(
+          () =>
+            assertUniqueApplicationIdentity(
+              isolated,
+              process.execPath,
+              !packaged
+            ),
+          /当前进程不一致/
+        );
+      }
+    }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

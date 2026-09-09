@@ -82,7 +82,7 @@ pnpm build:desktop
 
 `build:native` 和 `build:desktop` 按当前主机选择 macOS 或 Windows；本地应用输出在 `electron-release/`，Windows 可运行目录为其中的 `win-unpacked/`。在 Windows 上运行 `pnpm build:desktop:win` 可显式构建 Windows 版本。构建命令不发布 GitHub Release。正式安装包分发仍需处理依赖告警、图标来源、第三方许可和应用签名；macOS 还需要公证。
 
-Apple Silicon Mac 上使用 `pnpm dist:mac`、Windows 上使用 `pnpm dist:win` 生成本地安装包。手动触发 **Desktop Prerelease** 工作流可构建 Apple Silicon Mac 和 Windows x64 安装包，全部成功后统一发布到 GitHub Prerelease，并附 SHA256 校验文件。暂不支持 Intel Mac 安装包。这些测试包尚未完成发行签名或公证。版本规则、操作步骤及安装限制见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
+Apple Silicon Mac 上使用 `pnpm dist:mac`、Windows 上使用 `pnpm dist:win` 生成本地安装包。所有本地构建默认按工作区隔离应用身份、权限和数据；准备使用正式身份的发行包时，显式添加 `--release`。手动触发 **Desktop Prerelease** 工作流可构建 Apple Silicon Mac 和 Windows x64 安装包，全部成功后统一发布到 GitHub Prerelease，并附 SHA256 校验文件。暂不支持 Intel Mac 安装包。这些测试包尚未完成发行签名或公证。版本规则、操作步骤及安装限制见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
 
 没有签名证书时，macOS 桌面构建会为整个应用及其辅助程序执行本地 ad-hoc 签名并校验，确保 macOS 能识别 PalmDesk 的应用身份；这不替代分发签名。明确配置的证书不可用时构建会失败。
 

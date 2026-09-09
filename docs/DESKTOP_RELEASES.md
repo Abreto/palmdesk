@@ -34,19 +34,21 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm dist:mac
+pnpm dist:mac --release
 ```
 
 Windows PowerShell：
 
 ```powershell
 pnpm install --frozen-lockfile
-pnpm dist:win
+pnpm dist:win --release
 ```
 
 命令会先构建桌面页面与 Electron 主进程，再编译原生辅助程序并生成安装包，本地构建不会上传 GitHub。macOS 请在 Apple Silicon Mac 上构建；Intel Mac 安装包暂不支持。Windows 输出 x64 安装包。
 
-主工作区的安装包位于 `electron-release/<version>/`。linked worktree 会自动使用隔离的应用名称、bundle ID 和输出子目录，适合开发测试；对外发布使用主工作区或干净 clone 的正式身份。原有 `pnpm build:desktop` 和 `pnpm build:desktop:win` 仍只生成本地应用目录。
+`--release` 显式选择固定的正式身份 `io.github.abreto.palmdesk`（PalmDesk），产物位于 `electron-release/<version>/`；从主工作区、clone 或 linked worktree 执行结果一致。GitHub Actions 同样显式传入该参数，并检查 macOS 包的正式 bundle ID。
+
+本地开发测试请省略 `--release`。`pnpm dist:mac`、`pnpm dist:win` 和 `pnpm build:desktop` 默认使用当前工作区独立的应用名称及 bundle ID：主工作区或普通 clone 的产物位于 `electron-release/<version>/local-<id>/`，linked worktree 位于 `electron-release/<version>/worktree-<id>/`，权限及配置与正式版隔离。`build:desktop` 和 `build:desktop:win` 只生成本地应用目录。身份规则及旧开发包的迁移步骤见 [本地开发](LOCAL_DEVELOPMENT.md#应用身份)。
 
 ## 用户安装与后续发行
 
