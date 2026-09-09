@@ -104,19 +104,51 @@ test('touch scrolling carries a point within the selected video and no mouse pre
     [Behavior.scrollDown]
   );
   assert.equal(h.messages[0].x, 500);
-  assert.equal(h.messages[0].amount, 8);
+  assert.equal(h.messages[0].amount, 144);
 });
-test('touch scrolling accumulates small pointer movements before sending ticks', (t) => {
+test('touch scrolling retains subpixel movement at the increased gain', (t) => {
   const h = controller(t);
   h.mode = 'scroll';
   h.pointer.down(event());
-  h.pointer.move(event(220, 139));
-  h.pointer.move(event(220, 138));
-  h.pointer.move(event(220, 137));
-  h.pointer.up(event(220, 137));
+  h.pointer.move(event(220, 139.9375));
+  h.pointer.move(event(220, 139.875));
+  assert.equal(h.messages.length, 0);
+  h.pointer.move(event(220, 139.8125));
+  h.pointer.up(event(220, 139.8125));
   assert.deepEqual(
     h.messages.map((m) => [m.type, m.amount]),
     [[Behavior.scrollDown, 1]]
+  );
+});
+test('touch scroll reversal resets the remainder and a new gesture starts cleanly', (t) => {
+  const h = controller(t);
+  h.mode = 'scroll';
+  h.pointer.down(event());
+  h.pointer.move(event(220, 139.875));
+  h.pointer.move(event(220, 139.9375));
+  assert.equal(h.messages.length, 0);
+  h.pointer.move(event(220, 140.0625));
+  assert.deepEqual(
+    h.messages.map((m) => [m.type, m.amount]),
+    [[Behavior.scrollUp, 1]]
+  );
+  h.pointer.cancel();
+  h.messages.length = 0;
+  h.pointer.down(event());
+  h.pointer.move(event(220, 140.125));
+  assert.equal(h.messages.length, 0);
+});
+test('horizontal and vertical scrolling retain independent distances', (t) => {
+  const h = controller(t);
+  h.mode = 'scroll';
+  h.pointer.down(event());
+  h.pointer.move(event(222, 136));
+  assert.deepEqual(
+    h.messages.map((m) => [m.type, m.amount]),
+    [
+      [Behavior.scrollDown, 24],
+      [Behavior.scrollLeft, 12],
+    ]
   );
 });
 test('cancel releases a held button even after switching to watch mode', (t) => {

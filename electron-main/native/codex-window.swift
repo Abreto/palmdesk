@@ -63,8 +63,11 @@ enum WindowError: String, Error {
     }
 }
 
-func windows() -> [TargetWindow] {
-    let entries = CGWindowListCopyWindowInfo([.optionAll, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] ?? []
+func windows(_ id: UInt32? = nil) -> [TargetWindow] {
+    let options: CGWindowListOption = id == nil
+        ? [.optionAll, .excludeDesktopElements]
+        : [.optionIncludingWindow, .excludeDesktopElements]
+    let entries = CGWindowListCopyWindowInfo(options, id ?? kCGNullWindowID) as? [[String: Any]] ?? []
     return entries.compactMap { entry in
         guard let id = entry[kCGWindowNumber as String] as? UInt32,
               let pid = entry[kCGWindowOwnerPID as String] as? Int32,
@@ -202,17 +205,22 @@ func thumbnails(_ requested: [WindowIdentity]) -> [WindowThumbnail] {
     }
 }
 
-func matches(_ element: AXUIElement, _ target: TargetWindow) -> Bool {
-    // Native IDs disambiguate same-title, same-frame windows even across Spaces.
+func windowNumber(_ element: AXUIElement) -> UInt32? {
     if let number = attribute(element, "AXWindowNumber" as CFString) as? NSNumber {
-        return number.uint32Value == target.nativeId
+        return number.uint32Value
     }
     if let symbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "_AXUIElementGetWindow") {
         typealias WindowNumber = @convention(c) (AXUIElement, UnsafeMutablePointer<UInt32>) -> Int32
         let readNumber = unsafeBitCast(symbol, to: WindowNumber.self)
         var number: UInt32 = 0
-        if readNumber(element, &number) == 0 && number != 0 { return number == target.nativeId }
+        if readNumber(element, &number) == 0 && number != 0 { return number }
     }
+    return nil
+}
+
+func matches(_ element: AXUIElement, _ target: TargetWindow) -> Bool {
+    // Native IDs disambiguate same-title, same-frame windows even across Spaces.
+    if let number = windowNumber(element) { return number == target.nativeId }
     // If native AX IDs are unavailable, callers require a unique title/frame match.
     let title = attribute(element, kAXTitleAttribute as CFString) as? String ?? ""
     if title != target.title { return false }
@@ -312,11 +320,21 @@ func activateOffscreenWindow(_ target: TargetWindow) throws {
 
 func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow {
     guard AXIsProcessTrusted() else { throw WindowError.permission }
+    let application = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(application, 0.5)
+    // Verify live focus and bounds without enumerating every desktop window for each input.
+    if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+       let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
+       CFGetTypeID(focused) == AXUIElementGetTypeID(),
+       windowNumber(focused as! AXUIElement) == id,
+       let target = windows(id).first(where: {
+           $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle
+       }), target.isOnScreen {
+        return target
+    }
     var appWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
     guard var target = appWindows.first(where: { $0.nativeId == id }),
           let running = NSRunningApplication(processIdentifier: pid) else { throw WindowError.unavailable }
-    let application = AXUIElementCreateApplication(pid)
-    AXUIElementSetMessagingTimeout(application, 0.5)
     var candidates = (attribute(application, kAXWindowsAttribute as CFString) as? [AXUIElement] ?? []).filter { matches($0, target) }
     if !target.isOnScreen && candidates.isEmpty {
         try activateOffscreenWindow(target)

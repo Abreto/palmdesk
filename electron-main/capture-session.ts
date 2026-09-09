@@ -239,7 +239,7 @@ export class CaptureSession {
               throw new Error('无效的滚动事件');
             await this.driver.scroll(
               input.direction!,
-              Math.max(1, Math.min(100, Math.round(Math.abs(input.amount!))))
+              Math.max(1, Math.min(1000, Math.round(Math.abs(input.amount!))))
             );
             break;
           case 'text':

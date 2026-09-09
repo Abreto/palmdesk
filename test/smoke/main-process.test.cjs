@@ -477,6 +477,27 @@ test('bounds are read again before each pointer event', async () => {
   await h.session.input(sessionId, { action: 'move', x: 1000, y: 0 });
   assert.deepEqual(h.events[0], ['position', { x: -1, y: 20 }]);
 });
+test('fast touch swipes retain their amplified distance while oversized input stays bounded', async () => {
+  const h = harness();
+  const { sessionId } = await h.session.begin('window:10:0');
+  for (const amount of [144, 600, 100000]) {
+    await h.session.input(sessionId, {
+      action: 'scroll',
+      direction: 'down',
+      x: 500,
+      y: 500,
+      amount,
+    });
+  }
+  assert.deepEqual(
+    h.events.filter(([action]) => action === 'scroll'),
+    [
+      ['scroll', 'down', 144],
+      ['scroll', 'down', 600],
+      ['scroll', 'down', 1000],
+    ]
+  );
+});
 test('same title with a new window ID cannot take over the video target', async () => {
   const h = harness();
   const { sessionId } = await h.session.begin('window:10:0');
