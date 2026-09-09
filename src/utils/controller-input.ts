@@ -12,9 +12,8 @@ type Pointer = {
 };
 type Send = (data: Partial<WsBilldDeskBehaviorType['data']>) => void;
 
-// A desktop wheel tick covers more content than a phone pixel. Keep touch
-// scrolling responsive by mapping roughly three touch pixels to one tick.
-const TOUCH_SCROLL_PIXELS_PER_TICK = 3;
+// macOS scroll units are pixels; compensate for the desktop being reduced on phones.
+const TOUCH_SCROLL_GAIN = 6;
 
 type ScrollAccumulator = {
   direction: number;
@@ -28,11 +27,9 @@ function scrollAmount(delta: number, accumulator: ScrollAccumulator) {
     accumulator.direction = direction;
     accumulator.distance = 0;
   }
-  accumulator.distance += Math.abs(delta);
-  const amount = Math.floor(
-    accumulator.distance / TOUCH_SCROLL_PIXELS_PER_TICK
-  );
-  accumulator.distance %= TOUCH_SCROLL_PIXELS_PER_TICK;
+  accumulator.distance += Math.abs(delta) * TOUCH_SCROLL_GAIN;
+  const amount = Math.floor(accumulator.distance);
+  accumulator.distance -= amount;
   return amount;
 }
 
