@@ -2,7 +2,15 @@ import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import path from 'node:path';
 import { createInterface } from 'node:readline';
 
+import { AGENT_DEFINITIONS, identifyAgent } from '../src/utils/agent-registry';
+
 import type { ICaptureBounds, ICaptureSource } from '../src/pure-interface';
+
+export interface NativeApplication {
+  ownerPid: number;
+  bundleId: string;
+  appName: string;
+}
 
 export interface NativeWindow {
   nativeId: number;
@@ -18,30 +26,21 @@ type WindowIdentity = Pick<NativeWindow, 'nativeId' | 'ownerPid' | 'bundleId'>;
 type WindowThumbnail = WindowIdentity & { thumbnail: string };
 
 /** macOS bundle IDs for desktop clients that are useful agent targets. */
-export const TARGET_BUNDLES = new Set([
-  'com.openai.codex',
-  'com.openai.chat',
-  'com.anthropic.claudefordesktop',
-  'com.moonshot.kimichat',
-  'dev.zcode.app',
-]);
-
-/** Windows executable names used by the same class of desktop clients. */
-const TARGET_EXECUTABLES = new Set([
-  'codex.exe',
-  'chatgpt.exe',
-  'claude.exe',
-  'kimi.exe',
-  'kimi desktop.exe',
-  'kimi work.exe',
-  'kimi-work.exe',
-  'zcode.exe',
-]);
+export const TARGET_BUNDLES = new Set<string>(
+  AGENT_DEFINITIONS.flatMap((agent) => [...agent.bundles])
+);
 
 export function isAiTargetIdentity(identity: string) {
-  if (TARGET_BUNDLES.has(identity)) return true;
-  const match = /^win32:(?:.*[\\/])?([^\\/]+\.exe)#[a-f0-9]+$/i.exec(identity);
-  return !!match && TARGET_EXECUTABLES.has(match[1].toLowerCase());
+  return !!identifyAgent(identity);
+}
+
+export function discoverAgents(applications: NativeApplication[]) {
+  const ids = new Set(
+    applications.map((application) => identifyAgent(application.bundleId)?.id)
+  );
+  return AGENT_DEFINITIONS.filter((agent) => ids.has(agent.id)).map(
+    ({ id, name }) => ({ id, name })
+  );
 }
 
 export function enableWindowsCapture(commandLine: Electron.CommandLine) {

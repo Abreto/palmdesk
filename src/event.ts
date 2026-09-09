@@ -39,6 +39,7 @@ export const IPC_EVENT = {
   globalShortcut: 'globalShortcut',
   getPlatform: 'getPlatform',
   getCaptureSources: 'getCaptureSources',
+  getAgentApplications: 'getAgentApplications',
   beginCapture: 'beginCapture',
   stopCapture: 'stopCapture',
   remoteInput: 'remoteInput',

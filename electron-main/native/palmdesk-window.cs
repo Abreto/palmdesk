@@ -335,6 +335,29 @@ internal static class PalmDeskWindow
         return refreshed;
     }
 
+    private static object ListApplications()
+    {
+        var applications = new List<object>();
+        int session;
+        using (var current = Process.GetCurrentProcess()) session = current.SessionId;
+        foreach (var process in Process.GetProcesses())
+        {
+            using (process)
+            {
+                try
+                {
+                    if (process.SessionId != session || process.HasExited) continue;
+                    var identity = ReadProcess((uint)process.Id);
+                    if (identity != null)
+                        applications.Add(new { ownerPid = process.Id, bundleId = identity.Bundle, appName = identity.Name });
+                }
+                catch (InvalidOperationException) { }
+                catch (System.ComponentModel.Win32Exception) { }
+            }
+        }
+        return applications;
+    }
+
     private static object Dispatch(Dictionary<string, object> request)
     {
         object command;
@@ -342,6 +365,7 @@ internal static class PalmDeskWindow
         switch (command as string)
         {
             case "list": return ListWindows();
+            case "applications": return ListApplications();
             case "focus": return FocusWindow(request);
             case "text": return TypeText(request);
             case "permissions": return new { accessibility = true, captureSupported = SupportsCapture() };

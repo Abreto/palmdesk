@@ -382,6 +382,14 @@ while let line = readLine() {
             data = try applicationIdentity()
         case "list":
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(listedWindows()))
+        case "applications":
+            data = NSWorkspace.shared.runningApplications
+                .filter { $0.activationPolicy == .regular && !$0.isTerminated }
+                .compactMap { application -> [String: Any]? in
+                    guard let bundle = application.bundleIdentifier else { return nil }
+                    return ["ownerPid": application.processIdentifier, "bundleId": bundle,
+                            "appName": application.localizedName ?? bundle]
+                }
         case "thumbnails":
             guard let requested = request["windows"] as? [[String: Any]] else { throw WindowError.invalid }
             let identities = try JSONDecoder().decode([WindowIdentity].self, from: JSONSerialization.data(withJSONObject: requested))
