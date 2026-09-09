@@ -45,7 +45,7 @@ export async function exerciseQrConnection({
   const waitConnected = async () => {
     await phone.waitForURL('**/webrtc');
     const windowOption = phone.getByRole('button', {
-      name: '选择 Synthetic window fixture',
+      name: '打开 Codex',
       exact: true,
     });
     await windowOption.waitFor({ timeout: 25000 });

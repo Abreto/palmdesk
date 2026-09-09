@@ -9,7 +9,7 @@ const { getDesktopIdentity } = require('../../scripts/desktop-identity.cjs');
 const root = process.cwd();
 const packaged = process.env.SMOKE_PACKAGED === 'true';
 const artifactName = packaged ? 'packaged-shell' : 'desktop-shell';
-const artifacts = path.join(root, 'docs/smoke-artifacts');
+const artifacts = path.resolve(process.env.SMOKE_ARTIFACT_DIR || 'docs/smoke-artifacts');
 await mkdir(artifacts, { recursive: true });
 const application = await _electron.launch({
   executablePath:
@@ -52,6 +52,13 @@ try {
     window.electronAPI.ipcRenderer.invoke('capturePermissions', { data: {} })
   );
   assert.equal(permissions.code, 0);
+  const discovery = await page.evaluate(() =>
+    window.electronAPI.ipcRenderer.invoke('getAgentApplications', { data: {} })
+  );
+  assert.equal(discovery.code, 0);
+  assert.ok(Array.isArray(discovery.data.agents));
+  assert.equal(new Set(discovery.data.agents.map((agent) => agent.id)).size,
+    discovery.data.agents.length);
   const deniedInput = await page.evaluate(() =>
     window.electronAPI.ipcRenderer.invoke('remoteInput', {
       data: {
@@ -71,7 +78,7 @@ try {
       try {
         await other.loadURL('data:text/html,<title>IPC isolation test</title>');
         return await other.webContents.executeJavaScript(
-          `window.electronAPI.ipcRenderer.invoke('capturePermissions', {data: {}})`
+          `window.electronAPI.ipcRenderer.invoke('getAgentApplications', {data: {}})`
         );
       } finally {
         other.destroy();
@@ -90,9 +97,11 @@ try {
       'Real PalmDesk Electron shell and guarded IPC; no target capture, focus, input, or permission changes',
     identity,
     permissions: permissions.data,
+    agents: discovery.data.agents,
     checks: [
       'cold startup',
       'backend connection',
+      'native agent discovery through guarded IPC',
       'invalid input session denied',
       'secondary renderer IPC denied',
       'no uncaught renderer errors',

@@ -28,15 +28,15 @@
               : selectedWindow
                 ? '正在加载'
                 : connected
-                  ? '选择窗口'
+                  ? '选择 Agent'
                   : '正在连接'
         }}</span
       >
       <button
         v-if="selectedWindow"
         type="button"
-        title="断开并重选窗口"
-        aria-label="断开并重选窗口"
+        title="返回 Agent 入口"
+        aria-label="返回 Agent 入口"
         @click="connect"
       >
         <BrowsersOutline />
@@ -75,14 +75,19 @@
         </div>
       </details>
     </header>
-    <WindowPicker
+    <AgentPicker
       v-if="connected && !selectedWindow"
+      :applications="agents"
       :sources="windows"
+      :bindings="agentBindings"
+      :device-id="remoteDeskUserUuid"
       :loading="windowsLoading"
       :disabled="windowStarting"
       :error="windowError"
+      :discovery-error="discoveryError"
       @refresh="requestWindows"
       @select="selectWindow"
+      @bind="bindAgentWindow"
     />
     <div
       v-if="controlling && inputError"
@@ -140,12 +145,12 @@ import { getRandomString } from 'billd-utils';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
+import AgentPicker from '@/components/AgentPicker/index.vue';
 import RemoteViewport from '@/components/RemoteViewport/index.vue';
-import WindowPicker from '@/components/WindowPicker/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useWebsocket } from '@/hooks/use-websocket';
-import type { IRemoteWindow } from '@/pure-interface';
+import type { IRemoteAgent, IRemoteWindow } from '@/pure-interface';
 import router, { routerName } from '@/router';
 import { useAppStore } from '@/store/app';
 import { useNetworkStore } from '@/store/network';
@@ -159,6 +164,8 @@ import {
   WsMsgTypeEnum,
 } from '@/types/websocket';
 import { ipcRenderer, ipcRendererSend } from '@/utils';
+import { windowContext, type AgentBindings } from '@/utils/agent-directory';
+import { getAgent, type AgentId } from '@/utils/agent-registry';
 
 const route = useRoute();
 const networkStore = useNetworkStore();
@@ -182,6 +189,9 @@ let resumeRequest = '';
 let inputTimeout: ReturnType<typeof setTimeout>;
 const hasCredentials = ref(false);
 const windows = ref<IRemoteWindow[]>([]);
+const agents = ref<IRemoteAgent[]>([]);
+const agentBindings = ref<AgentBindings>({});
+const discoveryError = ref('');
 const windowsLoading = ref(false);
 const windowStarting = ref(false);
 const windowError = ref('');
@@ -212,18 +222,25 @@ function requestWindows() {
   clearTimeout(requestTimer);
   listRequest = getRandomString(16);
   windows.value = [];
+  agents.value = [];
+  discoveryError.value = '';
   windowsLoading.value = true;
   windowError.value = '';
   peer.value?.dataChannelSend({
     msgType: WsMsgTypeEnum.remoteWindowsRequest,
     requestId: listRequest,
-    data: {},
+    data: { agentDiscovery: true },
   });
   requestTimer = setTimeout(() => {
     listRequest = '';
     windowsLoading.value = false;
     windowError.value = '读取窗口列表超时，请刷新重试';
   }, 15000);
+}
+function bindAgentWindow(source: IRemoteWindow, agentId: AgentId | undefined) {
+  const context = windowContext(source);
+  if (agentId) agentBindings.value[context] = agentId;
+  else delete agentBindings.value[context];
 }
 function selectWindow(source: IRemoteWindow) {
   if (!connected.value || windowsLoading.value || windowStarting.value) return;
@@ -272,18 +289,34 @@ function receiveWindowMessage(event: MessageEvent) {
     message.requestId === listRequest
   ) {
     const source = data.source;
+    const agent = getAgent(data.agent?.id);
+    if (agent && !agents.value.some((item) => item.id === agent.id))
+      agents.value.push({ id: agent.id, name: agent.name });
+    if (typeof data.discoveryError === 'string')
+      discoveryError.value = data.discoveryError;
     if (
       source &&
       ['id', 'name', 'appName', 'thumbnail', 'appIcon'].every(
         (key) => typeof source[key] === 'string'
       )
     )
-      windows.value.push(source);
+      windows.value.push({
+        ...source,
+        agentId: getAgent(source.agentId)?.id,
+        contextId:
+          typeof source.contextId === 'string' ? source.contextId : undefined,
+      });
     if (data.done) {
       clearTimeout(requestTimer);
       listRequest = '';
       windowsLoading.value = false;
       windowError.value = typeof data.error === 'string' ? data.error : '';
+      const contexts = new Set(windows.value.map(windowContext));
+      agentBindings.value = Object.fromEntries(
+        Object.entries(agentBindings.value).filter(([context]) =>
+          contexts.has(context)
+        )
+      );
     }
   } else if (
     message.msgType === WsMsgTypeEnum.remoteWindowSelected &&

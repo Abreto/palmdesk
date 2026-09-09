@@ -54,6 +54,7 @@ try {
       inputBlocked: false,
       fatalInputError: '',
       sourceReads: 0,
+      applications: true,
       resumeAttempts: 0,
     };
     window.__smoke = state;
@@ -123,6 +124,12 @@ try {
         removeListener() {},
         async invoke(channel, { data }) {
           let result = {};
+          if (channel === 'getAgentApplications')
+            result = { agents: state.applications ? [
+              { id: 'codex', name: 'Codex' },
+              { id: 'claude', name: 'Claude' },
+              { id: 'kimi', name: 'Kimi' },
+            ] : [] };
           if (channel === 'capturePermissions')
             result = {
               screen: 'granted',
@@ -327,7 +334,7 @@ try {
     await phone.waitForURL('**/webrtc');
     await phone
       .getByRole('button', {
-        name: `选择 ${'Synthetic window fixture'}`,
+        name: '打开 Codex',
         exact: true,
       })
       .waitFor({ timeout: 25000 });
@@ -343,7 +350,7 @@ try {
     if (!select) return;
     await phone
       .getByRole('button', {
-        name: '选择 Synthetic window fixture',
+        name: '打开 Codex',
         exact: true,
       })
       .click();
@@ -397,21 +404,32 @@ try {
     });
   }
   await connectPhone(false);
-  assert.equal(await phone.locator('.window-item').count(), 3);
+  assert.equal(await phone.locator('.agent-entry').count(), 3);
+  assert.equal(await phone.getByRole('button', { name: '打开 Kimi', exact: true }).isDisabled(), true);
   assert.equal(await phone.locator('video').count(), 0);
   pass(
-    'authenticated phone sees all app windows before any video capture starts'
+    'authenticated phone discovers agents, including a running app without windows, before capture'
   );
-  await phone.getByLabel('搜索应用或窗口').fill('no-matching-window');
-  await phone.getByText('没有匹配的窗口', { exact: true }).waitFor();
-  await phone.getByLabel('搜索应用或窗口').fill('terminal');
+  await phone.getByLabel('搜索 Agent、应用或窗口').fill('no-matching-window');
+  await phone.getByText('没有匹配的 Agent', { exact: true }).waitFor();
+  await phone.getByLabel('搜索 Agent、应用或窗口').fill('');
+  await phone.getByRole('tab', { name: /其他应用/ }).click();
+  await phone.getByLabel('搜索 Agent、应用或窗口').fill('terminal');
   assert.equal(await phone.locator('.window-item').count(), 1);
-  await phone.getByLabel('搜索应用或窗口').fill('');
+  await phone.getByLabel('搜索 Agent、应用或窗口').fill('');
+  await phone.getByLabel('将 Terminal 关联到 Agent').click();
+  await phone.getByLabel('选择关联的 Agent').selectOption('codex');
+  await phone.getByRole('button', { name: '置顶 Codex', exact: true }).click();
+  assert.equal(await phone.locator('[data-agent="codex"] .window-item').count(), 2);
+  await phone.getByLabel('刷新 Agent 和窗口').click();
+  await phone.waitForFunction(() => document.querySelectorAll('[data-agent="codex"] .window-item').length === 2);
+  assert.equal(await phone.getByRole('button', { name: '取消置顶 Codex' }).getAttribute('aria-pressed'), 'true');
+  pass('manual terminal binding and pinned agent survive refresh; multiple windows remain distinct');
   for (const [name, viewport] of [
-    ['mobile-window-picker', { width: 390, height: 844 }],
-    ['narrow-window-picker', { width: 320, height: 568 }],
-    ['landscape-window-picker', { width: 844, height: 390 }],
-    ['desktop-window-picker', { width: 1440, height: 900 }],
+    ['mobile-agent-picker', { width: 390, height: 844 }],
+    ['narrow-agent-picker', { width: 320, height: 568 }],
+    ['landscape-agent-picker', { width: 844, height: 390 }],
+    ['desktop-agent-picker', { width: 1440, height: 900 }],
   ]) {
     await phone.setViewportSize(viewport);
     assert.ok(
@@ -431,22 +449,23 @@ try {
   }
   await phone.setViewportSize({ width: 390, height: 844 });
   pass(
-    'window search and actual thumbnails render in portrait, narrow, landscape and desktop layouts'
+    'agent search, grouped windows and actual thumbnails render in portrait, narrow, landscape and desktop layouts'
   );
+  await phone.getByLabel('取消关联', { exact: true }).click();
   await host.evaluate(() => {
     window.__smoke.hiddenIds = ['window:103:0'];
   });
   await phone
-    .getByRole('button', { name: '选择 Project planning', exact: false })
+    .getByRole('button', { name: '打开 Claude', exact: true })
     .click();
   await phone
     .getByRole('alert')
     .filter({ hasText: 'Fixture window unavailable' })
     .waitFor();
   assert.equal(await host.evaluate(() => window.__smoke.capturedIds.length), 0);
-  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone.getByLabel('刷新 Agent 和窗口', { exact: true }).click();
   await phone.waitForFunction(
-    () => document.querySelectorAll('.window-item').length === 2
+    () => document.querySelector('[aria-label="打开 Claude"]')?.disabled
   );
   pass(
     'a window closed after listing cannot start capture and refresh removes it'
@@ -454,7 +473,7 @@ try {
   await host.evaluate(() => {
     window.__smoke.listError = '屏幕录制权限不可用';
   });
-  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone.getByLabel('刷新 Agent 和窗口', { exact: true }).click();
   await phone
     .getByRole('alert')
     .filter({ hasText: '屏幕录制权限不可用' })
@@ -462,16 +481,18 @@ try {
   await host.evaluate(() => {
     window.__smoke.listError = '';
     window.__smoke.sources = false;
+    window.__smoke.applications = false;
   });
-  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
-  await phone.getByText('没有可用的应用窗口', { exact: true }).waitFor();
+  await phone.getByLabel('刷新 Agent 和窗口', { exact: true }).click();
+  await phone.getByText('未发现已打开的 Agent', { exact: true }).waitFor();
   await host.evaluate(() => {
     window.__smoke.sources = true;
+    window.__smoke.applications = true;
     window.__smoke.hiddenIds = [];
   });
-  await phone.getByLabel('刷新窗口列表', { exact: true }).click();
+  await phone.getByLabel('刷新 Agent 和窗口', { exact: true }).click();
   await phone
-    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .getByRole('button', { name: '打开 Codex', exact: true })
     .click();
   await waitForVideo();
   pass(
@@ -767,7 +788,8 @@ try {
     'focus errors preserve video, survive refresh, and allow explicit input retry on phone layouts'
   );
 
-  await phone.getByLabel('断开并重选窗口', { exact: true }).click();
+  await phone.getByLabel('返回 Agent 入口', { exact: true }).click();
+  await phone.getByRole('tab', { name: /其他应用/ }).click();
   await phone
     .getByRole('button', { name: '选择 Agent CLI - workspace', exact: true })
     .waitFor();
@@ -816,15 +838,15 @@ try {
     'disconnect-and-reselect stops the previous stream and opens the selected terminal window'
   );
 
-  await phone.getByLabel('断开并重选窗口', { exact: true }).click();
+  await phone.getByLabel('返回 Agent 入口', { exact: true }).click();
   await phone
-    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .getByRole('button', { name: '打开 Codex', exact: true })
     .waitFor();
   await host.evaluate(() => {
     window.__smoke.delayCapture = true;
   });
   await phone
-    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .getByRole('button', { name: '打开 Codex', exact: true })
     .click();
   await host.waitForFunction(() => window.__smoke.captureWaiters.length === 1);
   await phone.getByLabel('断开并返回').click();
@@ -897,7 +919,7 @@ try {
   });
   await phone.getByRole('button', { name: '重新连接', exact: true }).click();
   await phone
-    .getByRole('button', { name: '选择 Synthetic window fixture', exact: true })
+    .getByRole('button', { name: '打开 Codex', exact: true })
     .click();
   await waitForVideo();
   pass(

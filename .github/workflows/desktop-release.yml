@@ -83,7 +83,7 @@ jobs:
       - run: pnpm test:smoke
       - run: pnpm typecheck
       - name: Build installer
-        run: pnpm ${{ matrix.command }}
+        run: pnpm ${{ matrix.command }} --release
       - name: Verify macOS binaries and local signature
         if: runner.os == 'macOS'
         shell: bash
@@ -92,6 +92,8 @@ jobs:
           NATIVE_ARCH: ${{ matrix.native_arch }}
         run: |
           app="electron-release/$RELEASE_VERSION/$APP_DIRECTORY/PalmDesk.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.abreto.palmdesk'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :PalmDeskBuildChannel' "$app/Contents/Info.plist")" = 'release'
           lipo "$app/Contents/MacOS/PalmDesk" -verify_arch "$NATIVE_ARCH"
           lipo "$app/Contents/MacOS/codex-window" -verify_arch "$NATIVE_ARCH"
           codesign --verify --deep --strict "$app"

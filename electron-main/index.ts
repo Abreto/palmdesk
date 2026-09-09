@@ -27,10 +27,11 @@ import {
   matchCaptureSources,
   nativeHelperPath,
   enableWindowsCapture,
+  discoverAgents,
 } from './native-window';
 
 import type { ApplicationIdentity } from './app-identity';
-import type { NativeWindow } from './native-window';
+import type { NativeApplication, NativeWindow } from './native-window';
 import type { nutjsTs } from './types';
 import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
@@ -733,6 +734,11 @@ function main() {
       result.sources = await nativeWindows.addThumbnails(result.sources);
     return result;
   });
+  captureHandler(IPC_EVENT.getAgentApplications, async () => ({
+    agents: discoverAgents(
+      await nativeWindows.request<NativeApplication[]>('applications')
+    ),
+  }));
   captureHandler(IPC_EVENT.beginCapture, (data) =>
     captureSession.begin(String(data.sourceId || ''), data.expectedSource)
   );
