@@ -57,6 +57,7 @@
               <option :value="720">720p</option>
               <option :value="1080">1080p</option>
               <option :value="1440">1440p</option>
+              <option :value="2160">2160p</option>
             </select></label
           >
           <label
@@ -166,6 +167,7 @@ import {
 import { ipcRenderer, ipcRendererSend } from '@/utils';
 import { windowContext, type AgentBindings } from '@/utils/agent-directory';
 import { getAgent, type AgentId } from '@/utils/agent-registry';
+import { REMOTE_VIDEO_DEFAULTS } from '@/utils/remote-video';
 
 const route = useRoute();
 const networkStore = useNetworkStore();
@@ -180,8 +182,8 @@ const {
 } = useWebsocket();
 const roomId = ref('');
 const receiverId = ref('');
-const quality = ref(1080);
-const frameRate = ref(30);
+const quality = ref<number>(REMOTE_VIDEO_DEFAULTS.resolutionRatio);
+const frameRate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxFramerate);
 const error = ref('');
 const inputError = ref('');
 const retryingInput = ref(false);
@@ -390,10 +392,10 @@ function connectionData() {
     deskUserPassword: deskUserPassword.value,
     remoteDeskUserUuid: remoteDeskUserUuid.value,
     remoteDeskUserPassword: remoteDeskUserPassword.value,
-    maxBitrate: 2500,
+    maxBitrate: REMOTE_VIDEO_DEFAULTS.maxBitrate,
     maxFramerate: frameRate.value,
     resolutionRatio: quality.value,
-    videoContentHint: 'detail',
+    videoContentHint: REMOTE_VIDEO_DEFAULTS.videoContentHint,
     audioContentHint: '',
   };
 }

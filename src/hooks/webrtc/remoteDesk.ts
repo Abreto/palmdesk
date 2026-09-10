@@ -39,6 +39,8 @@ export const useWebRtcRemoteDesk = () => {
       videoEl: HTMLVideoElement;
       deskUserUuid: string;
       remoteDeskUserUuid: string;
+      maxBitrate?: number;
+      maxFramerate?: number;
     }) => {
       const existing = networkStore.rtcMap.get(data.receiver);
       if (existing && !existing.closed) return existing;

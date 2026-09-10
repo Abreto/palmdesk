@@ -507,7 +507,6 @@ import {
 } from '@/types/websocket';
 import {
   createNullVideo,
-  handlConstraints,
   ipcRenderer,
   ipcRendererInvoke,
   ipcRendererOn,
@@ -521,6 +520,11 @@ import {
   parseConnectionInvite,
 } from '@/utils/connection-invite';
 import { WebRTCClass } from '@/utils/network/webRTC';
+import {
+  REMOTE_VIDEO_DEFAULTS,
+  applyRemoteVideoConstraints,
+  desktopCaptureConstraints,
+} from '@/utils/remote-video';
 import { WindowCatalog } from '@/utils/window-catalog';
 import ConnectionQr from '@/views/remote/connectionQr.vue';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
@@ -545,12 +549,15 @@ const {
 } = useRTCParams();
 const { handleRtcBilldDeskBehavior } = useIpcRendererSend();
 
-const currentMaxBitrate = ref(maxBitrate.value[3].value);
-const currentMaxFramerate = ref(30);
-const currentResolutionRatio = ref(resolutionRatio.value[3].value);
-const currentVideoContentHint = ref(videoContentHint.value[3].value);
+const currentMaxBitrate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxBitrate);
+const currentMaxFramerate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxFramerate);
+const currentResolutionRatio = ref<number>(
+  REMOTE_VIDEO_DEFAULTS.resolutionRatio
+);
+const currentVideoContentHint = ref<string>(
+  REMOTE_VIDEO_DEFAULTS.videoContentHint
+);
 const currentAudioContentHint = ref(audioContentHint.value[0].value);
-const rtc = ref<WebRTCClass>();
 const roomId = ref('');
 const receiverId = ref('');
 const anchorStream = ref<MediaStream>();
@@ -722,27 +729,19 @@ watch(
         if (msgType === WsMsgTypeEnum.changeMaxBitrate) {
           const { data }: { data: WsChangeMaxBitrateType['data'] } = jsondata;
           currentMaxBitrate.value = data.val;
-          rtc.value?.setMaxBitrate(data.val);
+          await item.setMaxBitrate(data.val);
         } else if (msgType === WsMsgTypeEnum.changeMaxFramerate) {
           const { data }: { data: WsChangeMaxFramerateType['data'] } = jsondata;
           if (anchorStream.value) {
             currentMaxFramerate.value = data.val;
-            handlConstraints({
-              frameRate: data.val,
-              height: currentResolutionRatio.value,
-              stream: anchorStream.value,
-            });
+            await updateCaptureQuality(item);
           }
         } else if (msgType === WsMsgTypeEnum.changeResolutionRatio) {
           const { data }: { data: WsChangeResolutionRatioType['data'] } =
             jsondata;
           if (anchorStream.value) {
             currentResolutionRatio.value = data.val;
-            handlConstraints({
-              frameRate: currentMaxFramerate.value,
-              height: data.val,
-              stream: anchorStream.value,
-            });
+            await updateCaptureQuality(item);
           }
         } else if (msgType === WsMsgTypeEnum.changeVideoContentHint) {
           const { data }: { data: WsChangeVideoContentHintType['data'] } =
@@ -751,6 +750,7 @@ watch(
             currentVideoContentHint.value = data.val;
             // @ts-ignore
             setVideoTrackContentHints(anchorStream.value, data.val);
+            await item.updateVideoSenderParameters();
           }
         } else if (msgType === WsMsgTypeEnum.changeAudioContentHint) {
           const { data }: { data: WsChangeAudioContentHintType['data'] } =
@@ -1154,17 +1154,10 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
     captureSessionId.value = sessionId;
     captureWarning.value = getCaptureBoundsWarning(capturedSource);
     const stream = await captureLifecycle.start(() =>
-      navigator.mediaDevices.getUserMedia({
-        audio: false,
-        video: {
-          // Electron binds the stream to the native window ID approved by the main process.
-          // @ts-ignore
-          mandatory: {
-            chromeMediaSource: 'desktop',
-            chromeMediaSourceId: captureStream.id,
-          },
-        },
-      })
+      // Use only the window ID approved by the main process.
+      navigator.mediaDevices.getUserMedia(
+        desktopCaptureConstraints(captureStream.id)
+      )
     );
     if (
       !stream ||
@@ -1195,6 +1188,20 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
   }
 }
 
+async function updateCaptureQuality(peer: WebRTCClass) {
+  if (!anchorStream.value) return;
+  try {
+    await applyRemoteVideoConstraints(
+      anchorStream.value,
+      currentResolutionRatio.value,
+      currentMaxFramerate.value
+    );
+    await peer.setMaxFramerate(currentMaxFramerate.value);
+  } catch (error) {
+    console.error('调整窗口画质失败', error);
+  }
+}
+
 async function handleRTC(receiver) {
   if (networkStore.rtcMap.has(receiver)) return;
   try {
@@ -1202,7 +1209,7 @@ async function handleRTC(receiver) {
       roomId: roomId.value,
       anchorStream: undefined,
     });
-    rtc.value = await webRtcRemoteDesk.newWebRtc({
+    await webRtcRemoteDesk.newWebRtc({
       // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
       // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
       sender: mySocketId.value,
@@ -1210,6 +1217,8 @@ async function handleRTC(receiver) {
       videoEl: createNullVideo(),
       deskUserUuid: cacheStore.deskUserUuid,
       remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
+      maxBitrate: currentMaxBitrate.value,
+      maxFramerate: currentMaxFramerate.value,
     });
     await webRtcRemoteDesk.sendOffer({
       sender: mySocketId.value,
@@ -1290,13 +1299,16 @@ async function handleWindowRequest(
     selectedCaptureSourceId.value = source.id;
     const stream = await beginSelectedCapture(source, peer.receiver);
     if (!stream || !current()) return;
-    await handlConstraints({
-      frameRate: currentMaxFramerate.value,
-      height: currentResolutionRatio.value,
+    await applyRemoteVideoConstraints(
       stream,
-    });
+      currentResolutionRatio.value,
+      currentMaxFramerate.value
+    );
     if (!current() || anchorStream.value !== stream) return;
     setVideoTrackContentHints(stream, currentVideoContentHint.value as any);
+    await peer.setMaxFramerate(currentMaxFramerate.value);
+    await peer.setMaxBitrate(currentMaxBitrate.value);
+    if (!current() || anchorStream.value !== stream) return;
     updateWebRtcRemoteDeskConfig({
       roomId: roomId.value,
       anchorStream: stream,

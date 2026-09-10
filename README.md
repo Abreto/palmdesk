@@ -88,6 +88,8 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 3. Enter the device code and password displayed by the desktop client, or use its QR code.
 4. After authentication, select a window on the phone. The host activates it and starts capture once it is available.
 
+The default video quality is up to 2160p at 30 fps with an 8 Mbps bitrate ceiling and text detail prioritized. Capture preserves the window's aspect ratio and does not enlarge small windows. Retina windows retain native pixels within 3840×2160, avoiding the text blur caused by a fixed 1080p downscale. Select 720p, 1080p, or 1440p on the phone to reduce traffic; actual bitrate still adapts to screen changes and network conditions.
+
 To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
 
 ## Window Selection and Session Behavior
