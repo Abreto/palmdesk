@@ -28,7 +28,7 @@ export class WebRTCClass {
   iceServers?: RTCIceServer[];
   remoteConnection?: Raw<RemoteConnection>;
 
-  /** 最大码率 */
+  /** 最大码率，单位 kbit/s；仅在写入编码器时转换为 bit/s。 */
   maxBitrate = -1;
   /** 最大帧率 */
   maxFramerate = -1;
@@ -44,6 +44,7 @@ export class WebRTCClass {
   rtt = -1;
 
   loopGetStatsTimer: any = null;
+  videoParametersQueue = Promise.resolve(1);
 
   constructor(data: {
     roomId: string;
@@ -157,34 +158,77 @@ export class WebRTCClass {
 
   /** 设置最大码率 */
   setMaxBitrate = (maxBitrate: number) => {
-    console.log('开始设置最大码率', maxBitrate);
-    return new Promise<number>((resolve) => {
-      this.peerConnection?.getSenders().forEach((sender) => {
-        if (sender.track?.kind === 'video') {
-          const parameters = { ...sender.getParameters() };
-          if (parameters.encodings[0]) {
-            const val = 1000 * maxBitrate;
-            if (parameters.encodings[0].maxBitrate === val) {
-              console.log('最大码率不变，不设置');
-              resolve(1);
-              return;
+    if (!Number.isFinite(maxBitrate) || maxBitrate <= 0)
+      return Promise.resolve(0);
+    // The DataChannel can connect before the user selects a window. Keep the
+    // requested value even when there is no negotiated video sender yet.
+    this.maxBitrate = maxBitrate;
+    return this.updateVideoSenderParameters();
+  };
+
+  setMaxFramerate = (maxFramerate: number) => {
+    if (!Number.isFinite(maxFramerate) || maxFramerate <= 0)
+      return Promise.resolve(0);
+    this.maxFramerate = maxFramerate;
+    return this.updateVideoSenderParameters();
+  };
+
+  updateVideoSenderParameters = () => {
+    // getParameters/setParameters transactions must not overlap during rapid
+    // quality changes, renegotiation or ICE reconnection.
+    this.videoParametersQueue = this.videoParametersQueue.then(async () => {
+      if (
+        this.closed ||
+        !this.peerConnection ||
+        (this.maxBitrate <= 0 && this.maxFramerate <= 0)
+      )
+        return 1;
+      const results = await Promise.all(
+        this.peerConnection.getSenders().map(async (sender) => {
+          if (sender.track?.kind !== 'video') return 1;
+          try {
+            const parameters = sender.getParameters();
+            // Some browsers expose encodings only after SDP negotiation.
+            // Retry when signaling becomes stable, without inventing encodings.
+            if (!parameters.encodings?.length) return 1;
+            let changed = false;
+            parameters.encodings.forEach((encoding) => {
+              if (
+                this.maxBitrate > 0 &&
+                encoding.maxBitrate !== this.maxBitrate * 1000
+              ) {
+                encoding.maxBitrate = this.maxBitrate * 1000;
+                changed = true;
+              }
+              if (
+                this.maxFramerate > 0 &&
+                encoding.maxFramerate !== this.maxFramerate
+              ) {
+                encoding.maxFramerate = this.maxFramerate;
+                changed = true;
+              }
+            });
+            const hint = sender.track.contentHint;
+            let preference: RTCDegradationPreference | undefined;
+            if (hint === 'text' || hint === 'detail')
+              preference = 'maintain-resolution';
+            else if (hint === 'motion') preference = 'maintain-framerate';
+            if (parameters.degradationPreference !== preference) {
+              if (preference) parameters.degradationPreference = preference;
+              else delete parameters.degradationPreference;
+              changed = true;
             }
-            parameters.encodings[0].maxBitrate = val;
-            sender
-              .setParameters(parameters)
-              .then(() => {
-                console.log('设置最大码率成功', maxBitrate);
-                this.maxBitrate = val;
-                resolve(1);
-              })
-              .catch((error) => {
-                console.error('设置最大码率失败', maxBitrate, error);
-                resolve(0);
-              });
+            if (changed) await sender.setParameters(parameters);
+            return 1;
+          } catch (error) {
+            console.error('设置视频编码参数失败', error);
+            return 0;
           }
-        }
-      });
+        })
+      );
+      return results.every(Boolean) ? 1 : 0;
     });
+    return this.videoParametersQueue;
   };
 
   /** 创建offer */
@@ -464,6 +508,13 @@ export class WebRTCClass {
       }
     );
 
+    this.peerConnection.addEventListener('signalingstatechange', () => {
+      // Selecting a window adds video to an already connected DataChannel.
+      // connectionstatechange need not fire again for this renegotiation.
+      if (this.peerConnection?.signalingState === 'stable')
+        void this.updateVideoSenderParameters();
+    });
+
     this.prettierLog({
       msg: '开始监听pc的connectionstatechange事件',
       type: 'warn',
@@ -484,9 +535,7 @@ export class WebRTCClass {
             type: 'warn',
           });
           appStore.setLiveLine(LiveLineEnum.rtc);
-          if (this.maxBitrate !== -1) {
-            this.setMaxBitrate(this.maxBitrate);
-          }
+          void this.updateVideoSenderParameters();
           // Native connection state can change after the DataChannel opens.
           if (!this.closed) this.update();
         }

@@ -106,6 +106,15 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
+窗口画质回归测试不需要后端，只捕获测试程序自己创建的文字窗口，验证旧 1080P 约束与新默认画质的实际尺寸、先建立 DataChannel 再添加视频时的编码参数，以及 720P 降档后恢复原始尺寸。macOS 上使用当前工作区的隔离开发应用运行：
+
+```bash
+node scripts/dev.mjs --prepare-only
+.local/electron-dev/Electron.app/Contents/MacOS/Electron test/smoke/electron-video-quality.cjs
+```
+
+Windows 可执行 `pnpm exec electron test/smoke/electron-video-quality.cjs`。测试会短暂显示自己的窗口，结果写入 `.local/video-quality/result.json`，包含实际显示器缩放比例。普通显示器上的结果不代表已经完成 Retina 或手机实机验收。
+
 烟测使用 Playwright 和本机 Chrome。把额外依赖装在被 Git 忽略的目录：
 
 ```bash
