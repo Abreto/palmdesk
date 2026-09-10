@@ -108,6 +108,7 @@
       :video="peer?.videoEl"
       :connected="controlling"
       :input-blocked="!!inputError || retryingInput"
+      :task-navigation="selectedWindow.agentId === 'codex'"
       @behavior="sendBehavior"
     />
     <div
@@ -195,7 +196,7 @@ const discoveryError = ref('');
 const windowsLoading = ref(false);
 const windowStarting = ref(false);
 const windowError = ref('');
-const selectedWindow = ref<{ id: string; name: string }>();
+const selectedWindow = ref<Pick<IRemoteWindow, 'id' | 'name' | 'agentId'>>();
 const videoReady = ref(false);
 let listRequest = '';
 let selectRequest = '';
@@ -328,7 +329,11 @@ function receiveWindowMessage(event: MessageEvent) {
     windowStarting.value = false;
     if (typeof data.error === 'string') windowError.value = data.error;
     else if (typeof data.id === 'string' && typeof data.name === 'string') {
-      selectedWindow.value = { id: data.id, name: data.name };
+      selectedWindow.value = {
+        id: data.id,
+        name: data.name,
+        agentId: windows.value.find((source) => source.id === data.id)?.agentId,
+      };
       requestTimer = setTimeout(() => {
         if (!controlling.value) endConnection('窗口视频加载超时，请重新连接');
       }, 20000);

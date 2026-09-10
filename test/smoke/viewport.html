@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>PalmDesk 手机任务视图验收</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 14px system-ui;
+        background: #e9efed;
+        color: #243e33;
+      }
+      .fixture-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      .fixture-controls button {
+        padding: 8px 12px;
+      }
+      .fixture-controls button[aria-pressed='true'] {
+        color: #12664f;
+        background: #def0e9;
+        border: 1px solid #167c65;
+      }
+      .comparison-note {
+        margin: 0 0 12px;
+        color: #60736b;
+      }
+      .phone {
+        display: flex;
+        flex-direction: column;
+        border: 1px solid #bccbc5;
+        background: white;
+        max-width: 100%;
+      }
+      .fixture-header {
+        padding: 12px;
+        border-bottom: 1px solid #d7ddda;
+      }
+      .fixture-header small {
+        display: block;
+        margin-top: 4px;
+        color: #60736b;
+      }
+      output {
+        display: block;
+        margin-top: 12px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script
+      type="module"
+      src="./viewport.mjs"
+    ></script>
+  </body>
+</html>
