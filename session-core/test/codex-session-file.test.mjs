@@ -1,0 +1,619 @@
+import assert from "node:assert/strict";
+import { mkdir, mkdtemp, writeFile, utimes } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+import { createCodexProvider } from "../src/providers/codex.mjs";
+import {
+  createCodexSessionFileCatalog,
+  extractCodexSessionReference,
+  listCodexSessionFileSessions,
+  parseCodexSessionFile
+} from "../src/providers/codex-session-file.mjs";
+
+const fixtureRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "fixtures/codex-home"
+);
+const fixtureSessionPath = path.join(
+  fixtureRoot,
+  "sessions/2026/07/05/rollout-2026-07-05T09-00-00-11111111-1111-4111-8111-111111111111.jsonl"
+);
+
+test("parseCodexSessionFile extracts metadata, messages, and skips malformed lines", async () => {
+  const session = await parseCodexSessionFile(fixtureSessionPath, {
+    indexEntry: {
+      id: "11111111-1111-4111-8111-111111111111",
+      thread_name: "Fixture Codex thread",
+      updated_at: "2026-07-05T09:10:00.000Z"
+    }
+  });
+
+  assert.equal(session.id, "codex:session-file:11111111-1111-4111-8111-111111111111");
+  assert.equal(session.title, "Fixture Codex thread");
+  assert.equal(session.projectPath, "/repo/glassline");
+  assert.equal(session.startedAt, "2026-07-05T09:00:00.000Z");
+  assert.equal(session.lastUpdatedAt, "2026-07-05T09:10:00.000Z");
+  assert.equal(session.quality, "partial");
+  assert.equal(session.turnState, "idle");
+  assert.equal(session.sources[0].kind, "session-file");
+  assert.equal(session.sources[0].confidence, "medium");
+  assert.equal(session.sources[0].path, fixtureSessionPath);
+  assert.equal(session.resumeRef.value, "11111111-1111-4111-8111-111111111111");
+  assert.equal(session.resumeRef.command, "codex resume 11111111-1111-4111-8111-111111111111");
+  assert.equal(session.resumeRef.confidence, "medium");
+  assert.equal(session.parseErrors, 1);
+
+  const messages = session.timeline.filter((item) => item.type === "message");
+  assert.deepEqual(
+    messages.map((message) => [message.role, message.content]),
+    [
+      ["user", "Build the adapter."],
+      ["assistant", "I will inspect the session files."]
+    ]
+  );
+});
+
+test("parseCodexSessionFile derives turn state from the last valid lifecycle event", async () => {
+  const cases = [
+    { lifecycle: ["task_started"], expected: "running" },
+    { lifecycle: ["task_started", "task_complete"], expected: "idle" },
+    { lifecycle: ["task_started", "turn_aborted"], expected: "idle" },
+    { lifecycle: [], expected: "unknown" }
+  ];
+
+  for (const [index, testCase] of cases.entries()) {
+    const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-lifecycle-"));
+    const sessionId = `aaaaaaaa-aaaa-4aaa-8aaa-${String(index + 1).padStart(12, "0")}`;
+    const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+    const sessionPath = path.join(
+      sessionDir,
+      `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`
+    );
+    const records = [
+      JSON.stringify({
+        timestamp: "2026-07-05T09:00:00.000Z",
+        type: "session_meta",
+        payload: { session_id: sessionId, cwd: "/repo/glassline" }
+      }),
+      ...testCase.lifecycle.map((type, lifecycleIndex) =>
+        JSON.stringify({
+          timestamp: `2026-07-05T09:00:0${lifecycleIndex + 1}.000Z`,
+          type: "event_msg",
+          payload: { type }
+        })
+      ),
+      "not json"
+    ];
+
+    await mkdir(sessionDir, { recursive: true });
+    await writeFile(sessionPath, records.join("\n"));
+
+    const session = await parseCodexSessionFile(sessionPath);
+    assert.equal(session.turnState, testCase.expected);
+  }
+});
+
+test("parseCodexSessionFile uses the newest JSONL event when the index is stale", async () => {
+  const session = await parseCodexSessionFile(fixtureSessionPath, {
+    indexEntry: {
+      id: "11111111-1111-4111-8111-111111111111",
+      thread_name: "Fixture Codex thread",
+      updated_at: "2026-07-05T08:00:00.000Z"
+    }
+  });
+
+  assert.equal(session.lastUpdatedAt, "2026-07-05T09:00:14.000Z");
+  assert.equal(session.sources[0].updatedAt, "2026-07-05T09:00:14.000Z");
+});
+
+test("parseCodexSessionFile derives a short title from Codex transcript blobs", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-title-"));
+  const sessionId = "55555555-5555-4555-8555-555555555555";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(
+    sessionDir,
+    `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`
+  );
+  const transcriptBlob = [
+    "The following is the Codex agent history whose request action you are assessing.",
+    ">>> TRANSCRIPT START",
+    "[1] user: Find useful arbitrage opportunities in World Cup markets",
+    "",
+    "[2] tool exec_command call: {\"cmd\":\"python3 scan.py\"}",
+    "[3] tool exec_command result: Output:",
+    "market line that should not become the session title",
+    ">>> TRANSCRIPT END"
+  ].join("\n");
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    sessionPath,
+    [
+      JSON.stringify({
+        timestamp: "2026-07-05T09:00:00.000Z",
+        type: "session_meta",
+        payload: {
+          session_id: sessionId,
+          timestamp: "2026-07-05T09:00:00.000Z",
+          cwd: "/repo/glassline"
+        }
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-05T09:00:05.000Z",
+        type: "event_msg",
+        payload: {
+          type: "user_message",
+          message: transcriptBlob
+        }
+      })
+    ].join("\n")
+  );
+
+  const session = await parseCodexSessionFile(sessionPath);
+  const userMessage = session.timeline.find((item) => item.type === "message" && item.role === "user");
+
+  assert.equal(session.title, "Find useful arbitrage opportunities in World Cup markets");
+  assert.equal(userMessage.content, transcriptBlob);
+});
+
+test("parseCodexSessionFile clamps plain long prompt titles without changing messages", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-title-"));
+  const sessionId = "66666666-6666-4666-8666-666666666666";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(
+    sessionDir,
+    `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`
+  );
+  const longPrompt = `Summarize ${"very detailed market data ".repeat(10)}`.trim();
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    sessionPath,
+    [
+      JSON.stringify({
+        timestamp: "2026-07-05T09:00:00.000Z",
+        type: "session_meta",
+        payload: {
+          session_id: sessionId,
+          timestamp: "2026-07-05T09:00:00.000Z",
+          cwd: "/repo/glassline"
+        }
+      }),
+      JSON.stringify({
+        timestamp: "2026-07-05T09:00:05.000Z",
+        type: "event_msg",
+        payload: {
+          type: "user_message",
+          message: longPrompt
+        }
+      })
+    ].join("\n")
+  );
+
+  const session = await parseCodexSessionFile(sessionPath);
+  const userMessage = session.timeline.find((item) => item.type === "message" && item.role === "user");
+
+  assert.equal(session.title.length <= 96, true);
+  assert.equal(session.title, `${longPrompt.slice(0, 93).trimEnd()}...`);
+  assert.equal(userMessage.content, longPrompt);
+});
+
+test("Codex index titles are clamped for summary and stale sessions", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-title-"));
+  const parsedSessionId = "77777777-7777-4777-8777-777777777777";
+  const staleSessionId = "88888888-8888-4888-8888-888888888888";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(
+    sessionDir,
+    `rollout-2026-07-05T09-00-00-${parsedSessionId}.jsonl`
+  );
+  const longIndexTitle = `The following is a very long generated Codex session title ${"with extra context ".repeat(8)}`.trim();
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    path.join(codexHome, "session_index.jsonl"),
+    [
+      JSON.stringify({
+        id: parsedSessionId,
+        thread_name: longIndexTitle,
+        updated_at: "2026-07-05T09:10:00.000Z"
+      }),
+      JSON.stringify({
+        id: staleSessionId,
+        thread_name: longIndexTitle,
+        updated_at: "2026-07-05T09:20:00.000Z"
+      })
+    ].join("\n")
+  );
+  await writeFile(
+    sessionPath,
+    `${JSON.stringify({
+      timestamp: "2026-07-05T09:00:00.000Z",
+      type: "session_meta",
+      payload: {
+        session_id: parsedSessionId,
+        timestamp: "2026-07-05T09:00:00.000Z",
+        cwd: "/repo/glassline"
+      }
+    })}\n`
+  );
+
+  const sessions = await listCodexSessionFileSessions({ codexHome, summaryOnly: true });
+  const parsed = sessions.find((session) => session.id === `codex:session-file:${parsedSessionId}`);
+  const stale = sessions.find((session) => session.id === `codex:session-file:${staleSessionId}`);
+
+  assert.equal(parsed.title, `${longIndexTitle.slice(0, 93).trimEnd()}...`);
+  assert.equal(stale.title, `${longIndexTitle.slice(0, 93).trimEnd()}...`);
+  assert.equal(parsed.recentMessage, longIndexTitle);
+  assert.equal(stale.recentMessage, longIndexTitle);
+});
+
+test("Codex session catalog reuses summaries and invalidates them when the index changes", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-cache-"));
+  const sessionId = "99999999-9999-4999-8999-999999999999";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(
+    sessionDir,
+    `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`
+  );
+  const indexPath = path.join(codexHome, "session_index.jsonl");
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    sessionPath,
+    `${JSON.stringify({
+      timestamp: "2026-07-05T09:00:00.000Z",
+      type: "session_meta",
+      payload: {
+        session_id: sessionId,
+        timestamp: "2026-07-05T09:00:00.000Z",
+        cwd: "/repo/glassline"
+      }
+    })}\n`
+  );
+  await writeFile(
+    indexPath,
+    `${JSON.stringify({ id: sessionId, thread_name: "First cached title" })}\n`
+  );
+  const catalog = createCodexSessionFileCatalog({ codexHome });
+
+  const first = (await catalog.listSessions())[0];
+  const unchanged = (await catalog.listSessions())[0];
+  assert.strictEqual(unchanged, first);
+  assert.equal((await catalog.resolve(first.id)).filePath, sessionPath);
+
+  await writeFile(
+    indexPath,
+    `${JSON.stringify({ id: sessionId, thread_name: "Updated cached title with new size" })}\n`
+  );
+  const updated = (await catalog.listSessions())[0];
+
+  assert.notStrictEqual(updated, first);
+  assert.equal(updated.title, "Updated cached title with new size");
+});
+
+test("summary session uses file mtime when the index is stale", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-home-"));
+  const sessionId = "33333333-3333-4333-8333-333333333333";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(
+    sessionDir,
+    `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`
+  );
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    path.join(codexHome, "session_index.jsonl"),
+    `${JSON.stringify({
+      id: sessionId,
+      thread_name: "Stale index session",
+      updated_at: "2026-07-05T08:00:00.000Z"
+    })}\n`
+  );
+  await writeFile(
+    sessionPath,
+    `${JSON.stringify({
+      timestamp: "2026-07-05T09:00:00.000Z",
+      type: "session_meta",
+      payload: {
+        session_id: sessionId,
+        timestamp: "2026-07-05T09:00:00.000Z",
+        cwd: "/repo/glassline"
+      }
+    })}\n`
+  );
+  await utimes(
+    sessionPath,
+    new Date("2026-07-05T09:20:00.000Z"),
+    new Date("2026-07-05T09:20:00.000Z")
+  );
+
+  const sessions = await listCodexSessionFileSessions({ codexHome, summaryOnly: true });
+  const session = sessions.find((candidate) => candidate.id === `codex:session-file:${sessionId}`);
+
+  assert.equal(session.lastUpdatedAt, "2026-07-05T09:20:00.000Z");
+  assert.equal(session.sources[0].updatedAt, "2026-07-05T09:20:00.000Z");
+  assert.equal(session.resumeRef.value, sessionId);
+});
+
+test("summary sessions keep the newest file when rollout files share a session id", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-home-"));
+  const sessionId = "44444444-4444-4444-8444-444444444444";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const newerPath = path.join(
+    sessionDir,
+    "rollout-2026-07-05T09-00-00-aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.jsonl"
+  );
+  const olderPath = path.join(
+    sessionDir,
+    "rollout-2026-07-05T10-00-00-bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb.jsonl"
+  );
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(
+    path.join(codexHome, "session_index.jsonl"),
+    `${JSON.stringify({
+      id: sessionId,
+      thread_name: "Shared rollout session",
+      updated_at: "2026-07-05T08:00:00.000Z"
+    })}\n`
+  );
+  for (const filePath of [newerPath, olderPath]) {
+    await writeFile(
+      filePath,
+      `${JSON.stringify({
+        timestamp: "2026-07-05T09:00:00.000Z",
+        type: "session_meta",
+        payload: {
+          session_id: sessionId,
+          timestamp: "2026-07-05T09:00:00.000Z",
+          cwd: "/repo/glassline"
+        }
+      })}\n`
+    );
+  }
+  await utimes(
+    newerPath,
+    new Date("2026-07-05T11:00:00.000Z"),
+    new Date("2026-07-05T11:00:00.000Z")
+  );
+  await utimes(
+    olderPath,
+    new Date("2026-07-05T10:00:00.000Z"),
+    new Date("2026-07-05T10:00:00.000Z")
+  );
+
+  const sessions = await listCodexSessionFileSessions({ codexHome, summaryOnly: true });
+  const session = sessions.find((candidate) => candidate.id === `codex:session-file:${sessionId}`);
+
+  assert.equal(session.lastUpdatedAt, "2026-07-05T11:00:00.000Z");
+  assert.equal(session.sources[0].path, newerPath);
+});
+
+test("parseCodexSessionFile maps function calls, outputs, and patch changes", async () => {
+  const session = await parseCodexSessionFile(fixtureSessionPath);
+
+  const command = session.timeline.find((item) => item.type === "command");
+  assert.equal(command.command, "npm test");
+  assert.equal(command.cwd, "/repo/glassline");
+  assert.equal(command.exitCode, 0);
+  assert.match(command.output, /ok 1/);
+
+  const tool = session.timeline.find((item) => item.type === "tool_call");
+  assert.equal(tool.name, "apply_patch");
+  assert.equal(tool.status, "complete");
+  assert.equal(tool.output, "Success");
+
+  const fileChange = session.timeline.find((item) => item.type === "file_change");
+  assert.equal(fileChange.path, "src/providers/codex.mjs");
+  assert.equal(fileChange.summary, "update src/providers/codex.mjs");
+  assert.match(fileChange.diff, /\+new/);
+});
+
+test("listCodexSessionFileSessions returns parsed and stale index sessions", async () => {
+  const sessions = await listCodexSessionFileSessions({ codexHome: fixtureRoot });
+  const parsed = sessions.find(
+    (session) => session.id === "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+  const stale = sessions.find(
+    (session) => session.id === "codex:session-file:22222222-2222-4222-8222-222222222222"
+  );
+
+  assert.equal(parsed.quality, "partial");
+  assert.equal(stale.title, "Missing Codex transcript");
+  assert.equal(stale.quality, "stale");
+  assert.equal(stale.rawAvailable, false);
+});
+
+test("codex provider returns session-file and process sessions and resolves raw JSONL", async () => {
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => [
+      {
+        pid: 123,
+        startedAt: "2026-07-05T09:30:00.000Z",
+        command: "codex"
+      }
+    ]
+  });
+
+  const sessions = await provider.listSessions();
+
+  assert.deepEqual(
+    sessions.map((session) => session.id).sort(),
+    [
+      "codex:process:123",
+      "codex:session-file:11111111-1111-4111-8111-111111111111",
+      "codex:session-file:22222222-2222-4222-8222-222222222222"
+    ]
+  );
+
+  const detail = await provider.getSession(
+    "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(detail.timeline.some((item) => item.type === "message"), true);
+
+  const raw = await provider.getRawSession(
+    "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(raw.source, "session-file");
+  assert.equal(raw.confidence, "medium");
+  assert.match(raw.text, /Build the adapter/);
+});
+
+test("codex provider list uses session-file summaries and detail resolves full timeline", async () => {
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => []
+  });
+
+  const sessions = await provider.listSessions();
+  const summary = sessions.find(
+    (session) => session.id === "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+  const detail = await provider.getSession(
+    "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+
+  assert.equal(summary.quality, "partial");
+  assert.deepEqual(summary.timeline, []);
+  assert.equal(summary.resumeRef.value, "11111111-1111-4111-8111-111111111111");
+  assert.equal(summary.rawAvailable, true);
+  assert.equal(detail.resumeRef.value, "11111111-1111-4111-8111-111111111111");
+  assert.equal(detail.timeline.length > 0, true);
+});
+
+test("codex provider returns timeline pages from the newest items backward", async () => {
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => []
+  });
+
+  const latest = await provider.getSessionTimelinePage(
+    "codex:session-file:11111111-1111-4111-8111-111111111111",
+    { limit: 2 }
+  );
+
+  assert.deepEqual(
+    latest.items.map((item) => item.type),
+    ["tool_call", "file_change"]
+  );
+  assert.equal(latest.hasMore, true);
+  assert.equal(latest.nextCursor, "3");
+
+  const older = await provider.getSessionTimelinePage(
+    "codex:session-file:11111111-1111-4111-8111-111111111111",
+    { limit: 2, cursor: latest.nextCursor }
+  );
+
+  assert.deepEqual(
+    older.items.map((item) => item.type),
+    ["message", "command"]
+  );
+  assert.equal(older.hasMore, true);
+  assert.equal(older.nextCursor, "1");
+});
+
+test("extractCodexSessionReference reads session ids and resume paths", () => {
+  assert.equal(
+    extractCodexSessionReference("codex resume 11111111-1111-4111-8111-111111111111"),
+    "11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(
+    extractCodexSessionReference("codex --session-id 11111111-1111-4111-8111-111111111111"),
+    "11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(
+    extractCodexSessionReference(
+      "codex --resume /tmp/rollout-2026-07-05T09-00-00-11111111-1111-4111-8111-111111111111.jsonl"
+    ),
+    "11111111-1111-4111-8111-111111111111"
+  );
+  assert.equal(
+    extractCodexSessionReference("codex --resume 11111111-1111-4111-8111-111111111111"),
+    "11111111-1111-4111-8111-111111111111"
+  );
+});
+
+test("codex provider process-only session includes resumeRef from command", async () => {
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => [
+      {
+        pid: 789,
+        startedAt: "2026-07-05T09:40:00.000Z",
+        command: "codex resume 99999999-9999-4999-8999-999999999999"
+      }
+    ]
+  });
+
+  const sessions = await provider.listSessions();
+  const processOnly = sessions.find((session) => session.id === "codex:process:789");
+
+  assert.equal(processOnly.resumeRef.value, "99999999-9999-4999-8999-999999999999");
+  assert.equal(processOnly.resumeRef.command, "codex resume 99999999-9999-4999-8999-999999999999");
+  assert.equal(processOnly.resumeRef.confidence, "high");
+});
+
+test("codex provider merges matching process sources into session-file sessions", async () => {
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => [
+      {
+        pid: 123,
+        startedAt: "2026-07-05T09:30:00.000Z",
+        command: "codex --session-id 11111111-1111-4111-8111-111111111111"
+      },
+      {
+        pid: 456,
+        startedAt: "2026-07-05T09:31:00.000Z",
+        command: "codex"
+      }
+    ]
+  });
+
+  const sessions = await provider.listSessions();
+  const linked = sessions.find(
+    (session) => session.id === "codex:session-file:11111111-1111-4111-8111-111111111111"
+  );
+
+  assert.equal(sessions.some((session) => session.id === "codex:process:123"), false);
+  assert.equal(sessions.some((session) => session.id === "codex:process:456"), true);
+  assert.equal(linked.status, "running");
+  assert.equal(linked.turnState, "idle");
+  assert.equal(linked.quality, "partial");
+  assert.equal(linked.sources.some((source) => source.kind === "process" && source.label === "pid 123"), true);
+});
+
+test("codex provider does not retain process state in cached session summaries", async () => {
+  let processReads = 0;
+  const provider = createCodexProvider({
+    codexHome: fixtureRoot,
+    listAgentProcesses: async () => {
+      processReads += 1;
+      return processReads === 1
+        ? [
+            {
+              pid: 123,
+              startedAt: "2026-07-05T09:30:00.000Z",
+              command: "codex --session-id 11111111-1111-4111-8111-111111111111"
+            }
+          ]
+        : [];
+    }
+  });
+
+  const first = await provider.listSessions();
+  const second = await provider.listSessions();
+  const sessionId = "codex:session-file:11111111-1111-4111-8111-111111111111";
+  const firstSession = first.find((session) => session.id === sessionId);
+  const secondSession = second.find((session) => session.id === sessionId);
+
+  assert.equal(firstSession.status, "running");
+  assert.equal(firstSession.sources.some((source) => source.kind === "process"), true);
+  assert.equal(secondSession.status, "unknown");
+  assert.equal(secondSession.sources.some((source) => source.kind === "process"), false);
+});

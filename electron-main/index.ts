@@ -29,6 +29,7 @@ import {
   enableWindowsCapture,
   discoverAgents,
 } from './native-window';
+import { DesktopSessionReader } from './session-reader';
 
 import type { ApplicationIdentity } from './app-identity';
 import type { NativeApplication, NativeWindow } from './native-window';
@@ -739,6 +740,16 @@ function main() {
       await nativeWindows.request<NativeApplication[]>('applications')
     ),
   }));
+  const sessionReader = new DesktopSessionReader(app.getPath('userData'));
+  captureHandler(IPC_EVENT.sessionReaderSettings, () =>
+    sessionReader.settings()
+  );
+  captureHandler(IPC_EVENT.sessionReaderConfigure, (data) =>
+    sessionReader.configure(data.enabled)
+  );
+  captureHandler(IPC_EVENT.sessionReaderRequest, (data) =>
+    sessionReader.request(data)
+  );
   captureHandler(IPC_EVENT.beginCapture, (data) =>
     captureSession.begin(String(data.sourceId || ''), data.expectedSource)
   );

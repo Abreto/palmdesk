@@ -23,7 +23,14 @@ module.exports = {
       ? `electron-release/\${version}/${identity.worktreeId ? 'worktree' : 'local'}-${identity.checkoutId}`
       : 'electron-release/${version}',
   },
-  files: ['dist', 'electron-dist', 'LICENSE.txt', 'THIRD_PARTY_NOTICES.md'],
+  files: [
+    'dist',
+    'electron-dist',
+    'LICENSE.txt',
+    'THIRD_PARTY_NOTICES.md',
+    'session-core/LICENSE',
+    'session-core/NOTICE',
+  ],
   mac: {
     sign: './scripts/sign-macos.cjs',
     extraFiles: [{ from: 'native-bin/codex-window', to: 'MacOS/codex-window' }],

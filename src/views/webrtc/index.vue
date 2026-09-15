@@ -12,7 +12,9 @@
       <div class="heading">
         <h1>PalmDesk</h1>
         <span :title="selectedWindow?.name">{{
-          selectedWindow?.name || remoteDeskUserUuid || '未连接电脑'
+          (view === 'read' ? readingSession?.title : selectedWindow?.name) ||
+          remoteDeskUserUuid ||
+          '未连接电脑'
         }}</span>
       </div>
       <span
@@ -76,8 +78,64 @@
         </div>
       </details>
     </header>
+    <nav
+      v-if="connected"
+      class="view-tabs"
+      aria-label="查看方式"
+    >
+      <button
+        type="button"
+        :aria-pressed="view === 'read'"
+        @click="setView('read')"
+      >
+        阅读
+      </button>
+      <button
+        type="button"
+        :aria-pressed="view === 'window'"
+        @click="setView('window')"
+      >
+        窗口
+      </button>
+      <span>{{ view === 'read' ? '回复与执行记录' : '监看与输入' }}</span>
+    </nav>
+    <SessionReader
+      v-if="connected"
+      v-show="view === 'read'"
+      :client="readerClient"
+      :revision="readerRevision"
+      :active="view === 'read'"
+      :window-name="
+        readingSession &&
+        sessionWindows[readingSession.id] === selectedWindow?.id
+          ? selectedWindow?.name
+          : undefined
+      "
+      @select="readingSession = $event"
+      @available="readerAvailable"
+      @open-window="goToWindow"
+    />
+    <div
+      v-if="connected && view === 'window' && readingSession"
+      class="reading-context"
+    >
+      <span
+        >正在阅读：{{ readingSession.title }}。发送前请确认窗口中的任务。</span
+      >
+      <button
+        v-if="
+          selectedWindow &&
+          sessionWindows[readingSession.id] !== selectedWindow.id
+        "
+        type="button"
+        @click="associateWindow"
+      >
+        关联当前窗口
+      </button>
+      <span v-else-if="selectedWindow">已关联窗口</span>
+    </div>
     <AgentPicker
-      v-if="connected && !selectedWindow"
+      v-if="connected && !selectedWindow && view === 'window'"
       :applications="agents"
       :sources="windows"
       :bindings="agentBindings"
@@ -91,7 +149,7 @@
       @bind="bindAgentWindow"
     />
     <div
-      v-if="controlling && inputError"
+      v-if="controlling && inputError && view === 'window'"
       class="input-error"
       role="alert"
     >
@@ -106,9 +164,10 @@
     </div>
     <RemoteViewport
       v-if="selectedWindow"
+      v-show="view === 'window'"
       :video="peer?.videoEl"
       :connected="controlling"
-      :input-blocked="!!inputError || retryingInput"
+      :input-blocked="view !== 'window' || !!inputError || retryingInput"
       @behavior="sendBehavior"
     />
     <div
@@ -143,11 +202,12 @@ import {
   RefreshOutline,
 } from '@vicons/ionicons5';
 import { getRandomString } from 'billd-utils';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import AgentPicker from '@/components/AgentPicker/index.vue';
 import RemoteViewport from '@/components/RemoteViewport/index.vue';
+import SessionReader from '@/components/SessionReader/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useWebsocket } from '@/hooks/use-websocket';
@@ -168,6 +228,9 @@ import { ipcRenderer, ipcRendererSend } from '@/utils';
 import { windowContext, type AgentBindings } from '@/utils/agent-directory';
 import { getAgent, type AgentId } from '@/utils/agent-registry';
 import { REMOTE_VIDEO_DEFAULTS } from '@/utils/remote-video';
+import { ReaderClient } from '@/utils/session-reader-channel';
+
+import type { ReaderSession } from '../../../session-core/index.mjs';
 
 const route = useRoute();
 const networkStore = useNetworkStore();
@@ -198,6 +261,13 @@ const windowsLoading = ref(false);
 const windowStarting = ref(false);
 const windowError = ref('');
 const selectedWindow = ref<{ id: string; name: string }>();
+const view = ref<'read' | 'window'>('read');
+const readerClient = shallowRef<ReaderClient>();
+const readerRevision = ref(0);
+const readingSession = ref<ReaderSession>();
+const sessionWindows = ref<Record<string, string>>({});
+let choseView = false;
+let associationRequest = '';
 const videoReady = ref(false);
 let listRequest = '';
 let selectRequest = '';
@@ -217,6 +287,45 @@ const connected = computed(
 );
 const controlling = computed(
   () => connected.value && !!selectedWindow.value && videoReady.value
+);
+
+function setView(value: 'read' | 'window') {
+  releaseInput();
+  choseView = true;
+  view.value = value;
+}
+function readerAvailable(enabled: boolean) {
+  if (!choseView) view.value = enabled ? 'read' : 'window';
+}
+function goToWindow() {
+  setView('window');
+}
+function associateWindow() {
+  if (readingSession.value && selectedWindow.value)
+    sessionWindows.value[readingSession.value.id] = selectedWindow.value.id;
+}
+watch(
+  [
+    () => connected.value,
+    () => peer.value?.readerChannel,
+    () => peer.value?.readerChannel?.readyState,
+    () => peer.value?.cbReaderChannel,
+    () => peer.value?.cbReaderChannel?.readyState,
+  ],
+  () => {
+    readerClient.value?.dispose();
+    readerClient.value = undefined;
+    const outgoing = peer.value?.readerChannel;
+    const incoming = peer.value?.cbReaderChannel;
+    if (
+      connected.value &&
+      outgoing?.readyState === 'open' &&
+      incoming?.readyState === 'open'
+    )
+      readerClient.value = new ReaderClient(incoming, outgoing, () => {
+        readerRevision.value += 1;
+      });
+  }
 );
 
 function requestWindows() {
@@ -246,6 +355,8 @@ function bindAgentWindow(source: IRemoteWindow, agentId: AgentId | undefined) {
 }
 function selectWindow(source: IRemoteWindow) {
   if (!connected.value || windowsLoading.value || windowStarting.value) return;
+  setView('window');
+  associationRequest = readingSession.value?.id || '';
   clearTimeout(requestTimer);
   selectRequest = getRandomString(16);
   windowStarting.value = true;
@@ -331,6 +442,9 @@ function receiveWindowMessage(event: MessageEvent) {
     if (typeof data.error === 'string') windowError.value = data.error;
     else if (typeof data.id === 'string' && typeof data.name === 'string') {
       selectedWindow.value = { id: data.id, name: data.name };
+      if (associationRequest)
+        sessionWindows.value[associationRequest] = data.id;
+      associationRequest = '';
       requestTimer = setTimeout(() => {
         if (!controlling.value) endConnection('窗口视频加载超时，请重新连接');
       }, 20000);
@@ -359,17 +473,21 @@ function markVideoReady() {
 watch(controlling, (value) => {
   if (value) clearTimeout(requestTimer);
 });
-watch([connected, () => peer.value?.cbDataChannel], ([ready, channel]) => {
-  if (
-    ready &&
-    channel &&
-    !listRequest &&
-    !selectedWindow.value &&
-    !windowStarting.value &&
-    !windows.value.length
-  )
-    requestWindows();
-});
+watch(
+  [connected, () => peer.value?.cbDataChannel, view],
+  ([ready, channel, mode]) => {
+    if (
+      mode === 'window' &&
+      ready &&
+      channel &&
+      !listRequest &&
+      !selectedWindow.value &&
+      !windowStarting.value &&
+      !windows.value.length
+    )
+      requestWindows();
+  }
+);
 
 function endConnection(message: string) {
   clearTimeout(timeout);
@@ -444,6 +562,9 @@ function connect() {
   error.value = '';
   receiverId.value = '';
   selectedWindow.value = undefined;
+  sessionWindows.value = {};
+  readingSession.value = undefined;
+  associationRequest = '';
   windows.value = [];
   windowsLoading.value = false;
   windowStarting.value = false;
@@ -461,6 +582,7 @@ function sendBehavior(
   data: Partial<WsBilldDeskBehaviorType['data']>,
   requestId = getRandomString(8)
 ) {
+  if (view.value !== 'window' && data.type !== Behavior.releaseAll) return;
   if (!controlling.value && data.type !== Behavior.releaseAll) return;
   if (
     (inputError.value || retryingInput.value) &&
@@ -589,6 +711,7 @@ onMounted(() => {
   }, 2000);
 });
 onUnmounted(() => {
+  readerClient.value?.dispose();
   leaving = true;
   clearTimeout(timeout);
   clearTimeout(requestTimer);
@@ -601,6 +724,60 @@ onUnmounted(() => {
 </script>
 
 <style scoped lang="scss">
+.view-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 5px;
+  align-items: center;
+  padding: 8px 14px;
+  border-bottom: 1px solid #dce5df;
+  background: #fff;
+  button {
+    border: 0;
+    padding: 9px 22px;
+    border-radius: 8px;
+    background: transparent;
+    color: #678172;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  button[aria-pressed='true'] {
+    color: #245e43;
+    background: #e5efe8;
+    font-weight: 600;
+  }
+  > span {
+    margin-left: auto;
+    font-size: 11px;
+    color: #829389;
+  }
+}
+.reading-context {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 14px;
+  background: #edf5ef;
+  color: #54745f;
+  font-size: 12px;
+  line-height: 1.6;
+  > span:first-child {
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+  button {
+    flex-shrink: 0;
+    color: inherit;
+    font: inherit;
+    padding: 8px;
+    border: 1px solid #cbdece;
+    border-radius: 7px;
+    background: white;
+    cursor: pointer;
+  }
+}
 .input-error {
   display: flex;
   align-items: center;

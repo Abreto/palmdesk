@@ -1,0 +1,126 @@
+// PalmDesk's read-only entry point. Provider/parser code originated in Glassline.
+import { createHash } from 'node:crypto';
+
+import { createCodexProvider } from './src/providers/codex.mjs';
+
+const sessionIdPattern =
+  /^codex:session-file:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+const textLimit = 16384;
+
+export function createSessionReader(options = {}) {
+  // File-backed reads work without attaching to, resuming or executing an agent.
+  const provider =
+    options.provider ??
+    createCodexProvider({
+      codexHome: options.codexHome,
+      listAgentProcesses: () => Promise.resolve([]),
+    });
+
+  return {
+    async list(query = '') {
+      const sessions = await provider.listSessions();
+      const search = String(query).trim().toLocaleLowerCase();
+      const matches = sessions
+        .filter((session) => sessionIdPattern.test(session.id))
+        .map(summary)
+        .filter((session) =>
+          [session.title, session.projectPath, session.recentMessage].some(
+            (value) => value.toLocaleLowerCase().includes(search)
+          )
+        )
+        .sort(
+          (a, b) =>
+            b.lastUpdatedAt.localeCompare(a.lastUpdatedAt) ||
+            a.id.localeCompare(b.id)
+        );
+      return { sessions: matches.slice(0, 100), total: matches.length };
+    },
+
+    async read(id, cursor) {
+      if (typeof id !== 'string' || !sessionIdPattern.test(id))
+        throw new Error('无效的会话标识');
+      if (
+        cursor !== undefined &&
+        (typeof cursor !== 'string' || !/^\d{1,9}$/.test(cursor))
+      )
+        throw new Error('无效的历史位置');
+      const sessions = await provider.listSessions();
+      const session = sessions.find((entry) => entry.id === id);
+      if (!session) throw new Error('会话已不存在，请刷新列表');
+      const page = await provider.getSessionTimelinePage(id, {
+        limit: 40,
+        cursor,
+      });
+      if (!page) throw new Error('无法读取会话，请确认源文件仍然可用');
+      return {
+        session: summary(session),
+        items: page.items.map(projectItem),
+        nextCursor: page.nextCursor,
+        hasMore: page.hasMore,
+      };
+    },
+  };
+}
+
+function summary(session) {
+  return {
+    id: session.id,
+    providerId: 'codex',
+    title: clip(session.title || '未命名会话', 160),
+    projectPath: clip(session.projectPath, 512),
+    lastUpdatedAt: clip(session.lastUpdatedAt, 40),
+    recentMessage: clip(session.recentMessage, 300),
+    quality: session.quality || 'partial',
+    turnState: session.turnState || 'unknown',
+  };
+}
+
+function projectItem(item) {
+  let title = '';
+  let text = '';
+  let detail = '';
+  if (item.type === 'message') text = item.content;
+  else if (item.type === 'command') {
+    title =
+      typeof item.exitCode === 'number'
+        ? `命令 · 退出码 ${item.exitCode}`
+        : '命令';
+    text = item.command;
+    detail = item.output;
+  } else if (item.type === 'tool_call') {
+    title = `工具 · ${item.name}`;
+    text = stringify(item.input);
+    detail = stringify(item.output);
+  } else if (item.type === 'file_change') {
+    title = item.path;
+    text = item.summary;
+    detail = item.diff;
+  } else {
+    title = '状态';
+    text = item.detail || item.status;
+  }
+  return {
+    id: createHash('sha256').update(String(item.id)).digest('hex'),
+    type: item.type,
+    role: item.role,
+    createdAt: clip(item.createdAt, 40),
+    title: clip(title, 512),
+    text: clip(text, textLimit),
+    detail: clip(detail, textLimit),
+    truncated:
+      String(text ?? '').length > textLimit ||
+      String(detail ?? '').length > textLimit,
+  };
+}
+
+function clip(value, limit) {
+  return String(value ?? '').slice(0, limit);
+}
+
+function stringify(value) {
+  return typeof value === 'string'
+    ? value
+    : value === undefined
+      ? ''
+      : JSON.stringify(value, null, 2);
+}
