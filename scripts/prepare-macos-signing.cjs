@@ -13,7 +13,18 @@ const path = require('node:path');
 const certificate = require('../build/macos-signing.json');
 
 function security(args) {
-  const result = spawnSync('/usr/bin/security', args, { encoding: 'utf8' });
+  // User-domain trust can wait for a GUI authorization dialog on hosted runners.
+  // Use their disposable admin trust domain non-interactively instead.
+  const adminTrust =
+    process.env.GITHUB_ACTIONS === 'true' &&
+    ['add-trusted-cert', 'remove-trusted-cert'].includes(args[0]);
+  const result = spawnSync(
+    adminTrust ? '/usr/bin/sudo' : '/usr/bin/security',
+    adminTrust
+      ? ['-n', '/usr/bin/security', args[0], '-d', ...args.slice(1)]
+      : args,
+    { encoding: 'utf8', timeout: 60_000 }
+  );
   if (result.error || result.status !== 0)
     throw new Error(`macOS signing setup failed at security ${args[0]}.`);
   return result.stdout;
@@ -70,7 +81,13 @@ function prepare() {
   const p12 = path.join(directory, 'certificate.p12');
   const pem = path.join(directory, 'certificate.pem');
   const keychainPassword = randomBytes(32).toString('hex');
+  // Make the always-run cleanup step available even if setup is interrupted.
+  appendFileSync(
+    GITHUB_ENV,
+    `CSC_KEYCHAIN=${keychain}\nPALMDESK_SIGNING_DIR=${directory}\n`
+  );
   try {
+    console.log('Importing the fixed certificate into a temporary keychain.');
     writeFileSync(p12, Buffer.from(PALMDESK_SIGNING_P12, 'base64'), {
       mode: 0o600,
     });
@@ -108,6 +125,7 @@ function prepare() {
     )
       throw new Error('The signing certificate is not currently valid.');
     writeFileSync(pem, selected);
+    console.log('Configuring temporary code-signing trust.');
     security([
       'add-trusted-cert',
       '-r',
@@ -150,10 +168,6 @@ function prepare() {
       throw new Error(
         'The fixed certificate and private key are not usable for code signing.'
       );
-    appendFileSync(
-      GITHUB_ENV,
-      `CSC_KEYCHAIN=${keychain}\nPALMDESK_SIGNING_DIR=${directory}\n`
-    );
     console.log(
       'Fixed PalmDesk signing identity is ready in a temporary keychain.'
     );

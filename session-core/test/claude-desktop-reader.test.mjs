@@ -145,8 +145,11 @@ test('Desktop indexes never select metadata paths, unrelated transcripts, subage
   await put(path.join(cowork, desktopId, '.claude', 'projects', '-repo', `${uuid}.jsonl`), message(1));
   assert.equal((await reader.list()).total, 0);
   await put(localFile, message(1).replaceAll(uuid, '44444444-4444-4444-8444-444444444444'));
+  await utimes(localFile, new Date(now), new Date(now + 1000));
   assert.equal((await reader.list()).total, 0);
   await writeFile(localFile, message(1));
+  // Same-size rewrites can share Windows filesystem timestamps in fast tests.
+  await utimes(localFile, new Date(now), new Date(now + 2000));
   assert.equal((await reader.read(id)).items[0].text, 'Desktop 消息 1');
 });
 
