@@ -11,12 +11,15 @@ const {
 } = require('node:fs');
 const path = require('node:path');
 const certificate = require('../build/macos-signing.json');
+const hostedRunner =
+  process.env.GITHUB_ACTIONS === 'true' &&
+  process.env.RUNNER_ENVIRONMENT === 'github-hosted';
 
 function security(args) {
   // User-domain trust can wait for a GUI authorization dialog on hosted runners.
   // Use their disposable admin trust domain non-interactively instead.
   const adminTrust =
-    process.env.GITHUB_ACTIONS === 'true' &&
+    hostedRunner &&
     ['add-trusted-cert', 'remove-trusted-cert'].includes(args[0]);
   const result = spawnSync(
     adminTrust ? '/usr/bin/sudo' : '/usr/bin/security',
@@ -42,8 +45,16 @@ function cleanup(directory) {
       failures.push(error.message);
     }
   }
-  if (existsSync(path.join(directory, 'trusted')))
-    attempt(() => security(['remove-trusted-cert', cert]));
+  if (existsSync(path.join(directory, 'trusted'))) {
+    // macOS 15 may require GUI authorization to remove admin trust even with
+    // sudo. The public certificate trust dies with this disposable VM; remove
+    // the private key below without depending on that interactive operation.
+    if (hostedRunner)
+      console.log(
+        'Public certificate trust will be discarded with the hosted runner.'
+      );
+    else attempt(() => security(['remove-trusted-cert', cert]));
+  }
   if (existsSync(previous))
     attempt(() =>
       security([
@@ -61,6 +72,10 @@ function cleanup(directory) {
 }
 
 function prepare() {
+  if (process.env.GITHUB_ACTIONS === 'true' && !hostedRunner)
+    throw new Error(
+      'CI signing setup requires a disposable GitHub-hosted runner.'
+    );
   const {
     RUNNER_TEMP,
     GITHUB_ENV,
