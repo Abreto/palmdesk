@@ -101,7 +101,7 @@ pnpm build:desktop
 
 Apple Silicon Mac 上使用 `pnpm dist:mac`、Windows 上使用 `pnpm dist:win` 生成本地安装包。所有本地构建默认按工作区隔离应用身份、权限和数据；准备使用正式身份的发行包时，显式添加 `--release`。手动触发 **Desktop Prerelease** 工作流可构建 Apple Silicon Mac 和 Windows x64 安装包，全部成功后统一发布到 GitHub Prerelease，并附 SHA256 校验文件。暂不支持 Intel Mac 安装包。这些测试包尚未完成发行签名或公证。版本规则、操作步骤及安装限制见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
 
-没有签名证书时，macOS 桌面构建会为整个应用及其辅助程序执行本地 ad-hoc 签名并校验，确保 macOS 能识别 PalmDesk 的应用身份；这不替代分发签名。明确配置的证书不可用时构建会失败。
+从 v0.0.3 起，macOS 预发布使用固定自签名证书，并固定原生辅助程序的签名标识；`--release` 构建在证书缺失或不匹配时失败。本地普通构建未配置证书时仍使用 ad-hoc 签名。自签名不替代 Developer ID 和公证，详见[签名配置](docs/DESKTOP_RELEASES.md#固定-macos-签名)。
 
 本地签名在重建后可能使旧授权失效，辅助功能和屏幕录制都需要检查。修改授权后，请完全退出 PalmDesk 并重新启动；仅关闭窗口或刷新窗口列表可能仍保留旧进程的权限状态。若重启后仍未授权，请在对应权限列表中移除旧项，再添加并授权当前构建的 `PalmDesk.app`，然后再次完全退出并重启。
 

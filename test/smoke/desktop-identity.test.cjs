@@ -165,9 +165,11 @@ test('builder configuration isolates local artifacts and reserves the production
   const source = path.resolve(__dirname, '../..');
   for (const checkout of [main, first, clone]) {
     mkdirSync(path.join(checkout, 'scripts'));
+    mkdirSync(path.join(checkout, 'build'));
     for (const filename of [
       'electron-builder.cjs',
       'scripts/desktop-identity.cjs',
+      'build/macos-signing.json',
     ])
       copyFileSync(path.join(source, filename), path.join(checkout, filename));
     for (const channel of ['local', 'release']) {
@@ -192,6 +194,12 @@ test('builder configuration isolates local artifacts and reserves the production
       assert.equal(config.productName, expected.productName);
       assert.equal(config.extraMetadata.productName, expected.productName);
       assert.equal(config.mac.extendInfo.PalmDeskBuildChannel, channel);
+      assert.equal(
+        config.mac.identity,
+        channel === 'release'
+          ? require('../../build/macos-signing.json').sha1
+          : undefined
+      );
       assert.equal(
         config.directories.output,
         channel === 'release'

@@ -1,16 +1,15 @@
 Experimental PalmDesk desktop installers for testing.
 
-## What's new in v0.0.2
+## What's new in v0.0.3
 
-- The phone now opens an Agent directory that recognizes running Codex, Claude, ChatGPT, Kimi and ZCode apps on macOS and Windows. Open a single window directly or choose among multiple windows; apps without an available window still keep an entry.
-- Pin Agents per device and sort by recent use. Other applications remain available, and terminal or other windows can be manually linked to an Agent. These links survive refreshes within the current connection and reset after reconnecting.
-- Improve mobile scrolling responsiveness and sensitivity in both directions, accumulate small touch movements, remove the default mouse input delay and speed up macOS focus checks when the target window is already focused.
-- Isolate local desktop builds by checkout, including application identity, permissions and data. Distribution builds explicitly use `--release` to retain the PalmDesk release identity.
-- Add Chinese installation notes and update backend source references to the PalmDesk-maintained fork.
+- Read local Codex, Claude Code and Claude Desktop Code sessions from your phone on macOS. The reader is built into PalmDesk and does not require a separate Glassline deployment.
+- Search sessions by project, title or recent messages, read Markdown replies and tool output, copy text, load earlier history and return to the application window. Session reading is off by default; enable it on the computer to allow connected devices to read local session content.
+- Improve macOS window streaming sharpness and video quality settings.
+- Sign macOS previews with a fixed self-signed certificate and stable native helper identity. Release builds now refuse missing or mismatched certificates instead of using ad-hoc signing.
 
-Agent discovery identifies running applications; it does not read Agent sessions, project directories or task status.
+Session reading currently supports the current user's local logs on macOS. Claude Desktop support covers local Code sessions, not Chat/Cowork, cloud or SSH sessions. Windows continues to use the window view. See the [session reader guide](https://github.com/Abreto/palmdesk/blob/v0.0.3/README.md) for details and limits.
 
-[Changes since v0.0.1](https://github.com/Abreto/palmdesk/compare/v0.0.1...v0.0.2)
+[Changes since v0.0.2](https://github.com/Abreto/palmdesk/compare/v0.0.2...v0.0.3)
 
 ## Installation
 
@@ -22,7 +21,8 @@ Agent discovery identifies running applications; it does not read Agent sessions
 Open the DMG and drag PalmDesk into Applications, or run the Windows installer.
 Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
 
-- macOS builds have a local ad-hoc signature, not a Developer ID signature, and are not notarized. Gatekeeper may block opening them. Screen Recording and Accessibility permissions are required for remote control.
+- macOS builds now use a fixed self-signed certificate, not a Developer ID signature, and are not notarized. Gatekeeper may still block opening them. Screen Recording and Accessibility permissions are required for remote control.
+- **Upgrading from v0.0.2 or earlier:** the signing identity changes once. Fully quit PalmDesk, install this version, and reauthorize Screen Recording and Accessibility if needed. If the old entries remain ineffective, remove them and add `/Applications/PalmDesk.app` again, then restart. Later builds using the same certificate retain a stable signing identity; actual permission retention still needs validation on your macOS version. Users do not need the signing private key.
 - Windows installers are unsigned. SmartScreen or organization policies may warn or block installation.
 - The macOS package is for Apple Silicon only, built on macOS 15. Intel Macs are not supported by this prerelease. Earlier macOS versions have not been validated.
 - The desktop app connects to https://palmdesk.abreto.icu by default. The phone web client and desktop must use the same service. The installer does not include the backend.
@@ -37,28 +37,28 @@ This prerelease does not resolve the known dependency and license review items i
 
 供测试使用的 PalmDesk 桌面安装包。
 
-### v0.0.2 更新内容
+### v0.0.3 更新内容
 
-- 手机连接后进入 Agent 目录，自动识别 macOS 和 Windows 上已打开的 Codex、Claude、ChatGPT、Kimi 和 ZCode。单窗口直接进入，多窗口展开选择；没有可用窗口的应用仍保留入口。
-- 支持按设备置顶 Agent、按最近使用排序；“其他应用”保留通用窗口控制，并可将终端等窗口手动关联到 Agent。关联在本次连接内刷新后保留，重新连接后需重新关联。
-- 改善手机横向和纵向滚动的响应与灵敏度，累积细微触摸位移、移除默认鼠标输入延迟，并优化 macOS 目标窗口已聚焦时的检查流程。
-- 本地桌面构建按工作区隔离应用身份、权限和数据；发行构建显式使用 `--release`，保持 PalmDesk 正式身份。
-- 补充中文安装说明，将后端源码引用更新为 PalmDesk 维护的 fork。
+- 支持从手机阅读 macOS 当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话。读取模块已内置，无须单独部署 Glassline。
+- 支持按项目、标题或最近消息搜索会话，阅读 Markdown 回复和工具输出、复制文字、加载历史以及返回应用窗口。「会话阅读」默认关闭，需要在电脑上开启后，已连接设备才能读取本地内容。
+- 改善 macOS 窗口视频清晰度和画质设置。
+- macOS 测试版改用固定自签名证书，并固定原生辅助程序的签名标识。发布时若证书缺失或不匹配，构建会失败，不再退回 ad-hoc 签名。
 
-Agent 识别仅表示检测到已打开的应用，尚不读取真实会话、项目目录或任务状态。
+会话阅读目前仅支持 macOS 当前用户的本地日志。Claude Desktop 仅支持本地 Code，会话不包括 Chat/Cowork、云端和 SSH；Windows 继续使用窗口视图。详细说明及限制见[会话阅读指南](https://github.com/Abreto/palmdesk/blob/v0.0.3/README.zh-CN.md)。
 
-[查看自 v0.0.1 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.1...v0.0.2)
+[查看自 v0.0.2 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.2...v0.0.3)
 
 ### 安装说明
 
-| 下载                 | 适用设备                          |
-| -------------------- | --------------------------------- |
-| `*-mac-arm64.dmg`    | Apple Silicon Mac                 |
-| `*-windows-x64.exe`  | Windows 10 1903 及以上 / Windows 11 x64 |
+| 下载                | 适用设备                                |
+| ------------------- | --------------------------------------- |
+| `*-mac-arm64.dmg`   | Apple Silicon Mac                       |
+| `*-windows-x64.exe` | Windows 10 1903 及以上 / Windows 11 x64 |
 
 打开 DMG 后将 PalmDesk 拖入“应用程序”，或运行 Windows 安装程序。用户电脑无需安装 Node.js、pnpm、Xcode 或 Visual Studio。
 
-- macOS 构建使用本地 ad-hoc 签名，没有 Developer ID 签名，也没有经过公证。Gatekeeper 可能会阻止打开；远程控制需要授予“屏幕录制”和“辅助功能”权限。
+- macOS 构建改用固定自签名证书，没有 Developer ID 签名，也没有经过公证。Gatekeeper 仍可能阻止打开；远程控制需要授予“屏幕录制”和“辅助功能”权限。
+- **从 v0.0.2 或更早版本升级：** 本次签名身份会变化。请完全退出 PalmDesk，安装本版本，按需重新授予两项权限。若旧条目仍不生效，请移除后重新添加 `/Applications/PalmDesk.app`，然后重启应用。后续使用同一证书的构建保持稳定签名身份；实际权限保留仍需在所用 macOS 版本上验证。普通用户无需导入签名私钥。
 - Windows 安装包未签名，SmartScreen 或组织安全策略可能发出警告或阻止安装。
 - macOS 安装包仅支持 Apple Silicon，使用 macOS 15 构建；本测试版不支持 Intel Mac，尚未验证更早版本的 macOS。
 - 桌面端默认连接 https://palmdesk.abreto.icu。手机网页端和桌面端必须使用同一个服务；安装包不包含后端服务。

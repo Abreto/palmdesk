@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Tag matching package.json version (for example, v0.0.2)'
+        description: 'Tag matching package.json version (for example, v0.0.3)'
         required: true
         type: string
 
@@ -82,9 +82,18 @@ jobs:
         run: pnpm install --frozen-lockfile
       - run: pnpm test:smoke
       - run: pnpm typecheck
+      - name: Prepare fixed macOS signing certificate
+        if: runner.os == 'macOS'
+        env:
+          PALMDESK_SIGNING_P12: ${{ secrets.PALMDESK_SIGNING_P12 }}
+          PALMDESK_SIGNING_PASSWORD: ${{ secrets.PALMDESK_SIGNING_PASSWORD }}
+        run: node scripts/prepare-macos-signing.cjs prepare
+      - name: Verify signing identity survives a rebuild
+        if: runner.os == 'macOS'
+        run: node --test test/smoke/macos-signing-upgrade.cjs
       - name: Build installer
         run: pnpm ${{ matrix.command }} --release
-      - name: Verify macOS binaries and local signature
+      - name: Verify macOS binaries and fixed signing identity
         if: runner.os == 'macOS'
         shell: bash
         env:
@@ -96,7 +105,10 @@ jobs:
           test "$(/usr/libexec/PlistBuddy -c 'Print :PalmDeskBuildChannel' "$app/Contents/Info.plist")" = 'release'
           lipo "$app/Contents/MacOS/PalmDesk" -verify_arch "$NATIVE_ARCH"
           lipo "$app/Contents/MacOS/codex-window" -verify_arch "$NATIVE_ARCH"
-          codesign --verify --deep --strict "$app"
+          node scripts/verify-macos-signing.cjs "$app"
+      - name: Remove temporary macOS signing keychain
+        if: always() && runner.os == 'macOS' && env.PALMDESK_SIGNING_DIR != ''
+        run: node scripts/prepare-macos-signing.cjs cleanup
       - name: Verify Windows helper is packaged
         if: runner.os == 'Windows'
         shell: pwsh

@@ -126,7 +126,7 @@ System input depends on foreground focus. Concurrent local use or system shortcu
 
 The main workspace uses `PalmDesk Dev` with bundle ID `io.github.abreto.palmdesk.dev` for development. Linked worktrees automatically use `PalmDesk WT <id> Dev` and `io.github.abreto.palmdesk.worktree.<id>.dev`. Packaged builds also use separate identities per worktree to avoid overwriting the main application's system permissions and configuration. See the [application identity guide](docs/LOCAL_DEVELOPMENT.md#应用身份) for details and repair steps for existing permission entries.
 
-Without a signing certificate, desktop builds apply and verify local ad-hoc signatures for the application and its helpers so macOS can identify PalmDesk. This does not replace distribution signing. A build fails if an explicitly configured certificate is unavailable.
+Starting with v0.0.3, macOS previews use a fixed self-signed certificate and a stable native helper signing identifier. Release builds fail if that certificate is missing or mismatched; ordinary local builds can still use ad-hoc signing. Self-signing does not replace Developer ID signing or notarization. See the [signing setup](docs/DESKTOP_RELEASES.md#固定-macos-签名).
 
 Rebuilding an ad-hoc signed application can invalidate existing permissions. Check both Accessibility and Screen Recording, then fully quit and restart PalmDesk after changing permissions. Closing the window or refreshing the window list may leave the old process and its permission state running. If access still fails, remove the old entry from the relevant permission list, add and authorize the current `PalmDesk.app`, then fully quit and restart again.
 

@@ -3,6 +3,7 @@
  * https://github.com/electron-vite/electron-vite-vue/blob/main/electron-builder.json5
  */
 const { getDesktopIdentity } = require('./scripts/desktop-identity.cjs');
+const signingCertificate = require('./build/macos-signing.json');
 
 const channel = process.env.PALMDESK_BUILD_CHANNEL || 'local';
 if (!['local', 'release'].includes(channel))
@@ -32,6 +33,7 @@ module.exports = {
     'session-core/NOTICE',
   ],
   mac: {
+    identity: channel === 'release' ? signingCertificate.sha1 : undefined,
     sign: './scripts/sign-macos.cjs',
     extraFiles: [{ from: 'native-bin/codex-window', to: 'MacOS/codex-window' }],
     target: ['dmg'],
