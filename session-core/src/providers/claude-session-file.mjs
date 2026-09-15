@@ -10,6 +10,7 @@ import {
   mapWithConcurrency
 } from "./session-file-catalog.mjs";
 import { readSessionLines, readSessionText, SessionFileTooLargeError } from "./session-file-io.mjs";
+import { createClaudeDesktopSessionDiscovery } from "./claude-desktop-sessions.mjs";
 
 const CLAUDE_SESSION_PREFIX = "claude-code:session-file:";
 const SESSION_UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,26 +49,48 @@ export async function listClaudeSessionFileSessions({
 
 export function createClaudeSessionFileCatalog({
   claudeConfigDir = resolveClaudeConfigDir(),
+  claudeDesktopDataDirs = [],
   summaryOnly = true,
   concurrency = SUMMARY_CONCURRENCY,
   statFile = stat
 } = {}) {
+  // Direct parser callers stay scoped to the requested Claude config directory.
+  // The PalmDesk provider explicitly opts in to Desktop index discovery.
+  const discoverDesktop = createClaudeDesktopSessionDiscovery({ claudeDesktopDataDirs });
   return createSessionFileCatalog({
     concurrency,
     statFile,
-    discoverFiles: () => findRootSessionJsonlFiles(claudeConfigDir),
+    loadContext: async () => {
+      const [files, desktop] = await Promise.all([
+        findRootSessionJsonlFiles(claudeConfigDir),
+        discoverDesktop()
+      ]);
+      return { files, desktop };
+    },
+    discoverFiles: ({ files, desktop }) => [...desktop.byPath.keys(), ...files],
     loadFile: (filePath, { fileStat }) =>
       summaryOnly
         ? summarizeClaudeSessionFile(filePath, { fileStat })
         : parseClaudeSessionFile(filePath, { fileStat }),
     onFileError: (_error, filePath, { fileStat }) =>
       staleSessionForPath(filePath, { rawAvailable: false, fileStat }),
-    finalize: (fileSessions) => {
+    finalize: (fileSessions, { desktop }) => {
       const sessionsById = new Map();
       for (const session of fileSessions) {
+        const expectedUuid = desktop.byPath.get(session.sources?.[0]?.path);
+        if (expectedUuid && session.id !== glasslineSessionId(expectedUuid)) continue;
         setNewestSession(sessionsById, session);
       }
-      return [...sessionsById.values()];
+      return [...sessionsById.values()].map((session) => {
+        const metadata = desktop.byUuid.get(sessionFileUuidFromGlasslineId(session.id));
+        return metadata ? {
+          ...session,
+          source: "claude-desktop",
+          title: metadata.title || session.title,
+          projectPath: session.projectPath || metadata.projectPath,
+          lastUpdatedAt: maxIso(session.lastUpdatedAt, metadata.lastUpdatedAt)
+        } : session;
+      });
     }
   });
 }

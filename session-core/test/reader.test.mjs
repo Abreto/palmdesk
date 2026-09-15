@@ -22,7 +22,7 @@ test('read facade paginates persisted desktop-style messages and observes append
     record({ id: uuid, cwd: '/repo/palmdesk' }, 'session_meta'),
     ...Array.from({ length: 85 }, (_, index) => message(index)),
   ].join('\n') + '\n');
-  const reader = createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude') });
+  const reader = createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude'), claudeDesktopDataDir: '' });
   const list = await reader.list('palmdesk');
   assert.equal(list.sessions.length, 1);
   assert.equal(list.sessions[0].turnState, 'unknown');
@@ -63,7 +63,7 @@ test('identical prompts in separate turns remain readable while mirrored records
     record({ type: 'task_started' }, 'event_msg'),
     message(0), message(0),
   ].join('\n'));
-  const page = await createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude') }).read(id);
+  const page = await createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude'), claudeDesktopDataDir: '' }).read(id);
   assert.equal(page.items.length, 2);
   assert.equal(new Set(page.items.map((item) => item.id)).size, 2);
 });
@@ -78,7 +78,7 @@ test('oversized session logs stay discoverable but cannot trigger an unbounded d
   await truncate(file, 32 * 1024 * 1024 + 1);
   // An index entry must not turn the size error into a misleading empty page.
   await writeFile(path.join(directory, 'session_index.jsonl'), JSON.stringify({ id: uuid, thread_name: 'Large session' }) + '\n');
-  const reader = createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude') });
+  const reader = createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude'), claudeDesktopDataDir: '' });
   assert.equal((await reader.list()).sessions[0].id, id);
   await assert.rejects(reader.read(id), /32 MiB.*原窗口/);
   await writeFile(file, contents);

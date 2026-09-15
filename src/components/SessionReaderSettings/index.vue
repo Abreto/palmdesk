@@ -12,8 +12,8 @@
     <p>
       {{
         supported
-          ? '允许已连接设备读取此用户的 Codex 和 Claude Code 会话，包含回复与工具输出。'
-          : '会话阅读支持 macOS 上的 Codex 和 Claude Code。'
+          ? '允许已连接设备读取此用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话，包含回复与工具输出。'
+          : '会话阅读支持 macOS 上的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话。'
       }}
     </p>
     <p

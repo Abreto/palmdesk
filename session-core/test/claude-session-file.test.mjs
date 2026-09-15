@@ -446,6 +446,7 @@ test("Claude session-file helpers return detail, newest-first pages, and exact r
 test("Claude provider merges only exact process session references into file summaries", async () => {
   const provider = createClaudeCodeProvider({
     claudeConfigDir: fixtureRoot,
+    claudeDesktopDataDir: "",
     listAgentProcesses: async () => [
       {
         pid: 321,
@@ -495,6 +496,7 @@ test("Claude provider does not retain process state in cached session summaries"
   let processReads = 0;
   const provider = createClaudeCodeProvider({
     claudeConfigDir: fixtureRoot,
+    claudeDesktopDataDir: "",
     listAgentProcesses: async () => {
       processReads += 1;
       return processReads === 1

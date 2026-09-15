@@ -28,7 +28,7 @@ async function setup(t) {
   const claudeFile = path.join(claudeConfigDir, 'projects', '-repo-claude-project', `${uuid}.jsonl`);
   await mkdir(path.dirname(codexFile), { recursive: true });
   await mkdir(path.dirname(claudeFile), { recursive: true });
-  const reader = createSessionReader({ codexHome, claudeConfigDir });
+  const reader = createSessionReader({ codexHome, claudeConfigDir, claudeDesktopDataDir: '' });
   return { directory, codexHome, claudeConfigDir, codexFile, claudeFile, reader };
 }
 

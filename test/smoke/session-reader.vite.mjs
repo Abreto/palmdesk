@@ -35,7 +35,25 @@ await writeFile(claudeFile, [
   claudeRecord({ type: 'user', uuid: 'claude-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-bash', content: 'Claude 测试输出\n'.repeat(3000) }] } }),
   claudeMessage('assistant', '# Claude 阅读已接入\n\n现在支持 **Claude Code 回复**，并保留历史分页和工具输出。\n\n```ts\nconst provider = "claude-code";\n```\n\n这是一条合成测试记录。', 'claude-final'),
 ].join('\n') + '\n');
-const reader = createSessionReader({ codexHome: directory, claudeConfigDir });
+const claudeDesktopDataDir = path.join(directory, 'Claude');
+const desktopUuid = '44444444-4444-4444-8444-444444444444';
+const desktopId = 'local_dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+const desktopOrg = path.join(claudeDesktopDataDir, 'claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb');
+const desktopFile = path.join(desktopOrg, desktopId, '.claude', 'projects', '-workspace-palmdesk', `${desktopUuid}.jsonl`);
+const desktopMessage = (role, text, id) => JSON.stringify({
+  sessionId: desktopUuid, cwd: '/workspace/palmdesk', timestamp: new Date().toISOString(),
+  type: role, uuid: id, message: { content: text, stop_reason: role === 'assistant' ? 'end_turn' : null },
+});
+await mkdir(path.dirname(desktopFile), { recursive: true });
+await writeFile(path.join(desktopOrg, `${desktopId}.json`), JSON.stringify({
+  sessionId: desktopId, cliSessionId: desktopUuid, title: 'PalmDesk · Desktop Code 会话',
+  createdAt: Date.now(), lastActivityAt: Date.now(),
+}));
+await writeFile(desktopFile, [
+  ...Array.from({ length: 65 }, (_, i) => desktopMessage(i % 2 ? 'assistant' : 'user', `Desktop 历史消息 ${i + 1}：读取本地 Code 会话。`, `desktop-message-${i}`)),
+  desktopMessage('assistant', '# Desktop Code 阅读已接入\n\n这是通过 Desktop 索引发现的**合成会话**。支持历史分页和新回复。', 'desktop-final'),
+].join('\n') + '\n');
+const reader = createSessionReader({ codexHome: directory, claudeConfigDir, claudeDesktopDataDir });
 let enabled = true;
 let updates = 0;
 
@@ -59,7 +77,9 @@ export default defineConfig({
           else if (data.method === 'append') {
             updates += 1;
             const text = `## 新回复 ${updates}\n\n读取位置已保留，点击更新后才能看到这条合成消息。`;
-            if (data.id?.startsWith('claude-code:')) {
+            if (data.id === `claude-code:session-file:${desktopUuid}`) {
+              await appendFile(desktopFile, desktopMessage('assistant', text, `desktop-update-${updates}`) + '\n');
+            } else if (data.id?.startsWith('claude-code:')) {
               await appendFile(claudeFile, claudeMessage('assistant', text, `claude-update-${updates}`) + '\n');
             } else await appendFile(file, message('assistant', text) + '\n');
             result = { updates };

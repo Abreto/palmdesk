@@ -9,6 +9,7 @@ import {
   resolveClaudeConfigDir
 } from "./claude-session-file.mjs";
 import { commandTokens, listAgentProcesses, processSession } from "./process-utils.mjs";
+import { resolveClaudeDesktopDataDirs } from "./claude-desktop-sessions.mjs";
 
 const CLAUDE_PROCESS_MATCHERS = [matchesClaudeCodeAgentProcess];
 
@@ -45,7 +46,13 @@ export function createClaudeCodeProvider(options = {}) {
   const claudeConfigDir = options.claudeConfigDir ?? resolveClaudeConfigDir();
   const sessionFiles =
     options.sessionFileCatalog ??
-    createClaudeSessionFileCatalog({ claudeConfigDir, summaryOnly: true });
+    createClaudeSessionFileCatalog({
+      claudeConfigDir,
+      claudeDesktopDataDirs: options.claudeDesktopDataDir === undefined
+        ? resolveClaudeDesktopDataDirs()
+        : options.claudeDesktopDataDir ? [options.claudeDesktopDataDir] : [],
+      summaryOnly: true
+    });
   const listProcesses =
     options.listAgentProcesses ??
     (() =>
