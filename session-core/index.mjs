@@ -2,26 +2,37 @@
 import { createHash } from 'node:crypto';
 
 import { createCodexProvider } from './src/providers/codex.mjs';
+import { createClaudeCodeProvider } from './src/providers/claude-code.mjs';
 
 const sessionIdPattern =
-  /^codex:session-file:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+  /^(codex|claude-code):session-file:[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const textLimit = 16384;
 
 export function createSessionReader(options = {}) {
   // File-backed reads work without attaching to, resuming or executing an agent.
-  const provider =
-    options.provider ??
+  const providers = options.providers ?? [
     createCodexProvider({
       codexHome: options.codexHome,
       listAgentProcesses: () => Promise.resolve([]),
-    });
+    }),
+    createClaudeCodeProvider({
+      claudeConfigDir: options.claudeConfigDir,
+      listAgentProcesses: () => Promise.resolve([]),
+    }),
+  ];
+  const providerById = new Map(providers.map((provider) => [provider.id, provider]));
+
+  async function listProvider(provider) {
+    return (await provider.listSessions()).filter(
+      (session) => sessionIdPattern.exec(session.id)?.[1] === provider.id
+    );
+  }
 
   return {
     async list(query = '') {
-      const sessions = await provider.listSessions();
+      const sessions = (await Promise.all(providers.map(listProvider))).flat();
       const search = String(query).trim().toLocaleLowerCase();
       const matches = sessions
-        .filter((session) => sessionIdPattern.test(session.id))
         .map(summary)
         .filter((session) =>
           [session.title, session.projectPath, session.recentMessage].some(
@@ -44,7 +55,9 @@ export function createSessionReader(options = {}) {
         (typeof cursor !== 'string' || !/^\d{1,9}$/.test(cursor))
       )
         throw new Error('无效的历史位置');
-      const sessions = await provider.listSessions();
+      const provider = providerById.get(sessionIdPattern.exec(id)[1]);
+      if (!provider) throw new Error('不支持的会话来源');
+      const sessions = await listProvider(provider);
       const session = sessions.find((entry) => entry.id === id);
       if (!session) throw new Error('会话已不存在，请刷新列表');
       const page = await provider.getSessionTimelinePage(id, {
@@ -65,7 +78,7 @@ export function createSessionReader(options = {}) {
 function summary(session) {
   return {
     id: session.id,
-    providerId: 'codex',
+    providerId: sessionIdPattern.exec(session.id)[1],
     title: clip(session.title || '未命名会话', 160),
     projectPath: clip(session.projectPath, 512),
     lastUpdatedAt: clip(session.lastUpdatedAt, 40),

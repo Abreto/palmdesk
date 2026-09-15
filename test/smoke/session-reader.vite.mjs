@@ -23,7 +23,19 @@ await writeFile(file, [
   record({ type: 'task_complete' }, 'event_msg'),
 ].join('\n') + '\n');
 await writeFile(path.join(directory, 'session_index.jsonl'), JSON.stringify({ id: uuid, thread_name: 'PalmDesk · 会话阅读', updated_at: new Date().toISOString() }) + '\n');
-const reader = createSessionReader({ codexHome: directory });
+const claudeConfigDir = path.join(directory, 'claude');
+const claudeFile = path.join(claudeConfigDir, 'projects', '-workspace-palmdesk', `${uuid}.jsonl`);
+const claudeRecord = (value) => JSON.stringify({ sessionId: uuid, cwd: '/workspace/palmdesk', timestamp: new Date().toISOString(), ...value });
+const claudeMessage = (role, text, id) => claudeRecord({ type: role, uuid: id, message: { content: text, stop_reason: role === 'assistant' ? 'end_turn' : null } });
+await mkdir(path.dirname(claudeFile), { recursive: true });
+await writeFile(claudeFile, [
+  claudeRecord({ type: 'custom-title', customTitle: 'PalmDesk · Claude 会话阅读' }),
+  ...Array.from({ length: 65 }, (_, i) => claudeMessage(i % 2 ? 'assistant' : 'user', `Claude 历史消息 ${i + 1}：核对两种来源的会话阅读。`, `claude-message-${i}`)),
+  claudeRecord({ type: 'assistant', uuid: 'claude-tool', message: { content: [{ type: 'tool_use', id: 'claude-bash', name: 'Bash', input: { command: 'pnpm test:smoke' } }] } }),
+  claudeRecord({ type: 'user', uuid: 'claude-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-bash', content: 'Claude 测试输出\n'.repeat(3000) }] } }),
+  claudeMessage('assistant', '# Claude 阅读已接入\n\n现在支持 **Claude Code 回复**，并保留历史分页和工具输出。\n\n```ts\nconst provider = "claude-code";\n```\n\n这是一条合成测试记录。', 'claude-final'),
+].join('\n') + '\n');
+const reader = createSessionReader({ codexHome: directory, claudeConfigDir });
 let enabled = true;
 let updates = 0;
 
@@ -46,7 +58,10 @@ export default defineConfig({
           else if (data.method === 'toggle') { enabled = !enabled; result = { enabled }; }
           else if (data.method === 'append') {
             updates += 1;
-            await appendFile(file, message('assistant', `## 新回复 ${updates}\n\n读取位置已保留，点击更新后才能看到这条合成消息。`) + '\n');
+            const text = `## 新回复 ${updates}\n\n读取位置已保留，点击更新后才能看到这条合成消息。`;
+            if (data.id?.startsWith('claude-code:')) {
+              await appendFile(claudeFile, claudeMessage('assistant', text, `claude-update-${updates}`) + '\n');
+            } else await appendFile(file, message('assistant', text) + '\n');
             result = { updates };
           } else if (!enabled) throw new Error('会话读取已关闭');
           else if (data.method === 'list') result = await reader.list(data.query);

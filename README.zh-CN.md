@@ -8,11 +8,13 @@ PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](htt
 
 **状态：实验原型，尚未发布稳定版。** PalmDesk 默认连接官方后端 [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu)。连接设备后，在手机端选择窗口即可开始捕获；“打开即恢复到上次窗口”属于后续计划。已知依赖告警和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
 
-## 会话阅读（首版）
+## 会话阅读（预览）
 
-PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。首版支持 **macOS 上当前用户的 Codex 本地会话**；Windows 和其他应用继续使用窗口视图。
+PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。支持 **macOS 上当前用户的 Codex 和 Claude Code 本地会话**，按更新时间混合展示并标明来源；Windows 和其他应用继续使用窗口视图。
 
-1. 在电脑 PalmDesk 首页开启「会话阅读」，允许已连接设备读取当前用户的 Codex 回复和工具输出。设置默认关闭，保存在当前安装的应用数据目录。
+Codex 读取 `CODEX_HOME` 或 `~/.codex`。Claude Code 读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`，支持会话重命名、文字回复和工具结果。自定义目录需设置在启动 PalmDesk 的环境中；不包含嵌套子 Agent 日志和 Claude 网页聊天。
+
+1. 在电脑 PalmDesk 首页开启「会话阅读」，允许已连接设备读取当前用户的 Codex 和 Claude Code 回复及工具输出。设置默认关闭，保存在当前安装的应用数据目录。
 2. 用手机扫码或设备代码连接，在「阅读」页按项目、标题或最近消息搜索并打开会话。读取不要求先捕获窗口。
 3. 阅读页支持 Markdown、复制和历史分页；命令、工具输出与差异默认折叠。页面可见时每 8 秒检查一次更新，发现变化后显示提示，点击后转到最新内容。
 4. 点击「去窗口继续」选择原应用窗口。可以手动关联当前窗口，但发送 prompt 前仍需确认 GUI 中打开的是目标任务。阅读／窗口切换保留连接、阅读位置和未发送的输入草稿。

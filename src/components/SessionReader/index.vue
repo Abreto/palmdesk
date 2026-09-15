@@ -21,8 +21,8 @@
       <p>
         {{
           settings.supported
-            ? '在电脑 PalmDesk 首页打开「会话阅读」，这里就能直接查看 Codex 的回复。'
-            : '首版支持 macOS 上的 Codex，其他应用可以继续使用窗口视图。'
+            ? '在电脑 PalmDesk 首页打开「会话阅读」，这里就能直接查看 Codex 和 Claude Code 的回复。'
+            : '会话阅读支持 macOS 上的 Codex 和 Claude Code，其他应用可以继续使用窗口视图。'
         }}
       </p>
       <button
@@ -36,7 +36,7 @@
     <template v-else-if="!selected">
       <div class="reader-heading">
         <div>
-          <span class="eyebrow">CODEX</span>
+          <span class="eyebrow">CODEX · CLAUDE CODE</span>
           <h2>最近会话</h2>
         </div>
         <button
@@ -81,7 +81,10 @@
           <span class="preview">{{
             session.recentMessage || '打开查看会话记录'
           }}</span>
-          <span class="session-state">{{ turnLabel(session.turnState) }}</span>
+          <span class="session-state"
+            >{{ providerLabel(session.providerId) }} ·
+            {{ turnLabel(session.turnState) }}</span
+          >
         </button>
         <p
           v-if="!busy && !sessions.length && !error"
@@ -90,7 +93,7 @@
           {{
             query
               ? '没有匹配的会话，换个关键词试试。'
-              : '还没有可读取的 Codex 会话。'
+              : '还没有可读取的 Codex 或 Claude Code 会话。'
           }}
         </p>
         <p
@@ -132,6 +135,7 @@
           {{ selected.projectPath || '未提供项目目录' }}
         </p>
         <div>
+          <span>{{ providerLabel(selected.providerId) }}</span>
           <span>{{ turnLabel(selected.turnState) }}</span
           ><span>{{
             selected.quality === 'complete' ? '完整记录' : '记录可能不完整'
@@ -331,10 +335,16 @@ const blocks = computed(() => {
 const turnLabel = (state: string) =>
   ({ running: '正在执行', idle: '本轮已结束', unknown: '状态未知' })[state] ||
   '状态未知';
+const providerLabel = (providerId?: ReaderSession['providerId']) =>
+  ({ codex: 'Codex', 'claude-code': 'Claude Code' })[providerId || ''] ||
+  '助手';
 const roleLabel = (role?: string) =>
-  ({ user: '你', assistant: 'Codex', system: '系统', tool: '工具' })[
-    role || ''
-  ] || '消息';
+  ({
+    user: '你',
+    assistant: providerLabel(selected.value?.providerId),
+    system: '系统',
+    tool: '工具',
+  })[role || ''] || '消息';
 const projectName = (value: string) =>
   value.split(/[\\/]/).filter(Boolean).pop() || '未提供项目';
 function formatTime(value: string) {

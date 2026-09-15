@@ -90,7 +90,7 @@ createApp(defineComponent({
     return () => h('main', { class: 'fixture' }, [
       h('aside', { class: 'fixture-controls' }, [
         h('span', '合成数据联调'),
-        h('button', { onClick: () => fixture({ method: 'append' }) }, '添加回复'),
+        h('button', { onClick: () => fixture({ method: 'append', id: currentSession.value }) }, '添加回复'),
         h('button', { onClick: toggle }, '切换读取开关'),
         h('button', { onClick: connect }, '重新连接'),
         h('output', { 'data-input-count': inputCount.value }, `远端输入 ${inputCount.value}`),
