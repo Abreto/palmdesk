@@ -1,0 +1,843 @@
+<template>
+  <section
+    class="reader-panel"
+    aria-label="会话阅读"
+  >
+    <div
+      v-if="!client"
+      class="empty-reader"
+      role="status"
+    >
+      <strong>正在连接会话通道</strong>
+      <p>可先切到窗口；若一直无法连接，请确认电脑与手机使用同一版本。</p>
+    </div>
+    <div
+      v-else-if="settings && !settings.enabled"
+      class="empty-reader"
+    >
+      <strong>{{
+        settings.supported ? '开启会话阅读' : '此电脑暂不支持会话阅读'
+      }}</strong>
+      <p>
+        {{
+          settings.supported
+            ? '在电脑 PalmDesk 首页打开「会话阅读」，这里就能直接查看 Codex 的回复。'
+            : '首版支持 macOS 上的 Codex，其他应用可以继续使用窗口视图。'
+        }}
+      </p>
+      <button
+        type="button"
+        :disabled="busy"
+        @click="initialize"
+      >
+        重新检查
+      </button>
+    </div>
+    <template v-else-if="!selected">
+      <div class="reader-heading">
+        <div>
+          <span class="eyebrow">CODEX</span>
+          <h2>最近会话</h2>
+        </div>
+        <button
+          type="button"
+          :disabled="busy || !settings?.enabled"
+          @click="loadList"
+        >
+          刷新
+        </button>
+      </div>
+      <form
+        class="reader-search"
+        @submit.prevent="loadList"
+      >
+        <input
+          v-model="query"
+          aria-label="搜索会话"
+          placeholder="搜索项目、标题或最近内容"
+          maxlength="200"
+        />
+        <button
+          type="submit"
+          :disabled="busy || !settings?.enabled"
+        >
+          搜索
+        </button>
+      </form>
+      <div class="reader-scroll session-list">
+        <button
+          v-for="session in sessions"
+          :key="session.id"
+          class="session-card"
+          type="button"
+          :disabled="busy"
+          @click="openSession(session)"
+        >
+          <span class="session-meta"
+            ><span>{{ projectName(session.projectPath) }}</span
+            ><time>{{ formatTime(session.lastUpdatedAt) }}</time></span
+          >
+          <strong>{{ session.title }}</strong>
+          <span class="preview">{{
+            session.recentMessage || '打开查看会话记录'
+          }}</span>
+          <span class="session-state">{{ turnLabel(session.turnState) }}</span>
+        </button>
+        <p
+          v-if="!busy && !sessions.length && !error"
+          class="empty-list"
+        >
+          {{
+            query
+              ? '没有匹配的会话，换个关键词试试。'
+              : '还没有可读取的 Codex 会话。'
+          }}
+        </p>
+        <p
+          v-if="total > sessions.length"
+          class="list-note"
+        >
+          显示最近 {{ sessions.length }} 条，共
+          {{ total }} 条。搜索可以查找更早的会话。
+        </p>
+      </div>
+    </template>
+    <template v-else>
+      <div class="reader-heading detail-heading">
+        <button
+          type="button"
+          aria-label="返回会话列表"
+          @click="back"
+        >
+          ← 会话
+        </button>
+        <button
+          type="button"
+          :disabled="busy"
+          @click="loadLatest"
+        >
+          刷新
+        </button>
+        <button
+          type="button"
+          class="primary"
+          @click="emit('open-window')"
+        >
+          去窗口继续 ↗
+        </button>
+      </div>
+      <div class="session-context">
+        <h2>{{ selected.title }}</h2>
+        <p :title="selected.projectPath">
+          {{ selected.projectPath || '未提供项目目录' }}
+        </p>
+        <div>
+          <span>{{ turnLabel(selected.turnState) }}</span
+          ><span>{{
+            selected.quality === 'complete' ? '完整记录' : '记录可能不完整'
+          }}</span>
+        </div>
+        <p
+          v-if="windowName"
+          class="window-link"
+        >
+          关联窗口：{{ windowName }} · 发送前请确认窗口中的任务
+        </p>
+      </div>
+      <button
+        v-if="hasUpdate"
+        type="button"
+        class="update-banner"
+        :disabled="busy"
+        @click="loadLatest"
+      >
+        有新内容 · 查看最新回复 ↓
+      </button>
+      <div
+        ref="scrollArea"
+        class="reader-scroll timeline"
+      >
+        <button
+          v-if="hasMore"
+          type="button"
+          class="load-older"
+          :disabled="busy"
+          @click="loadOlder"
+        >
+          加载更早的记录
+        </button>
+        <template
+          v-for="block in blocks"
+          :key="block.id"
+        >
+          <article
+            v-if="block.message"
+            class="message-card"
+            :class="{ 'user-message': block.message.role === 'user' }"
+            :data-message-id="block.id"
+          >
+            <header>
+              <span>{{ roleLabel(block.message.role) }}</span
+              ><button
+                type="button"
+                @click="copy(block.message)"
+              >
+                {{ copied === block.id ? '已复制' : '复制' }}
+              </button>
+            </header>
+            <!-- renderMarkdown escapes HTML and allows only http(s)/mailto links. -->
+            <div
+              class="message-body"
+              v-html="renderMarkdown(block.message.text)"
+            ></div>
+            <p
+              v-if="block.message.truncated"
+              class="truncation"
+            >
+              内容过长，仅显示前 16,384 字符；完整内容请在原窗口查看。
+            </p>
+          </article>
+          <details
+            v-else
+            class="activity-group"
+          >
+            <summary>
+              工具活动 <span>{{ block.actions.length }} 项</span>
+            </summary>
+            <section
+              v-for="item in block.actions"
+              :key="item.id"
+              class="activity-item"
+            >
+              <strong>{{ item.title || '活动' }}</strong>
+              <pre v-if="item.text">{{ item.text }}</pre>
+              <details
+                v-if="item.detail"
+                class="tool-output"
+              >
+                <summary>
+                  {{ item.type === 'file_change' ? '查看差异' : '查看输出' }}
+                </summary>
+                <pre>{{ item.detail }}</pre>
+              </details>
+              <p
+                v-if="item.truncated"
+                class="truncation"
+              >
+                长内容已截断，完整内容请在原窗口查看。
+              </p>
+            </section>
+          </details>
+        </template>
+        <p
+          v-if="!busy && !items.length && !error"
+          class="empty-list"
+        >
+          暂未读取到消息，可稍后刷新或前往窗口查看。
+        </p>
+      </div>
+    </template>
+    <p
+      v-if="busy && !polling"
+      class="reader-notice"
+      role="status"
+    >
+      正在读取…
+    </p>
+    <p
+      v-if="error"
+      class="reader-notice error"
+      role="alert"
+    >
+      {{ error }}
+      <button
+        v-if="!settings"
+        type="button"
+        :disabled="busy"
+        @click="initialize"
+      >
+        重试
+      </button>
+    </p>
+    <p
+      v-if="copyError"
+      class="reader-notice error"
+      role="alert"
+    >
+      {{ copyError }}
+    </p>
+  </section>
+</template>
+
+<script setup lang="ts">
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+
+import type { ReaderClient } from '@/utils/session-reader-channel';
+
+import { renderMarkdown } from '../../../session-core/public/timeline-renderers.js';
+
+import type {
+  ReaderItem,
+  ReaderList,
+  ReaderPage,
+  ReaderSession,
+  ReaderSettings,
+} from '../../../session-core/index.mjs';
+
+const props = defineProps<{
+  client?: ReaderClient;
+  revision?: number;
+  active: boolean;
+  windowName?: string;
+}>();
+const emit = defineEmits<{
+  'open-window': [];
+  select: [session: ReaderSession | undefined];
+  available: [enabled: boolean];
+}>();
+const settings = ref<ReaderSettings>();
+const sessions = ref<ReaderSession[]>([]);
+const total = ref(0);
+const query = ref('');
+const selected = ref<ReaderSession>();
+const items = ref<ReaderItem[]>([]);
+const nextCursor = ref<string>();
+const hasMore = ref(false);
+const hasUpdate = ref(false);
+const busy = ref(false);
+const polling = ref(false);
+const error = ref('');
+const copied = ref('');
+const copyError = ref('');
+const scrollArea = ref<HTMLElement>();
+let generation = 0;
+let latestSignature = '';
+
+const blocks = computed(() => {
+  const result: { id: string; message?: ReaderItem; actions: ReaderItem[] }[] =
+    [];
+  items.value.forEach((item) => {
+    if (item.type === 'message')
+      result.push({ id: item.id, message: item, actions: [] });
+    else {
+      const previous = result[result.length - 1];
+      if (previous && !previous.message) previous.actions.push(item);
+      else result.push({ id: item.id, actions: [item] });
+    }
+  });
+  return result;
+});
+
+const turnLabel = (state: string) =>
+  ({ running: '正在执行', idle: '本轮已结束', unknown: '状态未知' })[state] ||
+  '状态未知';
+const roleLabel = (role?: string) =>
+  ({ user: '你', assistant: 'Codex', system: '系统', tool: '工具' })[
+    role || ''
+  ] || '消息';
+const projectName = (value: string) =>
+  value.split(/[\\/]/).filter(Boolean).pop() || '未提供项目';
+function formatTime(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? date.toLocaleString('zh-CN', {
+        month: 'numeric',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : '';
+}
+const signature = (page: ReaderPage) => JSON.stringify(page);
+
+async function run<T>(
+  request: Parameters<ReaderClient['request']>[0],
+  accept: (value: T) => void | Promise<void>
+) {
+  const client = props.client;
+  if (!client || busy.value) return;
+  const current = generation;
+  busy.value = true;
+  error.value = '';
+  try {
+    const result = await client.request<T>(request);
+    if (current === generation) {
+      await accept(result);
+      return result;
+    }
+  } catch (cause) {
+    if (current === generation)
+      error.value = cause instanceof Error ? cause.message : '读取失败，请重试';
+  } finally {
+    if (current === generation) busy.value = false;
+  }
+}
+
+async function initialize() {
+  generation += 1;
+  busy.value = false;
+  settings.value = undefined;
+  sessions.value = [];
+  selected.value = undefined;
+  items.value = [];
+  hasUpdate.value = false;
+  error.value = '';
+  copyError.value = '';
+  emit('select', undefined);
+  const state = await run<ReaderSettings>({ method: 'status' }, (value) => {
+    settings.value = value;
+    emit('available', value.enabled);
+  });
+  if (state?.enabled) await loadList();
+}
+
+async function loadList() {
+  await run<ReaderList>({ method: 'list', query: query.value }, (value) => {
+    sessions.value = value.sessions;
+    total.value = value.total;
+  });
+}
+
+async function openSession(session: ReaderSession) {
+  if (busy.value) return;
+  selected.value = session;
+  items.value = [];
+  hasMore.value = false;
+  hasUpdate.value = false;
+  copyError.value = '';
+  emit('select', session);
+  await loadLatest();
+}
+
+async function loadLatest() {
+  if (!selected.value) return;
+  await run<ReaderPage>(
+    { method: 'read', id: selected.value.id },
+    async (page) => {
+      selected.value = page.session;
+      items.value = page.items;
+      hasMore.value = page.hasMore;
+      nextCursor.value = page.nextCursor;
+      latestSignature = signature(page);
+      hasUpdate.value = false;
+      emit('select', page.session);
+      await nextTick();
+      const messages =
+        scrollArea.value?.querySelectorAll<HTMLElement>('[data-message-id]');
+      const latest = messages?.[messages.length - 1];
+      if (latest && scrollArea.value)
+        scrollArea.value.scrollTop =
+          latest.offsetTop - scrollArea.value.offsetTop;
+    }
+  );
+}
+
+async function loadOlder() {
+  if (!selected.value || !nextCursor.value) return;
+  const height = scrollArea.value?.scrollHeight || 0;
+  const top = scrollArea.value?.scrollTop || 0;
+  await run<ReaderPage>(
+    { method: 'read', id: selected.value.id, cursor: nextCursor.value },
+    async (page) => {
+      const existing = new Set(items.value.map((item) => item.id));
+      items.value = [
+        ...page.items.filter((item) => !existing.has(item.id)),
+        ...items.value,
+      ];
+      hasMore.value = page.hasMore;
+      nextCursor.value = page.nextCursor;
+      await nextTick();
+      if (scrollArea.value)
+        scrollArea.value.scrollTop =
+          top + scrollArea.value.scrollHeight - height;
+    }
+  );
+}
+
+function back() {
+  generation += 1;
+  busy.value = false;
+  selected.value = undefined;
+  items.value = [];
+  hasUpdate.value = false;
+  error.value = '';
+  emit('select', undefined);
+}
+
+async function copy(item: ReaderItem) {
+  copyError.value = '';
+  try {
+    await navigator.clipboard.writeText(item.text);
+    copied.value = item.id;
+  } catch {
+    copyError.value = '无法访问剪贴板，请长按选择文字复制。';
+  }
+}
+
+async function poll() {
+  if (
+    !props.active ||
+    document.hidden ||
+    !selected.value ||
+    busy.value ||
+    hasUpdate.value ||
+    error.value
+  )
+    return;
+  polling.value = true;
+  await run<ReaderPage>({ method: 'read', id: selected.value.id }, (page) => {
+    hasUpdate.value = signature(page) !== latestSignature;
+  });
+  polling.value = false;
+}
+
+watch(
+  () => [props.client, props.revision],
+  () => {
+    void initialize();
+  },
+  { immediate: true }
+);
+const pollTimer = setInterval(() => {
+  void poll();
+}, 8000);
+onUnmounted(() => {
+  generation += 1;
+  clearInterval(pollTimer);
+});
+</script>
+
+<style scoped>
+.reader-panel {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+  background: #f5f7f6;
+  color: #243e33;
+}
+button,
+input {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+  border: 1px solid #d4dfd9;
+  border-radius: 9px;
+  padding: 9px 13px;
+  min-height: 40px;
+  color: #355449;
+  background: #fff;
+}
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #21835d;
+  outline-offset: 2px;
+}
+.reader-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 18px 20px 10px;
+}
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #648474;
+}
+h2 {
+  margin: 4px 0 0;
+  font-size: 21px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.reader-search {
+  display: flex;
+  gap: 8px;
+  padding: 6px 20px 14px;
+}
+.reader-search input {
+  flex: 1;
+  min-width: 0;
+  width: 0;
+  border: 1px solid #d4dfd9;
+  border-radius: 9px;
+  padding: 11px;
+  background: white;
+  color: #243e33;
+}
+.reader-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 20px 24px;
+}
+.session-card {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 9px;
+  padding: 16px;
+  text-align: left;
+  border-radius: 13px;
+}
+.session-card:hover {
+  border-color: #7da992;
+}
+.session-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #72867b;
+  font-size: 11px;
+}
+.session-meta > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-meta time {
+  flex-shrink: 0;
+}
+.session-card strong {
+  font-size: 16px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.preview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #687c71;
+  overflow-wrap: anywhere;
+}
+.session-state {
+  font-size: 11px;
+  color: #567667;
+}
+.detail-heading {
+  justify-content: flex-start;
+  padding: 10px 16px;
+  border-bottom: 1px solid #e1e8e3;
+  background: #fff;
+}
+.detail-heading .primary {
+  margin-left: auto;
+  background: #27684c;
+  color: white;
+  border-color: #27684c;
+}
+.session-context {
+  padding: 12px 20px;
+  background: #fff;
+  border-bottom: 1px solid #e1e8e3;
+}
+.session-context h2 {
+  font-size: 17px;
+}
+.session-context p {
+  margin: 5px 0;
+  font-size: 11px;
+  color: #708479;
+  overflow-wrap: anywhere;
+}
+.session-context > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: #658371;
+  font-size: 11px;
+}
+.session-context .window-link {
+  color: #526f60;
+}
+.timeline {
+  position: relative;
+  padding: 16px max(16px, calc((100% - 860px) / 2)) 32px;
+}
+.message-card {
+  margin-bottom: 14px;
+  background: white;
+  border: 1px solid #e0e7e2;
+  border-radius: 12px;
+  padding: 16px;
+}
+.user-message {
+  background: #eaf1ec;
+  border-color: #dce7df;
+}
+.message-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #648373;
+  font-size: 11px;
+}
+.message-card header button {
+  font-size: 11px;
+  min-height: 30px;
+  padding: 4px 9px;
+  background: transparent;
+}
+.message-body {
+  line-height: 1.85;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.message-body :deep(p) {
+  margin: 12px 0;
+}
+.message-body :deep(h3),
+.message-body :deep(h4),
+.message-body :deep(h5) {
+  line-height: 1.5;
+  margin: 18px 0 8px;
+}
+.message-body :deep(a) {
+  color: #22734f;
+  text-decoration: underline;
+}
+.message-body :deep(pre),
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 7px;
+  padding: 12px;
+  background: #edf2ee;
+  color: #304e3f;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre;
+}
+.message-body :deep(code) {
+  font-family: ui-monospace, monospace;
+  font-size: 0.88em;
+}
+.message-body :deep(blockquote) {
+  margin-left: 0;
+  padding-left: 14px;
+  border-left: 3px solid #b7d0bf;
+  color: #627a6d;
+}
+.message-body :deep(ul),
+.message-body :deep(ol) {
+  padding-left: 24px;
+}
+.activity-group {
+  margin-bottom: 14px;
+  padding: 12px 16px;
+  border: 1px dashed #ccdacf;
+  border-radius: 10px;
+  background: #f0f4f1;
+  font-size: 13px;
+}
+summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+summary span {
+  float: right;
+  color: #7a8e81;
+  font-size: 11px;
+}
+.activity-item {
+  padding-top: 14px;
+  min-width: 0;
+}
+.activity-item > strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.tool-output {
+  margin: 8px 0;
+}
+.load-older {
+  display: block;
+  margin: 0 auto 16px;
+  font-size: 12px;
+}
+.update-banner {
+  border: 0;
+  border-radius: 0;
+  background: #deefe4;
+  color: #256545;
+  font-size: 13px;
+}
+.empty-reader {
+  margin: auto;
+  padding: 32px;
+  max-width: 450px;
+  text-align: center;
+  line-height: 1.8;
+}
+.empty-reader p,
+.empty-list,
+.list-note {
+  color: #728477;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.empty-list,
+.list-note {
+  text-align: center;
+  padding: 20px 0;
+}
+.reader-notice {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px;
+  color: #63836e;
+  background: white;
+  font-size: 12px;
+}
+.error {
+  color: #a34542;
+  background: #fff5f3;
+}
+.truncation {
+  font-size: 12px;
+  color: #966d3a;
+  line-height: 1.7;
+}
+@media (max-width: 420px) {
+  .reader-heading {
+    padding-inline: 14px;
+  }
+  .reader-search {
+    padding-inline: 14px;
+  }
+  .session-list {
+    padding-inline: 14px;
+  }
+  .detail-heading {
+    gap: 6px;
+  }
+  .detail-heading button {
+    padding-inline: 10px;
+    font-size: 12px;
+  }
+  .session-context {
+    padding-inline: 16px;
+  }
+}
+</style>

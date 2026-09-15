@@ -200,6 +200,11 @@
         </button>
       </div>
 
+      <SessionReaderSettings
+        v-if="ipcRenderer"
+        @change="configureReader"
+      />
+
       <div
         v-if="ipcRenderer"
         class="ai-target"
@@ -479,6 +484,7 @@ import {
   fetchDeskUserUpdateByUuid,
   fetchFindReceiverByUuid,
 } from '@/api/deskUser';
+import SessionReaderSettings from '@/components/SessionReaderSettings/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
@@ -525,6 +531,7 @@ import {
   applyRemoteVideoConstraints,
   desktopCaptureConstraints,
 } from '@/utils/remote-video';
+import { ReaderHost } from '@/utils/session-reader-channel';
 import { WindowCatalog } from '@/utils/window-catalog';
 import ConnectionQr from '@/views/remote/connectionQr.vue';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
@@ -584,6 +591,46 @@ const captureSessionId = ref('');
 const captureLifecycle = new CaptureLifecycle();
 const windowCatalogs = new Map<string, WindowCatalog>();
 const listingPeers = new Set<string>();
+const readerHosts = new Map<RTCDataChannel, ReaderHost>();
+let readerEnabled = false;
+
+function configureReader(enabled: boolean) {
+  readerEnabled = enabled;
+  readerHosts.forEach((host) => host.reset());
+}
+
+function bindReader(peer: WebRTCClass) {
+  const incoming = peer.cbReaderChannel;
+  const outgoing = peer.readerChannel;
+  if (!incoming || !outgoing || readerHosts.has(incoming)) return;
+  const current = () =>
+    !!ipcRenderer &&
+    appStore.remoteDesk.has(peer.receiver) &&
+    !appStore.remoteDesk.get(peer.receiver)?.isClose &&
+    networkStore.rtcMap.get(peer.receiver)?.cbReaderChannel === incoming;
+  const host = new ReaderHost(
+    incoming,
+    outgoing,
+    async (request) => {
+      const result = await invokeCapture(
+        IPC_EVENT.sessionReaderRequest,
+        request
+      );
+      if (result?.code !== 0) throw new Error(result?.msg || '无法读取会话');
+      return result.data;
+    },
+    (method) => current() && (method === 'status' || readerEnabled)
+  );
+  readerHosts.set(incoming, host);
+  incoming.addEventListener(
+    'close',
+    () => {
+      host.dispose();
+      readerHosts.delete(incoming);
+    },
+    { once: true }
+  );
+}
 let windowSelection: symbol | undefined;
 let captureOwner = '';
 let captureGeneration = 0;
@@ -615,6 +662,8 @@ const selectedCaptureSource = computed(() => {
 });
 
 onUnmounted(() => {
+  readerHosts.forEach((host) => host.dispose());
+  readerHosts.clear();
   disposed = true;
   pendingInvite.value = undefined;
   clearInterval(loopBilldDeskUpdateUserTimer.value);
@@ -694,6 +743,7 @@ watch(
   () => networkStore.rtcMap,
   (newval) => {
     newval.forEach((item) => {
+      bindReader(item);
       if (!item.cbDataChannel) return;
       // const setting = anchorStream.value?.getVideoTracks()[0].getSettings();
       item.cbDataChannel.onmessage = async (event) => {

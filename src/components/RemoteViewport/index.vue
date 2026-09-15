@@ -311,6 +311,10 @@ watch(
   releaseAll
 );
 watch([zoom, showKeyboard], () => nextTick(resizeVideo));
+watch(
+  () => props.inputBlocked,
+  () => nextTick(resizeVideo)
+);
 useResizeObserver(stage, resizeVideo);
 onMounted(() => {
   window.addEventListener('keydown', keyboard);

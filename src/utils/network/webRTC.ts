@@ -22,6 +22,8 @@ export class WebRTCClass {
   peerConnection: RTCPeerConnection | null = null;
   dataChannel: RTCDataChannel | null = null;
   cbDataChannel: RTCDataChannel | null = null;
+  readerChannel: RTCDataChannel | null = null;
+  cbReaderChannel: RTCDataChannel | null = null;
   pendingCandidates: RTCIceCandidateInit[] = [];
   awaitingRemoteDescription = false;
   closed = false;
@@ -626,6 +628,13 @@ export class WebRTCClass {
         iceServers,
       });
       this.peerConnection.ondatachannel = (event) => {
+        if (event.channel.label === 'SessionReader') {
+          this.cbReaderChannel = event.channel;
+          event.channel.onopen = () => this.update();
+          event.channel.onclose = () => this.update();
+          this.update();
+          return;
+        }
         this.cbDataChannel = event.channel;
         this.cbDataChannel.onclose = () => this.close();
         this.update();
@@ -654,6 +663,12 @@ export class WebRTCClass {
         this.close();
       };
       this.dataChannel.onclose = () => this.close();
+      this.readerChannel = this.peerConnection.createDataChannel(
+        'SessionReader',
+        { ordered: true }
+      );
+      this.readerChannel.onopen = () => this.update();
+      this.readerChannel.onclose = () => this.update();
       this.handleStreamEvent();
       this.handleConnectionEvent();
       this.update();
@@ -679,6 +694,10 @@ export class WebRTCClass {
       this.peerConnection?.close();
       this.dataChannel?.close();
       this.cbDataChannel?.close();
+      this.readerChannel?.close();
+      this.cbReaderChannel?.close();
+      this.readerChannel = null;
+      this.cbReaderChannel = null;
       this.peerConnection = null;
       this.dataChannel = null;
       this.cbDataChannel = null;

@@ -8,6 +8,16 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 
 **Status: experimental prototype, with no stable release yet.** PalmDesk connects to the official backend at [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu) by default. After connecting, select a window to start capture. Automatically reopening the last selected window is planned. Known dependency warnings and release prerequisites are tracked in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
 
+## Session Reading Preview
+
+PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. The first version supports **the current user's local Codex sessions on macOS**. Windows hosts and other applications retain the window view.
+
+Enable **会话阅读** (Session reading) on the desktop home page, then connect from your phone using the QR code or device credentials. The **阅读** (Read) tab lists searchable sessions and renders Markdown, copyable replies, paginated history and collapsed tool output. Reading works before window capture starts. While visible, the reader checks for updates every eight seconds and offers a button to view new content without moving your reading position automatically.
+
+Choose **去窗口继续** (Continue in window) to select the original application window. Window associations are manual navigation hints: confirm the active task in the GUI before sending a prompt. Switching between reading and the window retains the connection, reading position and unsent input draft.
+
+Reading is disabled by default and enabled per desktop installation. Disabling it revokes subsequent reads and clears connected readers. The result stream uses its own WebRTC DataChannel. Lists show the newest 100 matching sessions; search covers all discovered sessions. Timeline pages contain up to 40 items, with each body/output capped at 16,384 characters and visibly marked when truncated. Detail reads reject logs larger than 32 MiB and direct you to the original window. Logs may be incomplete and task state can be unknown. Attachment previews and automatic GUI task selection are not included. See the [integration notes](docs/GLASSLINE_INTEGRATION.md).
+
 ## Features
 
 - Stream a single application window via Electron capture and WebRTC, with input sent over a DataChannel.
