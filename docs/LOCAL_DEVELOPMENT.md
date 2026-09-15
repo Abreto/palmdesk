@@ -214,4 +214,4 @@ tccutil reset Accessibility 'io.github.abreto.palmdesk.local.<id>'
 
 代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。
 
-macOS 上开启「会话阅读」后，应用会读取当前用户的 Codex 和 Claude Code 本地会话；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。
+macOS 上开启「会话阅读」后，应用会读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话（含 `Claude-3p` 配置）；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。

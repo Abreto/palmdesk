@@ -1,6 +1,7 @@
 export interface ReaderSession {
   id: string;
   providerId: 'codex' | 'claude-code';
+  source?: 'codex' | 'claude-code' | 'claude-desktop';
   title: string;
   projectPath: string;
   lastUpdatedAt: string;
@@ -35,6 +36,7 @@ export interface ReaderSettings {
 export function createSessionReader(options?: {
   codexHome?: string;
   claudeConfigDir?: string;
+  claudeDesktopDataDir?: string;
 }): {
   list(query?: string): Promise<ReaderList>;
   read(id: string, cursor?: string): Promise<ReaderPage>;

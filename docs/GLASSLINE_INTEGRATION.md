@@ -1,6 +1,6 @@
 # PalmDesk 会话阅读
 
-Codex 首版实现于 2026-09-15，2026-09-16 扩展 Claude Code。读取能力迁入 PalmDesk 仓库，Glassline 独立项目未作修改。
+Codex 首版实现于 2026-09-15，2026-09-16 扩展 Claude Code 和 Claude Desktop 本地 Code 会话。读取能力迁入 PalmDesk 仓库，Glassline 独立项目未作修改。
 
 ## 产品与代码归属
 
@@ -10,7 +10,7 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 
 ## 已实现的流程
 
-1. 电脑首页开启「会话阅读」。默认关闭，仅在 macOS 可启用，范围是当前用户的 Codex 与 Claude Code 本地会话目录（分别遵循 `CODEX_HOME` 与 `CLAUDE_CONFIG_DIR`）。两种来源按更新时间合并展示，列表、详情和助手署名标明来源。
+1. 电脑首页开启「会话阅读」。默认关闭，仅在 macOS 可启用，范围是当前用户的 Codex、Claude Code 与 Claude Desktop 本地 Code 会话。读取目录遵循 `CODEX_HOME`、`CLAUDE_CONFIG_DIR` 和 `CLAUDE_USER_DATA_DIR`。所有来源按更新时间合并展示，列表、详情和助手署名标明来源。
 2. 扫码认证后进入阅读视图，无须先授权或启动窗口捕获。没有开启读取时默认进入窗口选择。
 3. 选择会话，阅读 Markdown、复制回复、向前加载历史；工具活动及长输出默认折叠。
 4. 页面可见时每 8 秒检查所选会话，出现新内容后显示提示；点击查看更新才重新定位到最近消息。
@@ -45,9 +45,23 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 
 为保留父链，Claude 摘要会流式扫描变化的文件，超过 32 MiB 时保留为不可读的会话项；打开后明确提示前往原窗口。摘要按文件指纹缓存。损坏行不会使其余记录消失，尚未写完的尾行可在后续刷新恢复。两个适配器均关闭进程扫描，不调用 Agent CLI。
 
+## Claude Desktop Code 读取范围
+
+按照 [Claude Desktop 文档](https://code.claude.com/docs/en/desktop)，Desktop 包含 Chat、Cowork 和 Code 三个入口；此适配仅覆盖本地 Code 日志。存储格式依据 macOS Claude `1.52386.6` 安装包及本地索引核对，不属于 Anthropic 承诺的稳定 API。
+
+- 默认发现 `~/Library/Application Support/Claude` 与 `Claude-3p`，覆盖普通及第三方模型配置；若设置 `CLAUDE_USER_DATA_DIR`，则只使用该目录。
+- 读取 `claude-code-sessions/<account>/<org>/local_<uuid>.json`，按 `cliSessionId` 关联全局 Claude 项目日志，或索引同级 `<local_uuid 或 UUID 前八位>/.claude/projects/*/<cliSessionId>.jsonl`。
+- 保留 `claude-code:session-file:<cliSessionId>` 标识及既有解析器。全局和 Desktop 副本按日志更新时间选取最新一份，列表和详情读取同一份文件；来源显示为 `Claude Desktop · Code`。Desktop 的非空标题优先于日志标题，索引重命名会在下次读取时生效。
+- 索引每文件最多读取 10 MiB，变化后才重新解析；只保留关联 ID、标题、项目路径和时间。索引中的任意文件路径、账号字段及应用配置不会投影到手机。专属目录内只接受关联 UUID 的根日志，跳过符号链接与嵌套子 Agent。
+- 缺失、损坏或过大的索引不会阻断 CLI 读取。只有索引、没有日志的会话不展示；不会连接 Claude 账号、调用 CLI 或抓取云端/SSH 日志。Chat、Cowork 及远程会话专用适配不在本版范围内。
+
+真实只读验证使用本机 `Claude-3p` 的 9 条 Code 索引，其中 6 条仍有全局日志，均正确识别为 Desktop，标题匹配且无重复。共读取 10 页、118 条文字消息与 136 项工具活动，其中 4 个会话验证了历史分页。没有修改这些会话；仓库中的测试记录全部为合成数据。会话专属目录、短目录名、追加与重命名由合成测试覆盖；尚未通过真实手机或在 Claude Desktop 中新建会话验证写入全过程。
+
+合成 WebRTC 页面在 390 × 844 浏览器尺寸下验证了三种来源的混合列表、Desktop 标题及助手署名、历史加载和新回复提示。提示出现前后阅读位置保持不变（`scrollTop = 3318`），点击后显示最新回复；切回 CLI 会话后署名恢复为 `Claude Code`，无横向溢出。
+
 ## 本版限制
 
-- 提供 macOS 上的 Codex 与 Claude Code 读取；其他平台和 Agent 继续使用原窗口功能。
+- 提供 macOS 上的 Codex、Claude Code 与 Claude Desktop 本地 Code 读取；其他平台和 Agent 继续使用原窗口功能。
 - 搜索覆盖已发现的全部会话，每次显示最近 100 条匹配项。
 - 历史每页 40 项，单项正文或输出各保留前 16,384 字符，截断有明确提示。
 - 日志并非稳定 API，可能缺失记录；本轮状态可以是未知。首次建立目录需扫描文件，详情仍会解析相应日志文件，超过 32 MiB 时拒绝读取并提示前往原窗口，读取过程中也检查大小上限。
@@ -67,10 +81,12 @@ pnpm exec vite build --mode production
 
 测试覆盖合成 JSONL 的分页、追加与未完整写入的尾行、跨轮次重复 prompt、超长输出、32 MiB 文件上限（含读取中增长）、Markdown 截断标记与搜索，以及默认关闭、启用持久化、撤销、分片完整性、背压、请求排队和断开。Claude 扩展另外覆盖混合来源排序、同 UUID 路由、重命名、父链、子 Agent 排除、工具结果配对、缓存失效、损坏日志恢复和主进程读取开关。
 
+Desktop 扩展覆盖全局/专属/短目录布局、共享日志去重及详情一致性、普通/第三方配置目录、只改索引的重命名、分页与追加、索引及日志大小上限、缺失日志、损坏索引恢复、ID 不匹配与路径隔离，以及同一个主进程读取开关的授权和撤销。
+
 浏览器联调页仅使用临时目录内的合成记录，通过两个真实 WebRTC peer 连接阅读组件与读取模块，同时提供合成窗口视频。它不会读取本机真实会话或发送真实 GUI 输入：
 
 ```sh
 pnpm exec vite --config test/smoke/session-reader.vite.mjs
 ```
 
-打开 `http://127.0.0.1:5194/test/smoke/session-reader.html`。列表同时包含 Codex 和 Claude Code；可为当前选中的会话添加合成回复、切换读取开关、重连，并检查阅读位置、输出折叠和窗口输入。此页面用于验证新增功能，不替代真实手机、原生窗口输入或跨网络 TURN 验收。
+打开 `http://127.0.0.1:5194/test/smoke/session-reader.html`。列表同时包含 Codex、Claude Code 和 Claude Desktop Code；可为当前选中的会话添加合成回复、切换读取开关、重连，并检查阅读位置、输出折叠和窗口输入。此页面用于验证新增功能，不替代真实手机、原生窗口输入或跨网络 TURN 验收。

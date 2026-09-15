@@ -17,6 +17,7 @@ export function createSessionReader(options = {}) {
     }),
     createClaudeCodeProvider({
       claudeConfigDir: options.claudeConfigDir,
+      claudeDesktopDataDir: options.claudeDesktopDataDir,
       listAgentProcesses: () => Promise.resolve([]),
     }),
   ];
@@ -79,6 +80,10 @@ function summary(session) {
   return {
     id: session.id,
     providerId: sessionIdPattern.exec(session.id)[1],
+    source:
+      session.source === 'claude-desktop'
+        ? 'claude-desktop'
+        : sessionIdPattern.exec(session.id)[1],
     title: clip(session.title || '未命名会话', 160),
     projectPath: clip(session.projectPath, 512),
     lastUpdatedAt: clip(session.lastUpdatedAt, 40),
