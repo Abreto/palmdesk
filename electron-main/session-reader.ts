@@ -13,7 +13,8 @@ export class DesktopSessionReader {
   constructor(
     private directory: string,
     private platform = process.platform,
-    private codexHome?: string
+    private codexHome?: string,
+    private claudeConfigDir?: string
   ) {
     this.ready = this.load();
   }
@@ -67,7 +68,10 @@ export class DesktopSessionReader {
     if (data.method === 'status') return await this.settings();
     if (!this.enabled) throw new Error('请在电脑 PalmDesk 中开启「会话阅读」');
     const generation = this.generation;
-    this.reader ||= createSessionReader({ codexHome: this.codexHome });
+    this.reader ||= createSessionReader({
+      codexHome: this.codexHome,
+      claudeConfigDir: this.claudeConfigDir,
+    });
     let result: unknown;
     if (data.method === 'list') {
       if (

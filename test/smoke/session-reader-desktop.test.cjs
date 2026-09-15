@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { mkdtemp, rm } = require('node:fs/promises');
+const { cp, mkdtemp, rm } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -32,4 +32,26 @@ test('desktop reader is off by default, persists opt-in, rejects writes and revo
   const windows = new DesktopSessionReader(directory, 'win32');
   assert.deepEqual(await windows.settings(), { enabled: false, supported: false });
   await assert.rejects(windows.configure(true), /macOS/);
+});
+
+test('desktop requests read Claude transcripts through the same opt-in boundary', async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-desktop-claude-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const claudeConfigDir = path.join(directory, 'claude');
+  await cp(path.join(__dirname, '../../session-core/test/fixtures/claude-config'), claudeConfigDir, { recursive: true });
+  const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
+    '../session-core/index.mjs': await import('../../session-core/index.mjs'),
+  });
+  const reader = new DesktopSessionReader(directory, 'darwin', path.join(directory, 'no-codex'), claudeConfigDir);
+  const id = 'claude-code:session-file:33333333-3333-4333-8333-333333333333';
+  await assert.rejects(reader.request({ method: 'read', id }), /开启/);
+  await reader.configure(true);
+  const list = await reader.request({ method: 'list' });
+  assert.equal(list.sessions.length, 1);
+  assert.equal(list.sessions[0].providerId, 'claude-code');
+  const page = await reader.request({ method: 'read', id });
+  assert.equal(page.items.at(-1).text, 'Done.');
+  assert.ok(page.items.some((item) => item.detail === 'tests passed'));
+  await reader.configure(false);
+  await assert.rejects(reader.request({ method: 'read', id }), /开启/);
 });

@@ -7,6 +7,7 @@ import path from "node:path";
 import { pageTimelineItems } from "../core/session-registry.mjs";
 import { commandTokens } from "./process-utils.mjs";
 import { createSessionFileCatalog } from "./session-file-catalog.mjs";
+import { readSessionText, SessionFileTooLargeError } from "./session-file-io.mjs";
 
 const CODEX_SESSION_PREFIX = "codex:session-file:";
 const SESSION_UUID_SOURCE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
@@ -16,32 +17,6 @@ const SESSION_ID_PATTERN =
 const SESSION_TITLE_MAX_LENGTH = 96;
 const TURN_STATE_TAIL_BYTES = 64 * 1024;
 const SUMMARY_CONCURRENCY = 8;
-const MAX_SESSION_FILE_BYTES = 32 * 1024 * 1024;
-
-class SessionFileTooLargeError extends Error {
-  constructor() {
-    super("会话日志超过 32 MiB，请在原窗口查看");
-  }
-}
-
-async function readSessionText(filePath) {
-  const file = await open(filePath, "r");
-  try {
-    if ((await file.stat()).size > MAX_SESSION_FILE_BYTES)
-      throw new SessionFileTooLargeError();
-    const chunks = [];
-    let bytes = 0;
-    // Recheck during reading: Codex can append after the initial stat.
-    for await (const chunk of file.createReadStream({ autoClose: false })) {
-      bytes += chunk.length;
-      if (bytes > MAX_SESSION_FILE_BYTES) throw new SessionFileTooLargeError();
-      chunks.push(chunk);
-    }
-    return Buffer.concat(chunks, bytes).toString("utf8");
-  } finally {
-    await file.close();
-  }
-}
 
 export function resolveCodexHome(env = process.env) {
   return env.CODEX_HOME || path.join(os.homedir(), ".codex");

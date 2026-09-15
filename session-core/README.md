@@ -1,9 +1,11 @@
 # Session core
 
-PalmDesk maintains this read-only module. It has no Electron, HTTP server or agent execution dependency. `index.mjs` is the bounded reading API; `index.d.mts` defines the data sent to the controller. The desktop integration currently enables Codex reading on macOS only.
+PalmDesk maintains this read-only module. It has no Electron, HTTP server or agent execution dependency. `index.mjs` is the bounded reading API; `index.d.mts` defines the data sent to the controller. The desktop integration enables Codex and Claude Code reading on macOS. Session IDs include the provider, and the facade routes each read only to its owning provider. Process discovery is disabled for both adapters.
 
 The parser, registry, Markdown renderer and their original tests were imported from [Glassline](https://github.com/Abreto/glassline) commit `63f7d3dd67f723f6f20fe3c91b8e04a725e3bfce`. Their Apache-2.0 [LICENSE](LICENSE) and [NOTICE](NOTICE) are retained. PalmDesk changes include the public reading facade, bounded wire representations, a 32 MiB detail-file limit, incomplete Markdown marker handling and subsequent parser fixes recorded in this repository's history.
 
 The module is maintained in this repository, with no separately deployed Glassline service or separately published package. `src/` uses Node built-ins; `public/timeline-renderers.js` is a separate browser entry and does not import the filesystem adapters. The controller must not import the Node entry at runtime.
+
+Claude Code uses `CLAUDE_CONFIG_DIR || ~/.claude` and discovers root `projects/*/*.jsonl` files, excluding nested subagents. Its summary reads stream the full file up to 32 MiB, retaining compact records to resolve the active parent chain; unchanged summaries are cached. Oversize files remain discoverable as stale entries and their detail reads return an explicit size error. Both providers use the same 32 MiB detail bound, also enforced during reads. Claude titles prefer `custom-title`, then `agent-name`, then `ai-title`, then the first user message. Tool results are matched by `tool_use_id`; Bash is a command and other tools remain tool calls. Thinking, images and internal command wrappers are excluded.
 
 Run `pnpm test:session-core` from the repository root. All fixtures are synthetic. The imported raw-session and resume-reference parsing helpers are internal; PalmDesk exposes only session listing and paginated reading, with no raw-file, follow-up or command execution endpoint.
