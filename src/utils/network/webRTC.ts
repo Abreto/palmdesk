@@ -24,6 +24,7 @@ export class WebRTCClass {
   cbDataChannel: RTCDataChannel | null = null;
   readerChannel: RTCDataChannel | null = null;
   cbReaderChannel: RTCDataChannel | null = null;
+  imageChannel: RTCDataChannel | null = null;
   pendingCandidates: RTCIceCandidateInit[] = [];
   awaitingRemoteDescription = false;
   closed = false;
@@ -615,6 +616,41 @@ export class WebRTCClass {
     this.dataChannel.send(blob);
   };
 
+  // Create this channel only after the host advertises image paste support.
+  openImageChannel = () => {
+    if (
+      !this.peerConnection ||
+      this.closed ||
+      (this.imageChannel &&
+        !['closed', 'closing'].includes(this.imageChannel.readyState))
+    )
+      return;
+    this.bindImageChannel(
+      this.peerConnection.createDataChannel('ImageTransfer', { ordered: true })
+    );
+  };
+
+  bindImageChannel = (channel: RTCDataChannel) => {
+    if (
+      this.closed ||
+      (this.imageChannel &&
+        !['closed', 'closing'].includes(this.imageChannel.readyState))
+    ) {
+      channel.close();
+      return;
+    }
+    this.imageChannel = channel;
+    channel.binaryType = 'arraybuffer';
+    channel.onopen = () => this.update();
+    channel.onerror = () => channel.close();
+    channel.onclose = () => {
+      if (this.imageChannel !== channel) return;
+      this.imageChannel = null;
+      this.update();
+    };
+    this.update();
+  };
+
   /** 创建对等连接 */
   createPeerConnection = () => {
     if (!window.RTCPeerConnection) {
@@ -628,6 +664,10 @@ export class WebRTCClass {
         iceServers,
       });
       this.peerConnection.ondatachannel = (event) => {
+        if (event.channel.label === 'ImageTransfer') {
+          this.bindImageChannel(event.channel);
+          return;
+        }
         if (event.channel.label === 'SessionReader') {
           this.cbReaderChannel = event.channel;
           event.channel.onopen = () => this.update();
@@ -696,6 +736,8 @@ export class WebRTCClass {
       this.cbDataChannel?.close();
       this.readerChannel?.close();
       this.cbReaderChannel?.close();
+      this.imageChannel?.close();
+      this.imageChannel = null;
       this.readerChannel = null;
       this.cbReaderChannel = null;
       this.peerConnection = null;

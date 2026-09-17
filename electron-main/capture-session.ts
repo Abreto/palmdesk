@@ -1,7 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { setTimeout as delay } from 'node:timers/promises';
 
+import { validateImage } from '../src/utils/image-payload';
+
 import type { ICaptureSource, RemoteInput } from '../src/pure-interface';
+import type { ImagePayload } from '../src/utils/image-payload';
 
 function sameWindow(a: ICaptureSource, b: ICaptureSource) {
   return (
@@ -25,6 +28,12 @@ export interface InputDriver {
   keysDown: (keys: number[]) => Promise<unknown>;
   keysUp: (keys: number[]) => Promise<unknown>;
   validKey: (key: number) => boolean;
+  canPasteImage?: (source: ICaptureSource) => boolean;
+  pasteImage?: (
+    image: ImagePayload,
+    source: ICaptureSource,
+    current: () => boolean
+  ) => Promise<unknown>;
 }
 
 export class InputUnavailableError extends Error {}
@@ -66,6 +75,7 @@ export class CaptureSession {
   private active?: { id: string; source: ICaptureSource; inputError?: string };
   private keys = new Set<number>();
   private buttons = new Set<'left' | 'right'>();
+  private imageJob?: { sessionId: string; id: number; cancelled: boolean };
 
   constructor(
     private driver: InputDriver,
@@ -139,6 +149,7 @@ export class CaptureSession {
         sessionId: this.active.id,
         source,
         stream: { id: source.captureId! },
+        imagePaste: !!this.driver.canPasteImage?.(source),
       };
     });
   }
@@ -172,6 +183,46 @@ export class CaptureSession {
         await this.end(active?.id);
       throw error;
     }
+  }
+
+  cancelImagePaste(sessionId: string, id: number) {
+    if (this.imageJob?.sessionId === sessionId && this.imageJob.id === id)
+      this.imageJob.cancelled = true;
+  }
+
+  pasteImage(sessionId: string, id: number, image: ImagePayload) {
+    if (this.imageJob) return Promise.reject(new Error('已有图片正在粘贴'));
+    if (!Number.isSafeInteger(id) || id < 1)
+      return Promise.reject(new Error('无效的图片请求'));
+    const job = { sessionId, id, cancelled: false };
+    this.imageJob = job;
+    return this.enqueue(async () => {
+      try {
+        const active = this.active;
+        const current = () =>
+          !!active && this.active === active && !job.cancelled;
+        if (!active || active.id !== sessionId || !current())
+          throw new Error('远程控制会话已结束或图片粘贴已取消');
+        if (
+          !this.driver.canPasteImage?.(active.source) ||
+          !this.driver.pasteImage
+        )
+          throw new Error('图片粘贴目前仅支持 macOS 上的 Codex');
+        if (active.inputError)
+          throw new InputUnavailableError(active.inputError);
+        validateImage(image);
+        await this.release();
+        if (!current()) throw new Error('图片粘贴已取消');
+        const source = await this.focus(active.source);
+        if (!current()) throw new Error('图片粘贴已取消');
+        if (!sameWindow(source, active.source) || !source.isOnScreen)
+          throw new Error('目标窗口已变化，请重新连接');
+        active.source = source;
+        await this.driver.pasteImage(image, source, current);
+      } finally {
+        if (this.imageJob === job) this.imageJob = undefined;
+      }
+    });
   }
 
   input(sessionId: string, input: RemoteInput) {

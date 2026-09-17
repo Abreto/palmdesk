@@ -55,6 +55,31 @@ test('double touch emits a double click without a preceding single click', (t) =
     [Behavior.doubleClick]
   );
 });
+test('flushing a pending tap before blocking input retains one click and leaves no delayed duplicate', (t) => {
+  const h = controller(t);
+  h.pointer.down(event());
+  h.pointer.up(event());
+  t.mock.timers.tick(50);
+  h.pointer.flush();
+  h.enabled = false;
+  h.pointer.cancel();
+  t.mock.timers.tick(300);
+  h.pointer.flush();
+  assert.deepEqual(
+    h.messages.map((m) => m.type),
+    [Behavior.leftClick]
+  );
+});
+test('flushing after input is disabled never sends a stale click', (t) => {
+  const h = controller(t);
+  h.pointer.down(event());
+  h.pointer.up(event());
+  h.enabled = false;
+  h.pointer.flush();
+  h.enabled = true;
+  t.mock.timers.tick(300);
+  assert.deepEqual(h.messages, []);
+});
 test('two fast taps at different positions are both retained', (t) => {
   const h = controller(t);
   h.pointer.down(event(30, 50));

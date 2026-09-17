@@ -525,6 +525,7 @@ import {
   type ConnectionInvite,
   parseConnectionInvite,
 } from '@/utils/connection-invite';
+import { ImageTransferHost } from '@/utils/image-transfer-channel';
 import { WebRTCClass } from '@/utils/network/webRTC';
 import {
   REMOTE_VIDEO_DEFAULTS,
@@ -592,7 +593,51 @@ const captureLifecycle = new CaptureLifecycle();
 const windowCatalogs = new Map<string, WindowCatalog>();
 const listingPeers = new Set<string>();
 const readerHosts = new Map<RTCDataChannel, ReaderHost>();
+const imageHosts = new Map<RTCDataChannel, ImageTransferHost>();
+let imagePasteSession = '';
 let readerEnabled = false;
+
+function bindImages(peer: WebRTCClass) {
+  const channel = peer.imageChannel;
+  if (!channel || imageHosts.has(channel)) return;
+  const allowed = (sessionId: string) =>
+    !!ipcRenderer &&
+    !!sessionId &&
+    sessionId === imagePasteSession &&
+    sessionId === captureSessionId.value &&
+    peer.receiver === captureOwner &&
+    !!anchorStream.value &&
+    appStore.remoteDesk.has(peer.receiver) &&
+    !appStore.remoteDesk.get(peer.receiver)?.isClose &&
+    networkStore.rtcMap.get(peer.receiver)?.imageChannel === channel;
+  const host = new ImageTransferHost(
+    channel,
+    allowed,
+    async (sessionId, id, image) => {
+      if (!allowed(sessionId)) throw new Error('窗口控制会话已结束');
+      const result = await invokeCapture(IPC_EVENT.pasteImage, {
+        sessionId,
+        id,
+        image,
+      });
+      if (result?.code !== 0) throw new Error(result?.msg || '图片粘贴失败');
+    },
+    (sessionId, id) => {
+      void invokeCapture(IPC_EVENT.cancelImagePaste, { sessionId, id }).catch(
+        () => {}
+      );
+    }
+  );
+  imageHosts.set(channel, host);
+  channel.addEventListener(
+    'close',
+    () => {
+      host.dispose();
+      imageHosts.delete(channel);
+    },
+    { once: true }
+  );
+}
 
 function configureReader(enabled: boolean) {
   readerEnabled = enabled;
@@ -662,6 +707,8 @@ const selectedCaptureSource = computed(() => {
 });
 
 onUnmounted(() => {
+  imageHosts.forEach((host) => host.dispose());
+  imageHosts.clear();
   readerHosts.forEach((host) => host.dispose());
   readerHosts.clear();
   disposed = true;
@@ -744,6 +791,7 @@ watch(
   (newval) => {
     newval.forEach((item) => {
       bindReader(item);
+      bindImages(item);
       if (!item.cbDataChannel) return;
       // const setting = anchorStream.value?.getVideoTracks()[0].getSettings();
       item.cbDataChannel.onmessage = async (event) => {
@@ -776,6 +824,13 @@ watch(
           return;
         }
         if (item.receiver !== captureOwner) return;
+        if (msgType === WsMsgTypeEnum.remoteImagePaste) {
+          if (item.imageChannel)
+            imageHosts
+              .get(item.imageChannel)
+              ?.commit(jsondata.data.sessionId, jsondata.data.id);
+          return;
+        }
         if (msgType === WsMsgTypeEnum.changeMaxBitrate) {
           const { data }: { data: WsChangeMaxBitrateType['data'] } = jsondata;
           currentMaxBitrate.value = data.val;
@@ -1167,6 +1222,8 @@ function handleWsMsg() {
 }
 
 function stopCaptureStream() {
+  imagePasteSession = '';
+  imageHosts.forEach((host) => host.reset());
   captureGeneration += 1;
   captureLifecycle.stop();
   anchorStream.value = undefined;
@@ -1202,6 +1259,7 @@ async function beginSelectedCapture(source: ICaptureSource, receiver: string) {
       return;
     }
     captureSessionId.value = sessionId;
+    imagePasteSession = result.data.imagePaste === true ? sessionId : '';
     captureWarning.value = getCaptureBoundsWarning(capturedSource);
     const stream = await captureLifecycle.start(() =>
       // Use only the window ID approved by the main process.
@@ -1370,6 +1428,7 @@ async function handleWindowRequest(
     reply(WsMsgTypeEnum.remoteWindowSelected, {
       id: request.data.id,
       name: source.name,
+      imagePasteSession: imagePasteSession || undefined,
     });
   } catch (error) {
     if (captureOwner === peer.receiver) stopCaptureStream();

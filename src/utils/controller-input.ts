@@ -70,6 +70,13 @@ export function createPointerController(options: {
   };
   return {
     cancel,
+    flush() {
+      const point = tapTimer ? lastTap : undefined;
+      clearTimeout(tapTimer);
+      tapTimer = undefined;
+      lastTap = undefined;
+      if (point) emit(Behavior.leftClick, point);
+    },
     lostCapture() {
       if (active) cancel();
     },
