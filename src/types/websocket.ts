@@ -97,6 +97,7 @@ export enum WsMsgTypeEnum {
   remoteWindowSelect = 'remoteWindowSelect',
   remoteWindowSelected = 'remoteWindowSelected',
   remoteInputResult = 'remoteInputResult',
+  remoteImagePaste = 'remoteImagePaste',
   billdDeskOffer = 'billdDeskOffer',
   billdDeskAnswer = 'billdDeskAnswer',
   billdDeskCandidate = 'billdDeskCandidate',

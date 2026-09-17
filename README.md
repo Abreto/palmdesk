@@ -33,6 +33,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Return to the Agent directory and choose another window by reconnecting with the existing device credentials. Windows within each agent retain their original order.
 - Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
+- Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS Codex prompt. Image paste is not yet enabled for Windows hosts.
 - On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
 - On Windows, identify the target by HWND, process ID, executable path, and process start time. Support regular windows on the current virtual desktop, restoring a selected minimized window, and physical coordinates across high-DPI and multiple displays.
 - Send literal Unicode text on Windows, preserving Chinese and English text without conversion by the host's input method.
@@ -40,6 +41,14 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Configure API and signaling services. Browser clients use the current origin by default. TURN credentials are issued and renewed by the backend unless a manual TURN configuration is supplied.
 
 **Hosts support macOS and Windows.** Linux has no native host adapter and rejects capture and input. This host restriction does not apply to browser controllers. Video uses a window source, but input still relies on system focus and mouse/keyboard APIs; it does not provide operating-system-level input isolation.
+
+### Paste images into Codex from your phone (macOS)
+
+Connect to a macOS host and select its Codex window. Use the image picker or clipboard button below the text composer, or paste an image into the text field. The initial version accepts one PNG/JPEG at a time, up to 10 MiB, approximately 25 megapixels, and 16384 pixels per side. HEIC, GIF, and other files are unsupported. Original image resolution and content are preserved without lossy compression.
+
+Tap the Codex prompt in the remote video first, then choose “粘贴到 Codex” (Paste into Codex). The host verifies the control session and window identity, writes the image to its system clipboard, and presses `Cmd+V`. Existing text drafts are preserved; confirm the attachment and send the message yourself. PalmDesk verifies window focus but does not locate the prompt or select a GUI task automatically. Pasting replaces the computer's clipboard with the image.
+
+Images travel in chunks over a dedicated WebRTC channel on the authenticated connection, without cloud file storage. Switching to reading or watch-only mode, disconnecting, or ending capture cancels pending work. If the image connection closes, choose “重新连接图片” (Reconnect images), then retry manually; your selected image is retained. If the result is unconfirmed, inspect Codex's attachments before retrying to avoid duplicates. Reading the phone clipboard requires HTTPS and browser paste permission; use the image picker when unavailable. Update both clients to a version supporting this feature. Physical iOS Safari and actual Codex attachment display still require validation.
 
 ## Getting Started
 

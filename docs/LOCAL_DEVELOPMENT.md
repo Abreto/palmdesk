@@ -106,6 +106,24 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
+图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。按下文安装 Playwright 后，分别启动测试页和测试：
+
+```bash
+pnpm exec vite --config test/smoke/image-paste.vite.mjs
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/image-paste-browser.mjs
+```
+
+覆盖 PNG/JPEG 选图、文字框图片粘贴、逐字节传输、文字草稿保留、取消后重试、仅观看和手机布局，截图写入 `.local/image-paste/`。回归场景还包括快速点击输入框后立即粘贴、普通输入通道延迟时保持点击与粘贴顺序、传输中保留文字粘贴、收起输入面板后恢复控制、替换图片时禁止发送旧图，以及图片通道断开后独立重连。不代表 iOS Safari 真机或真实 Codex 附件已经验收。协议校验、大小限制、会话失效、去重、取消排队粘贴、点击与粘贴的主进程执行顺序和修饰键释放由 `pnpm test:smoke` 覆盖。
+
+macOS 上还可在准备隔离开发应用后运行真实图片剪贴板烟测：
+
+```bash
+node scripts/dev.mjs --prepare-only
+.local/electron-dev/Electron.app/Contents/MacOS/Electron test/smoke/electron-image-paste.cjs
+```
+
+该测试用隐藏的临时 Electron 窗口验证原生 PNG/JPEG 解码、macOS 图片剪贴板和粘贴事件；结束时若剪贴板仍是测试图片，会恢复先前的文字、HTML、RTF 和图片。它使用测试窗口的 `webContents.paste()`，不验证系统 `Cmd+V` 或操作真实 Codex，结果写入 `.local/image-paste/electron-result.json`。
+
 窗口画质回归测试不需要后端，只捕获测试程序自己创建的文字窗口，验证旧 1080P 约束与新默认画质的实际尺寸、先建立 DataChannel 再添加视频时的编码参数，以及 720P 降档后恢复原始尺寸。macOS 上使用当前工作区的隔离开发应用运行：
 
 ```bash

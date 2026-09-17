@@ -46,6 +46,8 @@ export const IPC_EVENT = {
   beginCapture: 'beginCapture',
   stopCapture: 'stopCapture',
   remoteInput: 'remoteInput',
+  pasteImage: 'pasteImage',
+  cancelImagePaste: 'cancelImagePaste',
   capturePermissions: 'capturePermissions',
   openCapturePermission: 'openCapturePermission',
   showTargetApplication: 'showTargetApplication',

@@ -82,7 +82,7 @@
           type="button"
           :title="key.label"
           :aria-label="key.label"
-          :disabled="!canControl"
+          :disabled="!canControl || imageBusy"
           @click="tapKey(key.code)"
         >
           <component
@@ -104,16 +104,27 @@
           :disabled="watchOnly"
           @keydown.stop
           @keyup.stop
+          @paste="imageAttachment?.paste($event)"
         ></textarea>
         <button
           type="submit"
           title="发送文字"
           aria-label="发送文字"
-          :disabled="!canControl || !draft.length"
+          :disabled="!canControl || imageBusy || !draft.length"
         >
           <SendOutline />
         </button>
       </form>
+      <ImageAttachment
+        v-if="imagePasteSession"
+        ref="imageAttachment"
+        :enabled="canControl"
+        :channel="imageChannel"
+        :session-id="imagePasteSession"
+        :commit-paste="commitImagePaste"
+        :reconnect-channel="reconnectImageChannel"
+        @busy="setImageBusy"
+      />
     </div>
   </section>
 </template>
@@ -137,6 +148,7 @@ import {
 import { useResizeObserver } from '@vueuse/core';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 
+import ImageAttachment from '@/components/ImageAttachment/index.vue';
 import { NUT_KEY_MAP } from '@/constant';
 import type { WsBilldDeskBehaviorType } from '@/types/websocket';
 import { BilldDeskBehaviorEnum as Behavior } from '@/types/websocket';
@@ -147,6 +159,10 @@ const props = defineProps<{
   video?: HTMLVideoElement;
   connected: boolean;
   inputBlocked?: boolean;
+  imageChannel?: RTCDataChannel;
+  imagePasteSession?: string;
+  commitImagePaste?: (sessionId: string, id: number) => void;
+  reconnectImageChannel?: () => void;
 }>();
 const emit = defineEmits<{
   behavior: [data: Partial<WsBilldDeskBehaviorType['data']>];
@@ -157,6 +173,8 @@ const watchOnly = ref(false);
 const zoom = ref(1);
 const showKeyboard = ref(true);
 const draft = ref('');
+const imageAttachment = ref<InstanceType<typeof ImageAttachment>>();
+const imageBusy = ref(false);
 const hasFrame = ref(false);
 const canControl = computed(
   () =>
@@ -187,7 +205,8 @@ function point(event: { clientX: number; clientY: number }, clamp = false) {
 }
 const pointer = createPointerController({
   send,
-  enabled: () => canControl.value && touchMode.value !== 'pan',
+  enabled: () =>
+    canControl.value && !imageBusy.value && touchMode.value !== 'pan',
   mode: () => (touchMode.value === 'pan' ? 'tap' : touchMode.value),
   point,
 });
@@ -207,7 +226,7 @@ function wheel(event: WheelEvent) {
     stage.value?.scrollBy({ left: event.deltaX, top: event.deltaY });
     return;
   }
-  if (!canControl.value) return;
+  if (!canControl.value || imageBusy.value) return;
   const position = point(event);
   if (!position) return;
   if (event.deltaY)
@@ -231,12 +250,12 @@ function wheel(event: WheelEvent) {
 }
 function tapKey(code: string) {
   const key = NUT_KEY_MAP[code];
-  if (!canControl.value || typeof key !== 'number') return;
+  if (!canControl.value || imageBusy.value || typeof key !== 'number') return;
   send({ type: Behavior.keyboardPressKey, key: [key] });
   send({ type: Behavior.keyboardReleaseKey, key: [key] });
 }
 function sendText() {
-  if (!canControl.value || !draft.value.length) return;
+  if (!canControl.value || imageBusy.value || !draft.value.length) return;
   send({ type: Behavior.keyboardType, text: draft.value });
   draft.value = '';
 }
@@ -249,6 +268,7 @@ function releaseAll() {
 function keyboard(event: KeyboardEvent) {
   if (
     !canControl.value ||
+    imageBusy.value ||
     event.isComposing ||
     (event.target as HTMLElement)?.closest(
       'input, textarea, select, button, [contenteditable="true"]'
@@ -310,6 +330,14 @@ watch(
   [watchOnly, touchMode, () => props.connected, () => props.inputBlocked],
   releaseAll
 );
+function setImageBusy(busy: boolean) {
+  if (busy) {
+    // Flush while input is still enabled; releaseAll cancels pending taps.
+    pointer.flush();
+    releaseAll();
+  }
+  imageBusy.value = busy;
+}
 watch([zoom, showKeyboard], () => nextTick(resizeVideo));
 watch(
   () => props.inputBlocked,

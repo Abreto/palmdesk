@@ -3,6 +3,7 @@
 import { computeBox, getRangeRandom } from 'billd-utils';
 import sparkMD5 from 'spark-md5';
 
+import { IPC_EVENT } from '@/event';
 import { IIpcRendererData } from '@/interface';
 
 export const ipcRenderer = window.electronAPI?.ipcRenderer;
@@ -17,7 +18,10 @@ export function ipcRendererSend(data: IIpcRendererData) {
   });
 }
 export function ipcRendererInvoke(data: IIpcRendererData) {
-  console.log('ipcRendererInvoke', data.channel, data.data);
+  // Do not retain uploaded image bytes in the renderer's console history.
+  if (data.channel === IPC_EVENT.pasteImage)
+    console.log('ipcRendererInvoke', data.channel);
+  else console.log('ipcRendererInvoke', data.channel, data.data);
   return ipcRenderer?.invoke(data.channel, {
     requestId: data.requestId,
     data: { windowId: data.windowId, ...data.data },

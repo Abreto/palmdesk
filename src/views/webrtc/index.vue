@@ -168,6 +168,10 @@
       :video="peer?.videoEl"
       :connected="controlling"
       :input-blocked="view !== 'window' || !!inputError || retryingInput"
+      :image-channel="peer?.imageChannel || undefined"
+      :image-paste-session="selectedWindow.imagePasteSession"
+      :commit-image-paste="commitImagePaste"
+      :reconnect-image-channel="reconnectImageChannel"
       @behavior="sendBehavior"
     />
     <div
@@ -260,7 +264,11 @@ const discoveryError = ref('');
 const windowsLoading = ref(false);
 const windowStarting = ref(false);
 const windowError = ref('');
-const selectedWindow = ref<{ id: string; name: string }>();
+const selectedWindow = ref<{
+  id: string;
+  name: string;
+  imagePasteSession?: string;
+}>();
 const view = ref<'read' | 'window'>('read');
 const readerClient = shallowRef<ReaderClient>();
 const readerRevision = ref(0);
@@ -441,7 +449,17 @@ function receiveWindowMessage(event: MessageEvent) {
     windowStarting.value = false;
     if (typeof data.error === 'string') windowError.value = data.error;
     else if (typeof data.id === 'string' && typeof data.name === 'string') {
-      selectedWindow.value = { id: data.id, name: data.name };
+      const imagePasteSession =
+        typeof data.imagePasteSession === 'string' &&
+        data.imagePasteSession.length <= 80
+          ? data.imagePasteSession
+          : undefined;
+      selectedWindow.value = {
+        id: data.id,
+        name: data.name,
+        imagePasteSession,
+      };
+      if (imagePasteSession) peer.value?.openImageChannel();
       if (associationRequest)
         sessionWindows.value[associationRequest] = data.id;
       associationRequest = '';
@@ -604,6 +622,26 @@ function sendBehavior(
       ...data,
     } as WsBilldDeskBehaviorType['data'],
   });
+}
+function commitImagePaste(sessionId: string, id: number) {
+  if (
+    !controlling.value ||
+    view.value !== 'window' ||
+    inputError.value ||
+    retryingInput.value ||
+    sessionId !== selectedWindow.value?.imagePasteSession
+  )
+    throw new Error('窗口控制会话已结束');
+  peer.value!.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteImagePaste,
+    requestId: getRandomString(16),
+    data: { sessionId, id },
+  });
+}
+function reconnectImageChannel() {
+  if (!controlling.value || !selectedWindow.value?.imagePasteSession)
+    throw new Error('请先连接 Codex 窗口');
+  peer.value!.openImageChannel();
 }
 function retryInput() {
   if (!controlling.value || retryingInput.value) return;
