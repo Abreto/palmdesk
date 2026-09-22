@@ -106,6 +106,15 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
+窗口手势烟测复用图片粘贴测试页中的真实 `RemoteViewport` 和输入 DataChannel，无须后端。按下文安装 Playwright 后，分别启动测试页和测试：
+
+```bash
+pnpm exec vite --config test/smoke/image-paste.vite.mjs
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/viewport-gestures-browser.mjs
+```
+
+使用 Chrome 的真实触摸事件验证双指缩放的焦点、连续缩放比例、适合至 300% 的范围、双指及单指平移、缩放后的远程点击坐标、仅观看、取消、横屏和文字草稿保留，并检查手势没有产生远程输入或整页缩放。手势仲裁、拖拽释放、长按取消、指针丢失和三指切换由 `pnpm test:smoke` 覆盖。手机 Safari 和 Android Chrome 仍需真机验收。
+
 图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。按下文安装 Playwright 后，分别启动测试页和测试：
 
 ```bash
