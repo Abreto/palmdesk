@@ -811,7 +811,7 @@ onUnmounted(() => {
     color: inherit;
     font: inherit;
     padding: 8px;
-    border: 1px solid rgb(98 255 120 / 22%);
+    border: 1px solid rgb(22 138 58 / 20%);
     border-radius: 7px;
     background: var(--pd-surface);
     cursor: pointer;

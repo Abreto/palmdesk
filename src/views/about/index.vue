@@ -43,12 +43,7 @@ function handleClick() {
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
-  background: radial-gradient(
-      circle at 50% 0%,
-      rgb(98 255 120 / 12%),
-      transparent 18rem
-    ),
-    var(--pd-bg);
+  background: var(--pd-bg);
   color: var(--pd-text);
   font-size: 16px;
   .item {
@@ -61,7 +56,7 @@ function handleClick() {
     width: 100px;
     height: 100px;
     color: var(--pd-accent);
-    filter: drop-shadow(0 0 18px rgb(98 255 120 / 18%));
+    filter: drop-shadow(0 0 14px rgb(22 138 58 / 16%));
   }
   .name {
     padding-top: 15px;

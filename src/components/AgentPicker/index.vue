@@ -622,8 +622,7 @@ select:focus-visible {
   padding: 0 16px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius);
-  background: linear-gradient(145deg, rgb(255 255 255 / 3%), transparent 55%),
-    var(--pd-surface);
+  background: var(--pd-surface);
   box-shadow: var(--pd-shadow);
 }
 .agent-group:focus-within {

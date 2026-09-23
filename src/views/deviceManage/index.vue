@@ -134,7 +134,7 @@ function handleDelLinkDeviceList(item) {
   place-items: center;
   width: 76px;
   height: 76px;
-  border: 1px solid rgb(98 255 120 / 24%);
+  border: 1px solid var(--pd-border-strong);
   border-radius: 24px;
   background: var(--pd-accent-soft);
   color: var(--pd-accent);

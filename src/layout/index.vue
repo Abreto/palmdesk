@@ -322,7 +322,7 @@ $sidebar-width: 240px;
   z-index: 999;
   display: flex;
   height: $top-system-bar-height;
-  background: rgb(11 16 13 / 92%);
+  background: rgb(255 255 255 / 94%);
   border-bottom: 1px solid var(--pd-border);
   user-select: none;
   &.drag {
@@ -391,25 +391,8 @@ $sidebar-width: 240px;
   flex: 0 0 $sidebar-width;
   width: $sidebar-width;
   padding: 70px 18px 22px;
-  background: radial-gradient(
-      circle at 20% 0%,
-      rgb(98 255 120 / 8%),
-      transparent 17rem
-    ),
-    var(--pd-sidebar);
+  background: var(--pd-sidebar);
   border-right: 1px solid var(--pd-border);
-  &::after {
-    position: absolute;
-    right: -70px;
-    bottom: 80px;
-    width: 180px;
-    height: 180px;
-    border: 1px solid rgb(98 255 120 / 12%);
-    border-radius: 50%;
-    box-shadow: 0 0 0 18px rgb(98 255 120 / 3%);
-    content: '';
-    pointer-events: none;
-  }
 }
 .brand {
   display: flex;

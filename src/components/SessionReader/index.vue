@@ -698,7 +698,7 @@ h2 {
 }
 .user-message {
   background: var(--pd-accent-soft);
-  border-color: rgb(98 255 120 / 22%);
+  border-color: rgb(22 138 58 / 20%);
 }
 .message-card header {
   display: flex;

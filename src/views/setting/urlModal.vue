@@ -218,7 +218,7 @@ input {
   font-size: 16px;
   &:focus {
     border-color: var(--pd-accent);
-    box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
+    box-shadow: 0 0 0 3px rgb(22 138 58 / 14%);
   }
 }
 button {

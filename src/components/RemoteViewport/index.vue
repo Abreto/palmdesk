@@ -436,7 +436,7 @@ select {
   min-height: 120px;
   overflow: auto;
   display: flex;
-  background: #050806;
+  background: #0a0d0c;
   touch-action: none;
   overscroll-behavior: contain;
 }
@@ -490,7 +490,7 @@ textarea {
 @media (max-width: 480px) {
   .viewport-shell {
     position: relative;
-    background: #050806;
+    background: #0a0d0c;
   }
   .tools {
     order: 3;
@@ -502,8 +502,8 @@ textarea {
     margin: 8px 10px 10px;
     padding: 6px 8px;
     border: 1px solid var(--pd-border-strong);
-    border-radius: 999px;
-    background: rgb(16 22 18 / 94%);
+    border-radius: var(--pd-radius);
+    background: rgb(255 255 255 / 96%);
     box-shadow: 0 12px 30px rgb(0 0 0 / 34%);
   }
   .video-stage {
@@ -515,7 +515,7 @@ textarea {
     padding: 8px 10px max(10px, env(safe-area-inset-bottom));
     border: 1px solid var(--pd-border);
     border-radius: 24px;
-    background: #101411;
+    background: var(--pd-surface);
   }
   .tools button {
     width: 36px;

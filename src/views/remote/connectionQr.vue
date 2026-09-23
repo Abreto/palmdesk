@@ -110,8 +110,7 @@ function copyInvite() {
   margin-top: 18px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-lg);
-  background: linear-gradient(145deg, rgb(98 255 120 / 6%), transparent 58%),
-    var(--pd-surface-soft);
+  background: var(--pd-surface-soft);
 }
 .qr-image {
   display: grid;

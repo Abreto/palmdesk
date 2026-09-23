@@ -246,7 +246,7 @@ svg {
   aspect-ratio: 1;
   border-radius: 14px;
   overflow: hidden;
-  background: #050806;
+  background: #111511;
 }
 video {
   display: block;

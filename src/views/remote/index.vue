@@ -1822,18 +1822,7 @@ function handleDel(sender) {
   position: relative;
   min-height: 100%;
   &::before {
-    position: absolute;
-    top: -120px;
-    right: 8%;
-    width: 320px;
-    height: 320px;
-    border: 1px solid rgb(98 255 120 / 10%);
-    border-radius: 50%;
-    box-shadow:
-      0 0 0 24px rgb(98 255 120 / 2%),
-      0 0 100px rgb(98 255 120 / 8%);
-    content: '';
-    pointer-events: none;
+    display: none;
   }
   .container {
     position: relative;
@@ -1874,7 +1863,7 @@ function handleDel(sender) {
     color: var(--pd-accent);
     > span {
       background: var(--pd-accent);
-      box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
+      box-shadow: 0 0 0 3px rgb(22 138 58 / 14%);
     }
   }
   &.failed {
@@ -1900,9 +1889,9 @@ function handleDel(sender) {
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  border: 1px solid rgb(98 255 120 / 24%);
+  border: 1px solid var(--pd-border-strong);
   border-radius: 13px;
-  background: var(--pd-accent-soft);
+  background: var(--pd-surface-soft);
   color: var(--pd-accent);
   svg {
     width: 22px;
@@ -1917,7 +1906,7 @@ function handleDel(sender) {
 }
 .local-device {
   margin-bottom: 18px;
-  border-color: rgb(98 255 120 / 18%);
+  border-color: var(--pd-border);
   .info {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1975,10 +1964,8 @@ function handleDel(sender) {
   margin-top: 18px;
   padding: 28px;
   border-radius: var(--pd-radius-lg);
-  border-color: rgb(98 255 120 / 22%);
-  box-shadow:
-    var(--pd-shadow),
-    inset 0 1px 0 rgb(98 255 120 / 7%);
+  border-color: var(--pd-border-strong);
+  box-shadow: var(--pd-shadow);
 }
 .connection-heading {
   display: flex;
@@ -2054,7 +2041,7 @@ function handleDel(sender) {
   }
   &:focus {
     border-color: var(--pd-accent);
-    box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
+    box-shadow: 0 0 0 3px rgb(22 138 58 / 14%);
     background: var(--pd-surface-soft);
   }
   &:disabled {
@@ -2147,10 +2134,10 @@ function handleDel(sender) {
 .btn {
   min-width: 112px;
   height: 54px;
-  border-radius: 18px;
-  background: linear-gradient(145deg, var(--pd-accent), #36d85a);
+  border-radius: var(--pd-radius-sm);
+  background: linear-gradient(145deg, var(--pd-accent), #2ea84e);
   color: #071108;
-  box-shadow: 0 12px 28px rgb(98 255 120 / 18%);
+  box-shadow: 0 10px 24px rgb(22 138 58 / 18%);
   &:hover:not(:disabled) {
     background: linear-gradient(
       145deg,
@@ -2158,7 +2145,7 @@ function handleDel(sender) {
       var(--pd-accent)
     );
     color: #071108;
-    box-shadow: 0 14px 34px rgb(98 255 120 / 25%);
+    box-shadow: 0 12px 30px rgb(22 138 58 / 24%);
   }
   &:disabled {
     border-color: var(--pd-border);
@@ -2229,8 +2216,7 @@ function handleDel(sender) {
     padding: 20px;
     border: 1px solid var(--pd-border);
     border-radius: var(--pd-radius);
-    background: linear-gradient(145deg, rgb(255 255 255 / 3%), transparent 56%),
-      var(--pd-surface);
+    background: var(--pd-surface);
   }
   > div + div {
     padding-left: 20px;
@@ -2498,7 +2484,7 @@ function handleDel(sender) {
     border-radius: 50%;
     background: var(--pd-accent);
     color: #071108;
-    box-shadow: 0 14px 40px rgb(98 255 120 / 24%);
+    box-shadow: 0 12px 34px rgb(22 138 58 / 22%);
     cursor: pointer;
     svg {
       width: 28px;
@@ -2523,7 +2509,7 @@ function handleDel(sender) {
   .remote-device {
     margin-top: 0;
     padding: 20px;
-    border-radius: 18px;
+    border-radius: var(--pd-radius-lg);
   }
   .connection-heading {
     gap: 8px;
@@ -2607,7 +2593,7 @@ function handleDel(sender) {
     &::after {
       width: 40%;
       background: var(--pd-accent);
-      box-shadow: 0 0 18px rgb(98 255 120 / 24%);
+      box-shadow: 0 0 16px rgb(22 138 58 / 20%);
     }
     > div,
     > div + div {

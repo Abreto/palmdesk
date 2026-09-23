@@ -1,6 +1,6 @@
 <template>
   <n-config-provider
-    :theme="darkTheme"
+    :theme="lightTheme"
     :theme-overrides="themeOverrides"
   >
     <n-message-provider :max="3">
@@ -16,7 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import { darkTheme, GlobalThemeOverrides, NConfigProvider } from 'naive-ui';
+import { GlobalThemeOverrides, lightTheme, NConfigProvider } from 'naive-ui';
 import { onMounted } from 'vue';
 
 import {
@@ -36,24 +36,24 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#62ff78',
-    primaryColorHover: '#89ff98',
-    primaryColorPressed: '#35e85a',
-    primaryColorSuppl: '#62ff78',
-    textColorBase: '#f1f7ed',
-    textColor1: '#f1f7ed',
-    textColor2: '#c5d5c8',
-    textColor3: '#96a69a',
-    borderColor: '#26352b',
+    primaryColor: '#168a3a',
+    primaryColorHover: '#126f2e',
+    primaryColorPressed: '#0f5b24',
+    primaryColorSuppl: '#168a3a',
+    textColorBase: '#17211b',
+    textColor1: '#17211b',
+    textColor2: '#46564b',
+    textColor3: '#68756c',
+    borderColor: '#d7e1d9',
     borderRadius: '12px',
     borderRadiusSmall: '8px',
-    bodyColor: '#090d0b',
-    cardColor: '#101612',
-    modalColor: '#101612',
-    popoverColor: '#101612',
-    inputColor: '#151d17',
-    inputColorDisabled: '#0f1511',
-    placeholderColor: '#718277',
+    bodyColor: '#f3f6f3',
+    cardColor: '#ffffff',
+    modalColor: '#ffffff',
+    popoverColor: '#ffffff',
+    inputColor: '#f8faf8',
+    inputColorDisabled: '#e8eee9',
+    placeholderColor: '#88958d',
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
   },

@@ -146,7 +146,7 @@ watch(
 section {
   margin-bottom: 18px;
   &:first-of-type {
-    border-color: rgb(98 255 120 / 18%);
+    border-color: var(--pd-border-strong);
   }
 }
 .section-heading {
@@ -175,7 +175,7 @@ h2 {
   height: 42px;
   flex-shrink: 0;
   border-radius: 12px;
-  border: 1px solid rgb(98 255 120 / 22%);
+  border: 1px solid var(--pd-border-strong);
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
   svg {
@@ -222,8 +222,7 @@ dd {
   }
 }
 .about-card {
-  background: linear-gradient(145deg, rgb(98 255 120 / 8%), transparent 60%),
-    var(--pd-surface-soft);
+  background: var(--pd-surface-soft);
   box-shadow: none;
 }
 .about-brand {
