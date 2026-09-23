@@ -675,6 +675,7 @@ import {
 } from '@/utils/connection-invite';
 import { ImageTransferHost } from '@/utils/image-transfer-channel';
 import { WebRTCClass } from '@/utils/network/webRTC';
+import { VideoActivityLease } from '@/utils/remote-presence';
 import {
   REMOTE_VIDEO_DEFAULTS,
   applyRemoteVideoConstraints,
@@ -682,6 +683,7 @@ import {
 } from '@/utils/remote-video';
 import { ReaderHost } from '@/utils/session-reader-channel';
 import { WindowCatalog } from '@/utils/window-catalog';
+import { WindowResumeStore } from '@/utils/window-resume';
 import ConnectionQr from '@/views/remote/connectionQr.vue';
 import PwdModalCpt from '@/views/remote/pwdModal.vue';
 import ScanModal from '@/views/remote/scanModal.vue';
@@ -739,6 +741,10 @@ const errMsg = ref('');
 const captureSessionId = ref('');
 const captureLifecycle = new CaptureLifecycle();
 const windowCatalogs = new Map<string, WindowCatalog>();
+const windowResumes = new WindowResumeStore();
+const activityLeases = new WeakMap<RTCDataChannel, VideoActivityLease>();
+const stoppedPeers = new WeakSet<RTCDataChannel>();
+let captureResumeToken = '';
 const listingPeers = new Set<string>();
 const readerHosts = new Map<RTCDataChannel, ReaderHost>();
 const imageHosts = new Map<RTCDataChannel, ImageTransferHost>();
@@ -755,6 +761,8 @@ function bindImages(peer: WebRTCClass) {
     sessionId === captureSessionId.value &&
     peer.receiver === captureOwner &&
     !!anchorStream.value &&
+    !stoppedPeers.has(peer.cbDataChannel!) &&
+    activityLeases.get(peer.cbDataChannel!)?.active !== false &&
     appStore.remoteDesk.has(peer.receiver) &&
     !appStore.remoteDesk.get(peer.receiver)?.isClose &&
     networkStore.rtcMap.get(peer.receiver)?.imageChannel === channel;
@@ -792,12 +800,52 @@ function configureReader(enabled: boolean) {
   readerHosts.forEach((host) => host.reset());
 }
 
+function receiveControllerState(
+  peer: WebRTCClass,
+  data: any,
+  requestId: string
+) {
+  const channel = peer.cbDataChannel!;
+  let lease = activityLeases.get(channel);
+  if (!lease) {
+    lease = new VideoActivityLease((active) => {
+      void peer.setVideoActive(active);
+      if (!active && captureOwner === peer.receiver && captureSessionId.value) {
+        imageHosts.forEach((host) => host.reset());
+        void handleRtcBilldDeskBehavior(
+          WINDOW_ID_ENUM.remote,
+          {
+            type: BilldDeskBehaviorEnum.releaseAll,
+          } as WsBilldDeskBehaviorType['data'],
+          captureSessionId.value
+        )?.catch(() => {});
+      }
+    });
+    activityLeases.set(channel, lease);
+    channel.addEventListener(
+      'close',
+      () => {
+        lease!.dispose();
+        activityLeases.delete(channel);
+      },
+      { once: true }
+    );
+  }
+  if (lease.receive(data))
+    peer.dataChannelSend({
+      msgType: WsMsgTypeEnum.remoteControllerStateResult,
+      requestId,
+      data: { supported: true },
+    });
+}
+
 function bindReader(peer: WebRTCClass) {
   const incoming = peer.cbReaderChannel;
   const outgoing = peer.readerChannel;
   if (!incoming || !outgoing || readerHosts.has(incoming)) return;
   const current = () =>
     !!ipcRenderer &&
+    !stoppedPeers.has(peer.cbDataChannel!) &&
     appStore.remoteDesk.has(peer.receiver) &&
     !appStore.remoteDesk.get(peer.receiver)?.isClose &&
     networkStore.rtcMap.get(peer.receiver)?.cbReaderChannel === incoming;
@@ -944,6 +992,7 @@ watch(
       // const setting = anchorStream.value?.getVideoTracks()[0].getSettings();
       item.cbDataChannel.onmessage = async (event) => {
         if (
+          stoppedPeers.has(item.cbDataChannel!) ||
           !appStore.remoteDesk.has(item.receiver) ||
           networkStore.rtcMap.get(item.receiver)?.cbDataChannel !==
             item.cbDataChannel
@@ -964,6 +1013,10 @@ watch(
         if (!jsondata || !jsondata.data || typeof jsondata.data !== 'object')
           return;
         const { msgType } = jsondata;
+        if (msgType === WsMsgTypeEnum.remoteControllerState) {
+          receiveControllerState(item, jsondata.data, jsondata.requestId);
+          return;
+        }
         if (
           msgType === WsMsgTypeEnum.remoteWindowsRequest ||
           msgType === WsMsgTypeEnum.remoteWindowSelect
@@ -1015,6 +1068,11 @@ watch(
           }
         } else if (msgType === WsMsgTypeEnum.billdDeskBehavior) {
           const { data }: { data: WsBilldDeskBehaviorType['data'] } = jsondata;
+          if (
+            activityLeases.get(item.cbDataChannel!)?.active === false &&
+            data.type !== BilldDeskBehaviorEnum.releaseAll
+          )
+            return;
           if (anchorStream.value && captureSessionId.value) {
             const sessionId = captureSessionId.value;
             const result = await handleRtcBilldDeskBehavior(
@@ -1093,6 +1151,7 @@ watch(
 function handleLoopBilldDeskUpdateUserTimer() {
   clearInterval(loopBilldDeskUpdateUserTimer.value);
   loopBilldDeskUpdateUserTimer.value = setInterval(() => {
+    if (captureSessionId.value) windowResumes.touch(captureResumeToken);
     networkStore.wsMap.get(roomId.value)?.send<WsBilldDeskStartRemote['data']>({
       requestId: getRandomString(8),
       msgType: WsMsgTypeEnum.billdDeskUpdateUser,
@@ -1370,6 +1429,8 @@ function handleWsMsg() {
 }
 
 function stopCaptureStream() {
+  windowResumes.touch(captureResumeToken);
+  captureResumeToken = '';
   imagePasteSession = '';
   imageHosts.forEach((host) => host.reset());
   captureGeneration += 1;
@@ -1492,6 +1553,7 @@ async function handleWindowRequest(
   if (typeof request.requestId !== 'string' || request.requestId.length > 64)
     return;
   const current = () =>
+    !stoppedPeers.has(peer.cbDataChannel!) &&
     appStore.remoteDesk.has(peer.receiver) &&
     networkStore.rtcMap.get(peer.receiver)?.cbDataChannel ===
       peer.cbDataChannel;
@@ -1548,10 +1610,26 @@ async function handleWindowRequest(
   const selection = Symbol();
   windowSelection = selection;
   try {
-    const catalog = windowCatalogs.get(peer.receiver);
-    if (!catalog || typeof request.data.id !== 'string')
-      throw new Error('请先刷新窗口列表');
-    const source = catalog.get(request.data.id);
+    const device = appStore.remoteDesk.get(peer.receiver)?.deskUserUuid;
+    if (!device) throw new Error('请重新连接电脑');
+    let source: ICaptureSource;
+    let id = request.data.id;
+    if (typeof request.data.resumeToken === 'string') {
+      const result = await invokeCapture(IPC_EVENT.getCaptureSources);
+      if (!current()) return;
+      if (result?.code !== 0) throw new Error(result?.msg || '读取窗口失败');
+      source = windowResumes.resolve(
+        request.data.resumeToken,
+        device,
+        result.data.sources
+      );
+      id = crypto.randomUUID();
+    } else {
+      const catalog = windowCatalogs.get(peer.receiver);
+      if (!catalog || typeof id !== 'string')
+        throw new Error('请先刷新窗口列表');
+      source = catalog.get(id);
+    }
     selectedCaptureSourceId.value = source.id;
     const stream = await beginSelectedCapture(source, peer.receiver);
     if (!stream || !current()) return;
@@ -1573,9 +1651,12 @@ async function handleWindowRequest(
       sender: mySocketId.value,
       receiver: peer.receiver,
     });
+    if (!current() || anchorStream.value !== stream) return;
+    captureResumeToken = windowResumes.remember(device, source);
     reply(WsMsgTypeEnum.remoteWindowSelected, {
-      id: request.data.id,
+      id,
       name: source.name,
+      resumeToken: captureResumeToken,
       imagePasteSession: imagePasteSession || undefined,
     });
   } catch (error) {
@@ -1813,7 +1894,35 @@ function handleCloseAll() {
 }
 
 function handleDel(sender) {
-  networkStore.removeRtc(sender);
+  const peer = networkStore.rtcMap.get(sender);
+  if (!peer) return;
+  if (peer.cbDataChannel) stoppedPeers.add(peer.cbDataChannel);
+  const sessionId = peer.remoteConnection?.session.access.id;
+  if (sessionId) {
+    networkStore.wsMap.get(roomId.value)?.send({
+      requestId: getRandomString(8),
+      msgType: WsMsgTypeEnum.billdDeskEndRemote,
+      data: {
+        sender: mySocketId.value,
+        receiver: sender,
+        live_room_id: roomId.value,
+        sessionId,
+        isRemoteDesk: true,
+      },
+    });
+  }
+  peer.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteSessionStopped,
+    requestId: getRandomString(8),
+    data: {},
+  });
+  if (captureOwner === sender) stopCaptureStream();
+  // Allow the terminal notice to arrive before closing SCTP. Do not close a
+  // replacement connection if the controller has already reconnected manually.
+  setTimeout(() => {
+    if (networkStore.rtcMap.get(sender)?.peerConnection === peer.peerConnection)
+      networkStore.removeRtc(sender);
+  }, 200);
 }
 </script>
 

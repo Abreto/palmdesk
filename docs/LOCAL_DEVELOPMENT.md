@@ -106,6 +106,15 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
+窗口手势烟测复用图片粘贴测试页中的真实 `RemoteViewport` 和输入 DataChannel，无须后端。按下文安装 Playwright 后，分别启动测试页和测试：
+
+```bash
+pnpm exec vite --config test/smoke/image-paste.vite.mjs
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/viewport-gestures-browser.mjs
+```
+
+使用 Chrome 的真实触摸事件验证双指缩放的焦点、连续缩放比例、适合至 300% 的范围、双指及单指平移、缩放后的远程点击坐标、仅观看、取消、横屏和文字草稿保留，并检查手势没有产生远程输入或整页缩放。手势仲裁、拖拽释放、长按取消、指针丢失和三指切换由 `pnpm test:smoke` 覆盖。手机 Safari 和 Android Chrome 仍需真机验收。
+
 图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。按下文安装 Playwright 后，分别启动测试页和测试：
 
 ```bash
@@ -141,6 +150,16 @@ NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/business-flow.mjs
 ```
 
 默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
+
+手机后台恢复烟测自行启动本机 HTTP / Socket.IO 服务，使用真实 Vue 页面、会话认证模块和 WebRTC；设备存储、窗口捕获、输入及会话记录使用合成数据，不需要部署后端或控制真实窗口：
+
+```bash
+npm install --prefix .local/smoke --no-package-lock --no-save playwright socket.io
+pnpm build:prod
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs
+```
+
+覆盖后台／阅读暂停视频、未送达状态消息后的主机超时暂停、断线重认证、阅读位置与草稿保留、恢复原窗口及关闭窗口后的拒绝恢复。页面可见性由测试事件模拟，不能代替 iOS Safari 切换应用、锁屏以及 Wi-Fi／蜂窝切换的实机验收。
 
 Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 PalmDesk 实例占用单实例锁：
 
