@@ -1010,7 +1010,7 @@ onUnmounted(() => {
     font: inherit;
     padding: 8px;
     border: 1px solid rgb(22 138 58 / 20%);
-    border-radius: 7px;
+    border-radius: var(--pd-radius-sm);
     background: var(--pd-surface);
     cursor: pointer;
   }
@@ -1106,7 +1106,7 @@ onUnmounted(() => {
 .status {
   margin-left: auto;
   padding: 5px 9px;
-  border-radius: 20px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-surface-soft);
   font-size: 11px;
   color: var(--pd-danger);
@@ -1159,7 +1159,7 @@ onUnmounted(() => {
   height: 36px;
   padding: 0 8px;
   border: 1px solid var(--pd-border);
-  border-radius: 8px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-bg);
   color: var(--pd-text);
   font-size: 14px;

@@ -604,7 +604,7 @@ textarea {
     margin: 0 10px 10px;
     padding: 8px 10px max(10px, env(safe-area-inset-bottom));
     border: 1px solid var(--pd-border);
-    border-radius: 24px;
+    border-radius: var(--pd-radius);
     background: var(--pd-surface);
   }
   .tools button {

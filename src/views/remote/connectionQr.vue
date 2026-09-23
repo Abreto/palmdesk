@@ -120,7 +120,7 @@ function copyInvite() {
   background: white;
   overflow: hidden;
   border: 1px solid var(--pd-border);
-  border-radius: 16px;
+  border-radius: var(--pd-radius);
   box-shadow: var(--pd-shadow);
 }
 .qr-placeholder {

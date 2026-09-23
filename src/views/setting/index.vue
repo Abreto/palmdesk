@@ -174,7 +174,7 @@ h2 {
   width: 42px;
   height: 42px;
   flex-shrink: 0;
-  border-radius: 12px;
+  border-radius: var(--pd-radius-sm);
   border: 1px solid var(--pd-border-strong);
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
@@ -240,7 +240,7 @@ dd {
   place-items: center;
   width: 42px;
   height: 46px;
-  border-radius: 12px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-accent);
   color: #071108;
   svg {
@@ -252,7 +252,7 @@ dd {
   margin-left: auto;
   padding: 3px 9px;
   border: 1px solid var(--pd-border-strong);
-  border-radius: 20px;
+  border-radius: var(--pd-radius-sm);
   color: var(--pd-muted);
   font: 11px/1.6 var(--pd-mono);
 }

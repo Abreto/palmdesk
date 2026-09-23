@@ -1956,7 +1956,7 @@ function handleDel(sender) {
   margin-top: 20px;
   padding: 5px 10px;
   border: 1px solid var(--pd-border);
-  border-radius: 30px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-surface-soft);
   color: var(--pd-muted);
   font-family: var(--pd-mono);
@@ -1999,7 +1999,7 @@ function handleDel(sender) {
   width: 44px;
   height: 44px;
   border: 1px solid var(--pd-border-strong);
-  border-radius: 13px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-surface-soft);
   color: var(--pd-accent);
   svg {
@@ -2053,7 +2053,7 @@ function handleDel(sender) {
     height: 32px;
     padding: 7px;
     border: 1px solid var(--pd-border);
-    border-radius: 8px;
+    border-radius: var(--pd-radius-sm);
     background: var(--pd-surface);
     color: var(--pd-muted);
     cursor: pointer;
@@ -2167,7 +2167,7 @@ function handleDel(sender) {
   height: 40px;
   padding: 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
   color: var(--pd-muted);
   cursor: pointer;
@@ -2197,14 +2197,14 @@ function handleDel(sender) {
   overflow-y: auto;
   padding: 6px;
   border: 1px solid var(--pd-border);
-  border-radius: 12px;
+  border-radius: var(--pd-radius);
   background: var(--pd-surface);
   box-shadow: var(--pd-shadow-raised);
 }
 .link-device-item {
   display: flex;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--pd-radius-sm);
   &:hover {
     background: var(--pd-surface-soft);
   }
@@ -2399,7 +2399,7 @@ function handleDel(sender) {
   width: 72px;
   height: 46px;
   object-fit: cover;
-  border-radius: 5px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-surface-soft);
 }
 .capture-placeholder {
@@ -2431,7 +2431,7 @@ function handleDel(sender) {
   margin-top: 18px;
   padding: 24px;
   border: 1px dashed var(--pd-border-strong);
-  border-radius: 10px;
+  border-radius: var(--pd-radius);
   text-align: center;
 }
 .capture-empty,
@@ -2473,7 +2473,7 @@ function handleDel(sender) {
   margin-top: 24px;
   padding: 0 18px;
   border: 1px solid var(--pd-border);
-  border-radius: 12px;
+  border-radius: var(--pd-radius);
   background: var(--pd-surface-soft);
   summary {
     display: flex;
@@ -2544,14 +2544,14 @@ function handleDel(sender) {
     align-items: center;
     margin-bottom: 8px;
     padding: 12px;
-    border-radius: 10px;
+    border-radius: var(--pd-radius);
     background: var(--pd-accent-soft);
     font-size: 13px;
   }
   .del {
     margin-left: auto;
     padding: 6px 12px;
-    border-radius: 8px;
+    border-radius: var(--pd-radius-sm);
     background: var(--pd-danger-soft);
     color: var(--pd-danger);
     cursor: pointer;
@@ -2590,7 +2590,7 @@ function handleDel(sender) {
     height: 62px;
     padding: 0;
     border: 1px solid var(--pd-accent);
-    border-radius: 50%;
+    border-radius: var(--pd-radius);
     background: var(--pd-accent);
     color: #071108;
     box-shadow: 0 12px 34px rgb(22 138 58 / 22%);
@@ -2631,7 +2631,7 @@ function handleDel(sender) {
     flex-basis: 38px;
     width: 38px;
     height: 38px;
-    border-radius: 11px;
+    border-radius: var(--pd-radius-sm);
     svg {
       width: 20px;
       height: 20px;

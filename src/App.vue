@@ -45,8 +45,8 @@ const themeOverrides: GlobalThemeOverrides = {
     textColor2: '#46564b',
     textColor3: '#68756c',
     borderColor: '#d7e1d9',
-    borderRadius: '12px',
-    borderRadiusSmall: '8px',
+    borderRadius: 'var(--pd-radius-sm)',
+    borderRadiusSmall: 'var(--pd-radius-sm)',
     bodyColor: '#f3f6f3',
     cardColor: '#ffffff',
     modalColor: '#ffffff',
@@ -58,10 +58,10 @@ const themeOverrides: GlobalThemeOverrides = {
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
   },
   Dialog: {
-    borderRadius: '26px',
+    borderRadius: 'var(--pd-radius-lg)',
   },
   Card: {
-    borderRadius: '18px',
+    borderRadius: 'var(--pd-radius)',
   },
 };
 

@@ -551,7 +551,7 @@ select:focus-visible {
   gap: 4px;
   padding: 5px;
   border: 1px solid var(--pd-border);
-  border-radius: 13px;
+  border-radius: var(--pd-radius);
   background: var(--pd-surface-soft);
   margin-bottom: 18px;
 }
@@ -564,7 +564,7 @@ select:focus-visible {
   justify-content: center;
   padding: 8px 12px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
   font-size: 14px;
   color: var(--pd-muted);
@@ -581,7 +581,7 @@ select:focus-visible {
 }
 .picker-tabs span {
   padding: 0 6px;
-  border-radius: 6px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-accent-soft);
   font-size: 11px;
   font-weight: 500;
@@ -660,7 +660,7 @@ select:focus-visible {
   flex: 0 0 44px;
   border: 1px solid var(--pd-border);
   background: var(--pd-surface-soft);
-  border-radius: 13px;
+  border-radius: var(--pd-radius-sm);
 }
 .agent-icon img,
 .agent-icon svg {

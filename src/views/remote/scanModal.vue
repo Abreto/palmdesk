@@ -244,7 +244,7 @@ svg {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  border-radius: 14px;
+  border-radius: var(--pd-radius);
   overflow: hidden;
   background: #111511;
 }

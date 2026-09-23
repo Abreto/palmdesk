@@ -159,7 +159,7 @@ function handleConfirm() {
   height: 36px;
   padding: 8px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-surface-soft);
   color: var(--pd-muted);
   cursor: pointer;
@@ -184,7 +184,7 @@ function handleConfirm() {
 .err-msg {
   margin-top: 16px;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-danger-soft);
   color: var(--pd-danger);
   font-size: 12px;

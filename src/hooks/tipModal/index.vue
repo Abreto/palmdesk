@@ -90,7 +90,7 @@ export default defineComponent({
       box-sizing: border-box;
       width: 130px;
       height: 44px;
-      border-radius: 100px;
+      border-radius: var(--pd-radius-sm);
       text-align: center;
       line-height: 44px;
       cursor: pointer;

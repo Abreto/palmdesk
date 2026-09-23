@@ -105,7 +105,7 @@ function handleDelLinkDeviceList(item) {
   }
   > span {
     padding: 3px 9px;
-    border-radius: 20px;
+    border-radius: var(--pd-radius-sm);
     background: var(--pd-surface-soft);
     color: var(--pd-muted);
     font-size: 11px;
@@ -135,7 +135,7 @@ function handleDelLinkDeviceList(item) {
   width: 76px;
   height: 76px;
   border: 1px solid var(--pd-border-strong);
-  border-radius: 24px;
+  border-radius: var(--pd-radius-lg);
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
   transform: rotate(-6deg);
@@ -165,7 +165,7 @@ function handleDelLinkDeviceList(item) {
   min-width: 0;
   padding: 12px 8px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
   color: var(--pd-text);
   text-align: left;
@@ -180,7 +180,7 @@ function handleDelLinkDeviceList(item) {
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  border-radius: 12px;
+  border-radius: var(--pd-radius-sm);
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
   svg {

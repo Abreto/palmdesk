@@ -93,7 +93,7 @@ input {
   flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border-radius: 12px;
+  border-radius: var(--pd-radius-sm);
   color: var(--pd-accent);
   background: var(--pd-surface-soft);
 }

@@ -67,7 +67,7 @@ function handleClose() {
     padding: 15px 20px;
     width: 320px;
     // height: 350px;
-    border-radius: 10px;
+    border-radius: var(--pd-radius-lg);
     background-color: var(--pd-surface);
     border: 1px solid var(--pd-border);
     box-shadow: var(--pd-shadow-raised);
