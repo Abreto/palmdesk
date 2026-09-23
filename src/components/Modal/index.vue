@@ -57,23 +57,29 @@ const emits = defineEmits(['close']);
 
 <style lang="scss" scoped>
 .modal-wrap {
-  z-index: 100;
-  background-color: rgba(0, 0, 0, 0.6) !important;
+  z-index: 1100;
+  background-color: rgb(0 0 0 / 72%) !important;
 
+  backdrop-filter: blur(5px);
   @extend %maskBg;
   .container {
     position: absolute;
     top: 50%;
     left: 50%;
     box-sizing: border-box;
-    padding: 20px;
-    border-radius: 10px;
-    background-color: #fff;
+    max-width: calc(100vw - 32px);
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+    padding: 24px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius-lg);
+    box-shadow: var(--pd-shadow-raised);
+    background-color: var(--pd-surface);
     font-size: 14px;
     transform: translate(-50%, -50%);
     .title {
-      font-weight: 700;
-      font-size: 24px;
+      font-weight: 600;
+      font-size: 20px;
     }
     .close {
       position: absolute;
@@ -83,23 +89,26 @@ const emits = defineEmits(['close']);
       height: 18px;
       cursor: pointer;
 
-      @include cross(#ccc, 3px);
+      @include cross(var(--pd-muted), 3px);
     }
     .content {
       margin: 15px 0;
     }
     .footer {
       .btn {
-        width: 280px;
+        width: 100%;
         height: 44px;
-        border-radius: 100px;
-        background: $theme-color-gold;
-        color: white;
+        border-radius: var(--pd-radius-sm);
+        background: var(--pd-accent);
+        color: var(--pd-on-accent);
         text-align: center;
         font-weight: 600;
         font-size: 16px;
         line-height: 44px;
         cursor: pointer;
+        &:hover {
+          background: var(--pd-accent-hover);
+        }
       }
     }
   }

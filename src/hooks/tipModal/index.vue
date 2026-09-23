@@ -90,7 +90,7 @@ export default defineComponent({
       box-sizing: border-box;
       width: 130px;
       height: 44px;
-      border-radius: 100px;
+      border-radius: var(--pd-radius-sm);
       text-align: center;
       line-height: 44px;
       cursor: pointer;
@@ -98,16 +98,19 @@ export default defineComponent({
       user-select: none;
 
       &.return {
-        border: 1px solid rgba(153, 153, 153, 0.3);
-        background: #ffffff;
-        color: #666;
+        border: 1px solid var(--pd-border);
+        background: var(--pd-surface-soft);
+        color: var(--pd-muted);
         font-size: 14px;
       }
       &.next {
-        background: $theme-color-gold;
-        color: white;
+        background: var(--pd-accent);
+        color: var(--pd-on-accent);
         font-weight: 700;
         font-size: 16px;
+        &:hover {
+          background: var(--pd-accent-hover);
+        }
         &.hiddenCancel {
           width: 100%;
         }

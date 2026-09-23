@@ -459,7 +459,7 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  background: #f2f4f3;
+  background: var(--pd-bg);
 }
 button {
   display: inline-flex;
@@ -469,10 +469,10 @@ button {
   width: 42px;
   height: 42px;
   padding: 10px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
-  color: #304b41;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface);
+  color: var(--pd-text);
   cursor: pointer;
 }
 button svg {
@@ -485,8 +485,8 @@ button:disabled {
 }
 button.active,
 button[aria-pressed='true'] {
-  border-color: #167c65;
-  background: #def0e9;
+  border-color: var(--pd-accent);
+  background: var(--pd-accent-soft);
 }
 .tools {
   display: flex;
@@ -494,8 +494,8 @@ button[aria-pressed='true'] {
   align-items: center;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: white;
-  border-bottom: 1px solid #d7ddda;
+  background: var(--pd-surface);
+  border-bottom: 1px solid var(--pd-border);
 }
 .modes {
   display: flex;
@@ -516,9 +516,10 @@ select {
   height: 36px;
   max-width: 96px;
   padding: 4px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface-soft);
+  color: var(--pd-text);
   font-size: 13px;
 }
 .video-stage {
@@ -527,7 +528,7 @@ select {
   min-height: 120px;
   overflow: auto;
   display: flex;
-  background: #252a28;
+  background: #0a0d0c;
   touch-action: none;
   overscroll-behavior: contain;
   overflow-anchor: none;
@@ -541,8 +542,8 @@ select {
 }
 .keyboard-panel {
   padding: 8px 12px max(10px, env(safe-area-inset-bottom));
-  border-top: 1px solid #d7ddda;
-  background: white;
+  border-top: 1px solid var(--pd-border);
+  background: var(--pd-surface);
 }
 .key-row {
   display: flex;
@@ -566,18 +567,45 @@ textarea {
   resize: vertical;
   max-height: 160px;
   padding: 8px;
-  border: 1px solid #c7d1cc;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg);
+  color: var(--pd-text);
   font: 16px/1.4 system-ui;
 }
 .composer button {
-  color: white;
-  background: #167c65;
+  color: var(--pd-on-accent);
+  background: var(--pd-accent);
 }
 @media (max-width: 480px) {
+  .viewport-shell {
+    position: relative;
+    background: #0a0d0c;
+  }
   .tools {
+    order: 3;
+    align-self: center;
+    width: calc(100% - 20px);
+    box-sizing: border-box;
+    justify-content: center;
     gap: 5px;
+    margin: 8px 10px 10px;
     padding: 6px 8px;
+    border: 1px solid var(--pd-border-strong);
+    border-radius: var(--pd-radius);
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 34%);
+  }
+  .video-stage {
+    order: 2;
+  }
+  .keyboard-panel {
+    order: 4;
+    margin: 0 10px 10px;
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius);
+    background: var(--pd-surface);
   }
   .tools button {
     width: 36px;
@@ -585,6 +613,9 @@ textarea {
     padding: 8px;
   }
   .zoom-label > span {
+    display: none;
+  }
+  .zoom-label {
     display: none;
   }
   .watch-toggle {

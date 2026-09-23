@@ -166,49 +166,60 @@ function save() {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: 1100;
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgb(0 0 0 / 30%);
+  background: rgb(0 0 0 / 72%);
+  backdrop-filter: blur(5px);
 }
 .service-dialog {
   box-sizing: border-box;
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   max-height: calc(100dvh - 32px);
   overflow: auto;
-  padding: 20px;
-  border-radius: 6px;
-  background: white;
-  color: #263b32;
-  box-shadow: 0 6px 30px rgb(0 0 0 / 16%);
+  padding: 28px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-surface);
+  color: var(--pd-text);
+  box-shadow: var(--pd-shadow-raised);
 }
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
 }
 h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
 }
 label {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
+  gap: 8px;
+  margin-bottom: 18px;
+  color: var(--pd-muted);
   font-size: 13px;
 }
 input {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  height: 40px;
-  padding: 8px;
-  border: 1px solid #c7d1cc;
-  border-radius: 4px;
+  height: 46px;
+  padding: 10px 12px;
+  outline: none;
+  color: var(--pd-text);
+  background: var(--pd-bg);
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
   font-size: 16px;
+  &:focus {
+    border-color: var(--pd-accent);
+    box-shadow: 0 0 0 3px rgb(22 138 58 / 14%);
+  }
 }
 button {
   display: inline-flex;
@@ -217,10 +228,10 @@ button {
   gap: 8px;
   height: 40px;
   padding: 8px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
-  color: #167c65;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface);
+  color: var(--pd-accent);
   cursor: pointer;
 }
 header button {
@@ -233,14 +244,23 @@ svg {
 footer {
   display: flex;
   justify-content: flex-end;
+  padding-top: 8px;
 }
 .save {
+  width: 100%;
+  height: 46px;
+  border-color: var(--pd-accent);
   padding: 8px 14px;
-  background: #167c65;
-  color: white;
+  background: var(--pd-accent);
+  color: var(--pd-on-accent);
 }
 .error {
-  color: #b43e4e;
+  color: var(--pd-danger);
   font-size: 13px;
+}
+@media (max-width: 480px) {
+  .service-dialog {
+    padding: 22px;
+  }
 }
 </style>

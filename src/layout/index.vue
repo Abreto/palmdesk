@@ -36,32 +36,63 @@
       class="sidebar"
       aria-label="主导航"
     >
-      <PhonePortraitOutline
-        class="brand-icon"
-        role="img"
-        aria-label="PalmDesk"
-      />
+      <RouterLink
+        class="brand"
+        :to="{ name: routerName.remote }"
+        aria-label="PalmDesk 首页"
+      >
+        <span class="brand-mark"
+          ><PhonePortraitOutline aria-hidden="true"
+        /></span>
+        <span class="brand-name"
+          >PalmDesk<span>AI-native remote control</span></span
+        >
+      </RouterLink>
       <div class="list">
-        <div
+        <span class="nav-label">工作空间</span>
+        <RouterLink
           class="item"
           :class="{ active: route.name === routerName.remote }"
-          @click="router.push({ name: routerName.remote })"
+          :to="{ name: routerName.remote }"
         >
-          连接
-        </div>
-        <div
+          <GridOutline aria-hidden="true" /><span>连接</span
+          ><ChevronForwardOutline
+            class="nav-arrow"
+            aria-hidden="true"
+          />
+        </RouterLink>
+        <RouterLink
           class="item"
           :class="{ active: route.name === routerName.deviceManage }"
-          @click="router.push({ name: routerName.deviceManage })"
+          :to="{ name: routerName.deviceManage }"
         >
-          设备列表
-        </div>
-        <div
+          <LaptopOutline aria-hidden="true" /><span>设备列表</span
+          ><ChevronForwardOutline
+            class="nav-arrow"
+            aria-hidden="true"
+          />
+        </RouterLink>
+        <RouterLink
           class="item"
           :class="{ active: route.name === routerName.setting }"
-          @click="router.push({ name: routerName.setting })"
+          :to="{ name: routerName.setting }"
         >
-          高级设置
+          <OptionsOutline aria-hidden="true" /><span>高级设置</span
+          ><ChevronForwardOutline
+            class="nav-arrow"
+            aria-hidden="true"
+          />
+        </RouterLink>
+      </div>
+      <div class="sidebar-footer">
+        <span
+          class="footer-symbol"
+          aria-hidden="true"
+          >✳</span
+        >
+        <p>桌面工作，<br />掌心继续。</p>
+        <div>
+          <span>PalmDesk</span><span>v{{ appStore.version }}</span>
         </div>
       </div>
     </nav>
@@ -109,10 +140,16 @@
 </template>
 
 <script lang="ts" setup>
-import { PhonePortraitOutline } from '@vicons/ionicons5';
+import {
+  ChevronForwardOutline,
+  GridOutline,
+  LaptopOutline,
+  OptionsOutline,
+  PhonePortraitOutline,
+} from '@vicons/ionicons5';
 import { getRandomString, windowReload } from 'billd-utils';
 import { onMounted, reactive, ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
+import { useRoute } from 'vue-router';
 
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
@@ -128,7 +165,6 @@ import {
 } from '@/utils';
 
 const appStore = useAppStore();
-const router = useRouter();
 const route = useRoute();
 
 const { handleOpenDevTools } = useIpcRendererSend();
@@ -273,214 +309,343 @@ const moving = (e: MouseEvent) => {
 </script>
 
 <style lang="scss" scoped>
-$sidebar-width: 160px;
+$sidebar-width: 240px;
 .layout {
   display: flex;
-  box-sizing: border-box;
-  width: 100vw;
-  height: 100vh;
-  .system-bar {
-    position: fixed;
-    top: 0;
-    z-index: 999;
+  width: 100%;
+  height: 100dvh;
+  background: transparent;
+}
+.system-bar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 999;
+  display: flex;
+  height: $top-system-bar-height;
+  background: rgb(255 255 255 / 94%);
+  border-bottom: 1px solid var(--pd-border);
+  user-select: none;
+  &.drag {
+    -webkit-app-region: drag;
+  }
+  &.no-drag {
+    -webkit-app-region: no-drag;
+  }
+  .top-left {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
     box-sizing: border-box;
-    width: 100vw;
-    height: $top-system-bar-height;
-    &.drag {
-      -webkit-app-region: drag;
+    width: $sidebar-width;
+    padding: 0 18px;
+    background: var(--pd-sidebar);
+    border-right: 1px solid var(--pd-border);
+  }
+  .left {
+    display: flex;
+    gap: 8px;
+  }
+  .ico {
+    display: grid;
+    place-items: center;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    .corss {
+      width: 7px;
+      height: 7px;
+      @include cross(#71332d, 1px);
     }
-    &.no-drag {
-      -webkit-app-region: no-drag;
+    .heng {
+      width: 7px;
+      height: 1px;
+      background: #79581e;
     }
-
-    user-select: none;
-    .top-left {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      box-sizing: border-box;
-      padding: 10px 8px 0 12px;
-      width: $sidebar-width;
-      .left {
-        display: flex;
-        align-items: center;
-
-        .ico {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          margin-right: 8px;
-          width: 14px;
-          height: 14px;
-          border-radius: 50%;
-          font-size: 12px;
-          cursor: pointer;
-
-          -webkit-app-region: no-drag;
-          .corss {
-            width: 7px;
-            height: 7px;
-
-            @include cross(black, 1px);
-          }
-          .heng {
-            width: 7px;
-            height: 1px;
-            background-color: black;
-          }
-          &.close {
-            background-color: #f7564d;
-          }
-          &.min {
-            background-color: #f6c84e;
-          }
-          &.max {
-            background-color: #dedede;
-            cursor: auto;
-          }
-        }
-      }
-      .right {
-        display: flex;
-        align-items: center;
-        color: #666;
-        font-size: 12px;
-      }
+    &.close {
+      background: #f5786d;
     }
-    .top-right {
-      display: flex;
-      align-items: center;
-      width: calc(100vw - $sidebar-width);
+    &.min {
+      background: #e9c369;
+    }
+    &.max {
+      background: #d4dbd0;
+      cursor: default;
     }
   }
+  .right {
+    color: var(--pd-muted);
+    font-size: 10px;
+  }
+  .top-right {
+    flex: 1;
+  }
+}
+.sidebar {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  flex: 0 0 $sidebar-width;
+  width: $sidebar-width;
+  padding: 70px 18px 22px;
+  background: var(--pd-sidebar);
+  border-right: 1px solid var(--pd-border);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 4px;
+  text-decoration: none;
+  color: var(--pd-text);
+  position: relative;
+  z-index: 1;
+}
+.brand-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 42px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-accent);
+  color: var(--pd-on-accent);
+  box-shadow: var(--pd-glow);
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+.brand-name {
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -1px;
+  line-height: 1.3;
+  span {
+    display: block;
+    margin-top: 4px;
+    color: var(--pd-muted);
+    font-family: var(--pd-mono);
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+}
+.list {
+  position: relative;
+  z-index: 1;
+  margin-top: 56px;
+}
+.nav-label {
+  display: block;
+  margin: 0 14px 12px;
+  color: var(--pd-accent);
+  font-family: var(--pd-mono);
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  box-sizing: border-box;
+  margin: 6px 0;
+  padding: 10px 14px;
+  border: 1px solid transparent;
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-muted);
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+  svg {
+    width: 19px;
+    height: 19px;
+    flex-shrink: 0;
+  }
+  .nav-arrow {
+    width: 14px;
+    height: 14px;
+    margin-left: auto;
+    opacity: 0;
+  }
+  &:hover {
+    background: var(--pd-accent-soft);
+    color: var(--pd-text);
+  }
+  &.active {
+    background: var(--pd-accent);
+    color: var(--pd-on-accent);
+    box-shadow: var(--pd-glow);
+    .nav-arrow {
+      opacity: 0.65;
+    }
+  }
+}
+.sidebar-footer {
+  position: relative;
+  z-index: 1;
+  margin-top: auto;
+  padding: 40px 12px 0;
+  color: var(--pd-muted);
+  .footer-symbol {
+    font-size: 32px;
+    color: var(--pd-accent);
+  }
+  p {
+    margin: 10px 0 28px;
+    font-size: 12px;
+    line-height: 1.9;
+  }
+  > div {
+    display: flex;
+    justify-content: space-between;
+    padding-top: 14px;
+    border-top: 1px solid var(--pd-border);
+    color: var(--pd-muted);
+    font-family: var(--pd-mono);
+    font-size: 9px;
+    letter-spacing: 0.5px;
+  }
+}
+.view {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding-top: $top-system-bar-height;
+}
+.browser {
   .sidebar {
-    box-sizing: border-box;
-    padding: 60px 10px 0;
-    width: $sidebar-width;
-    height: 100vh;
-    background-color: rgba($color: #fffa65, $alpha: 0.15);
-    .user {
-      position: relative;
-      margin: 0 auto;
-      width: 50px;
-      height: 50px;
-      border-radius: 50%;
-
-      @include setBackground('@/assets/img/billd.jpg');
-      .dot {
-        position: absolute;
-        right: 0;
-        bottom: 0;
-        width: 11px;
-        height: 11px;
-        border-radius: 50%;
-        background-color: #6cdd5b;
-      }
-    }
-    .list {
-      padding-top: 20px;
-      .item {
-        margin-bottom: 5px;
-        padding: 0 10px;
-        height: 35px;
-        border-radius: 4px;
-        color: #666;
-        font-size: 14px;
-        line-height: 35px;
-        cursor: pointer;
-        &.active,
-        &:hover {
-          background-color: rgba($color: $theme-color-gold, $alpha: 0.2);
-          color: $theme-color-gold;
-        }
-      }
-    }
+    padding-top: 32px;
   }
   .view {
-    box-sizing: border-box;
-    width: calc(100vw - $sidebar-width);
+    padding-top: 0;
   }
-  .debug-area {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    z-index: 300;
-    width: 30px;
-    height: 30px;
+}
+.debug-area {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  z-index: 300;
+  width: 20px;
+  height: 20px;
+}
+.debug-area-wrap {
+  position: fixed;
+  bottom: 24px;
+  left: 10px;
+  z-index: 300;
+  display: flex;
+  gap: 10px;
+  color: var(--pd-danger);
+  font-size: 13px;
+  cursor: pointer;
+}
+@media (max-width: 900px) and (min-width: 701px) {
+  .sidebar {
+    flex-basis: 192px;
+    width: 192px;
+    padding-inline: 14px;
   }
-  .debug-area-wrap {
-    position: fixed;
-    bottom: 40px;
-    left: 0;
-    z-index: 300;
-    display: flex;
-    .item {
-      margin-right: 4px;
-      color: red;
-      font-size: 16px;
-      cursor: pointer;
+  .system-bar .top-left {
+    width: 192px;
+  }
+  .brand-name {
+    font-size: 19px;
+    span {
+      font-size: 8px;
     }
   }
-}
-</style>
-
-<style scoped lang="scss">
-.layout .sidebar {
-  background: #f0f5f2;
-  border-right: 1px solid #dfe8e2;
-}
-.brand-icon {
-  display: block;
-  width: 36px;
-  height: 36px;
-  color: #167c65;
-  margin: 0 auto 12px;
-}
-.layout.browser .sidebar {
-  padding-top: 32px;
 }
 @media (max-width: 700px) {
   .layout {
-    display: flex;
     flex-direction: column;
+    height: auto;
     min-height: 100dvh;
   }
-  .layout .sidebar,
-  .layout.browser .sidebar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    height: auto;
-    padding: max(10px, env(safe-area-inset-top)) 14px 10px;
-    box-sizing: border-box;
-    border-right: 0;
-    border-bottom: 1px solid #dfe8e2;
-  }
-  .layout .sidebar .brand-icon {
+  .sidebar,
+  .browser .sidebar {
+    position: relative;
+    z-index: 10;
+    display: block;
     flex: 0 0 auto;
-    margin: 0;
-    width: 28px;
-    height: 28px;
-  }
-  .layout .sidebar .list {
-    display: flex;
-    flex: 1;
-    gap: 6px;
-    padding: 0;
-    justify-content: space-evenly;
-  }
-  .layout .sidebar .list .item {
-    margin: 0;
-    padding: 0 8px;
-    height: 38px;
-    line-height: 38px;
-    font-size: 13px;
-  }
-  .layout .view {
     width: 100%;
-    min-width: 0;
+    min-height: 76px;
+    padding: max(18px, env(safe-area-inset-top)) 20px 12px;
+    border-right: 0;
+    border-bottom: 1px solid var(--pd-border);
+    background: var(--pd-sidebar);
+  }
+  .layout:not(.browser) .sidebar {
+    padding-top: 60px;
+  }
+  .brand {
+    padding: 0;
+    gap: 9px;
+    width: fit-content;
+  }
+  .brand-mark {
+    flex-basis: 30px;
+    width: 30px;
+    height: 32px;
+    border-radius: var(--pd-radius-sm);
+    svg {
+      width: 20px;
+      height: 20px;
+    }
+  }
+  .brand-name {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    font-size: 19px;
+    span {
+      display: none;
+    }
+  }
+  .list {
+    position: absolute;
+    top: max(18px, env(safe-area-inset-top));
+    right: 20px;
+    display: flex;
+    gap: 8px;
+    margin-top: 0;
+  }
+  .nav-label,
+  .sidebar-footer {
+    display: none;
+  }
+  .item {
+    flex: 0 0 42px;
+    justify-content: center;
+    gap: 0;
+    width: 42px;
+    min-height: 42px;
+    margin: 0;
+    padding: 8px;
+    border-color: var(--pd-border);
+    border-radius: var(--pd-radius-sm);
+    background: var(--pd-surface-soft);
+    font-size: 0;
+    svg {
+      width: 17px;
+      height: 17px;
+    }
+  }
+  .item .nav-arrow {
+    display: none;
+  }
+  .view {
+    overflow: visible;
+    padding-top: 0;
   }
 }
 </style>
