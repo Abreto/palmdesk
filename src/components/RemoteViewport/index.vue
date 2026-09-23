@@ -32,13 +32,20 @@
       <label class="zoom-label"
         ><span>缩放</span
         ><select
-          v-model.number="zoom"
+          :value="zoom"
           aria-label="画面缩放"
+          @change="selectZoom"
         >
           <option :value="1">适合</option>
           <option :value="1.5">150%</option>
           <option :value="2">200%</option>
           <option :value="3">300%</option>
+          <option
+            v-if="![1, 1.5, 2, 3].includes(zoom)"
+            :value="zoom"
+          >
+            {{ Math.round(zoom * 100) }}%
+          </option>
         </select></label
       >
       <button
@@ -62,13 +69,12 @@
     <div
       ref="stage"
       class="video-stage"
-      :class="{ watching: watchOnly || touchMode === 'pan' }"
       @pointerdown="pointerDown"
-      @pointermove="pointer.move"
+      @pointermove="pointerMove"
       @pointerup="pointerUp"
-      @pointercancel="pointer.cancel"
-      @lostpointercapture="pointer.lostCapture"
-      @contextmenu.prevent="pointer.context"
+      @pointercancel="pointerCancel"
+      @lostpointercapture="lostPointerCapture"
+      @contextmenu.prevent="contextMenu"
       @wheel.prevent="wheel"
     ></div>
     <div
@@ -154,6 +160,10 @@ import type { WsBilldDeskBehaviorType } from '@/types/websocket';
 import { BilldDeskBehaviorEnum as Behavior } from '@/types/websocket';
 import { createPointerController } from '@/utils/controller-input';
 import { videoPoint } from '@/utils/remote-input';
+import {
+  clampViewportZoom,
+  createViewportGestures,
+} from '@/utils/viewport-gestures';
 
 const props = defineProps<{
   video?: HTMLVideoElement;
@@ -206,20 +216,54 @@ function point(event: { clientX: number; clientY: number }, clamp = false) {
 const pointer = createPointerController({
   send,
   enabled: () =>
-    canControl.value && !imageBusy.value && touchMode.value !== 'pan',
+    canControl.value &&
+    !imageBusy.value &&
+    touchMode.value !== 'pan' &&
+    !gestures.active(),
   mode: () => (touchMode.value === 'pan' ? 'tap' : touchMode.value),
   point,
 });
+const gestures = createViewportGestures({
+  view: () => {
+    const rect = props.video?.getBoundingClientRect();
+    return rect ? { zoom: zoom.value, rect } : undefined;
+  },
+  localPan: () => watchOnly.value || touchMode.value === 'pan',
+  cancelInput: () => pointer.cancel(),
+  zoomAt,
+  panBy: (left, top) => stage.value?.scrollBy({ left, top }),
+});
 function pointerDown(event: PointerEvent) {
-  if (pointer.down(event)) {
+  // Keep local zooming and panning available during host input errors.
+  if (!hasFrame.value || !props.connected) return;
+  const local = gestures.down(event);
+  const remote = !local && pointer.down(event);
+  if (local || remote || event.pointerType === 'touch') {
     event.preventDefault();
     stage.value?.setPointerCapture(event.pointerId);
   }
 }
+function pointerMove(event: PointerEvent) {
+  if (!gestures.move(event)) pointer.move(event);
+}
 function pointerUp(event: PointerEvent) {
-  pointer.up(event);
+  if (!gestures.up(event)) pointer.up(event);
+  releaseCapture(event);
+}
+function releaseCapture(event: PointerEvent) {
   if (stage.value?.hasPointerCapture(event.pointerId))
     stage.value.releasePointerCapture(event.pointerId);
+}
+function pointerCancel(event: PointerEvent) {
+  gestures.cancel(event);
+  pointer.cancel();
+  releaseCapture(event);
+}
+function lostPointerCapture(event: PointerEvent) {
+  if (!gestures.cancel(event)) pointer.lostCapture();
+}
+function contextMenu(event: MouseEvent) {
+  if (!gestures.active()) pointer.context(event);
 }
 function wheel(event: WheelEvent) {
   if (watchOnly.value || touchMode.value === 'pan') {
@@ -262,6 +306,7 @@ function sendText() {
 const heldKeys = new Set<number>();
 function releaseAll() {
   pointer.cancel();
+  gestures.reset();
   heldKeys.clear();
   if (props.connected) send({ type: Behavior.releaseAll });
 }
@@ -291,7 +336,14 @@ function visibility() {
 }
 function resizeVideo() {
   const video = props.video;
-  if (!video || !stage.value || !video.videoWidth || !video.videoHeight) return;
+  if (
+    !video ||
+    !stage.value?.clientWidth ||
+    !stage.value.clientHeight ||
+    !video.videoWidth ||
+    !video.videoHeight
+  )
+    return;
   hasFrame.value = true;
   const fit =
     Math.min(
@@ -300,6 +352,42 @@ function resizeVideo() {
     ) * zoom.value;
   video.style.width = `${Math.max(1, Math.round(video.videoWidth * fit))}px`;
   video.style.height = `${Math.max(1, Math.round(video.videoHeight * fit))}px`;
+}
+function zoomAt(
+  value: number,
+  anchor: { x: number; y: number },
+  center: { clientX: number; clientY: number }
+) {
+  zoom.value = clampViewportZoom(value);
+  // Resize synchronously so each move uses the actual scrolled video bounds.
+  resizeVideo();
+  const rect = props.video?.getBoundingClientRect();
+  if (!rect || !stage.value) return;
+  stage.value.scrollLeft += rect.left + anchor.x * rect.width - center.clientX;
+  stage.value.scrollTop += rect.top + anchor.y * rect.height - center.clientY;
+}
+function selectZoom(event: Event) {
+  releaseAll();
+  const value = Number((event.target as HTMLSelectElement).value);
+  const rect = props.video?.getBoundingClientRect();
+  const element = stage.value;
+  if (!rect?.width || !rect.height || !element) {
+    zoom.value = clampViewportZoom(value);
+    return;
+  }
+  const bounds = element.getBoundingClientRect();
+  const center = {
+    clientX: bounds.left + element.clientWidth / 2,
+    clientY: bounds.top + element.clientHeight / 2,
+  };
+  zoomAt(
+    value,
+    {
+      x: (center.clientX - rect.left) / rect.width,
+      y: (center.clientY - rect.top) / rect.height,
+    },
+    center
+  );
 }
 async function fullscreen() {
   if (document.fullscreenElement) await document.exitFullscreen();
@@ -311,6 +399,7 @@ async function fullscreen() {
 watch(
   () => props.video,
   async (video, old) => {
+    releaseAll();
     old?.removeEventListener('loadeddata', resizeVideo);
     old?.removeEventListener('resize', resizeVideo);
     old?.remove();
@@ -338,12 +427,15 @@ function setImageBusy(busy: boolean) {
   }
   imageBusy.value = busy;
 }
-watch([zoom, showKeyboard], () => nextTick(resizeVideo));
+watch(showKeyboard, () => nextTick(resizeVideo));
 watch(
   () => props.inputBlocked,
   () => nextTick(resizeVideo)
 );
-useResizeObserver(stage, resizeVideo);
+useResizeObserver(stage, () => {
+  if (gestures.active()) gestures.reset();
+  resizeVideo();
+});
 onMounted(() => {
   window.addEventListener('keydown', keyboard);
   window.addEventListener('keyup', keyboard);
@@ -438,9 +530,7 @@ select {
   background: #252a28;
   touch-action: none;
   overscroll-behavior: contain;
-}
-.video-stage.watching {
-  touch-action: pan-x pan-y;
+  overflow-anchor: none;
 }
 .video-stage :deep(video) {
   display: block;

@@ -31,7 +31,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Agent discovery uses macOS bundle IDs or Windows executable identities. "Open" describes the application, not task execution. The separate Read tab shows supported local sessions, project paths and states inferred from logs; it does not identify or switch the active task in the GUI.
 - Activate windows on other Spaces or restore a selected minimized window before capture begins.
 - Return to the Agent directory and choose another window by reconnecting with the existing device credentials. Windows within each agent retain their original order.
-- Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
+- Use tap, double tap, long-press right click, drag, scroll, pinch-to-zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
 - Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS Codex prompt. Image paste is not yet enabled for Windows hosts.
 - On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
@@ -117,6 +117,8 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 4. After authentication, session reading opens if enabled on the host. To control a window, switch to **窗口** (Window) and select it from the Agent directory. When reading is disabled or unsupported, the directory opens by default. The host activates the selected window and starts capture once it is available.
 
 The default video quality is up to 2160p at 30 fps with an 8 Mbps bitrate ceiling and text detail prioritized. Capture preserves the window's aspect ratio and does not enlarge small windows. Retina windows retain native pixels within 3840×2160, avoiding the text blur caused by a fixed 1080p downscale. Select 720p, 1080p, or 1440p on the phone to reduce traffic; actual bitrate still adapts to screen changes and network conditions.
+
+Pinch with two fingers inside the window view to zoom from fit to 300%, centered on the gesture. Move both fingers to pan; after lifting one finger, the remaining finger can keep panning until lifted. These gestures move only the local video view, leaving the toolbar and text composer in place. For one-finger panning, select **移动画面** (Pan) or **仅观看** (Watch only); other touch modes retain remote control. The zoom selector shows the current scale; choose **适合** (Fit) to reset the view.
 
 To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
 
