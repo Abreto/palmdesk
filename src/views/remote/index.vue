@@ -117,6 +117,7 @@
         "
         @settings="showUrlModal = true"
       />
+      <div class="mobile-section-title">连接</div>
       <div class="remote-device pd-card">
         <div class="connection-heading">
           <div class="section-heading">
@@ -585,11 +586,23 @@
       @close="handleClose"
       @confirm="handleConfirm"
     ></PwdModalCpt>
+    <button
+      v-if="!ipcRenderer"
+      class="mobile-fab"
+      type="button"
+      title="添加连接"
+      aria-label="添加连接"
+      :disabled="loading || !!pendingInvite"
+      @click="showScanModal = true"
+    >
+      <AddOutline />
+    </button>
   </main>
 </template>
 
 <script lang="ts" setup>
 import {
+  AddOutline,
   ArrowForwardOutline,
   BrowsersOutline,
   ChevronDownOutline,
@@ -2392,6 +2405,12 @@ function handleDel(sender) {
     cursor: pointer;
   }
 }
+.mobile-fab {
+  display: none;
+}
+.mobile-section-title {
+  display: none;
+}
 .list {
   margin-top: 20px;
   .item {
@@ -2427,8 +2446,42 @@ function handleDel(sender) {
   }
 }
 @media (max-width: 700px) {
+  .mobile-section-title {
+    display: block;
+    margin: 26px 0 10px;
+    color: var(--pd-muted);
+    font-family: var(--pd-mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+  .mobile-fab {
+    position: fixed;
+    right: 20px;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    z-index: 30;
+    display: grid;
+    place-items: center;
+    width: 62px;
+    height: 62px;
+    padding: 0;
+    border: 1px solid var(--pd-accent);
+    border-radius: 50%;
+    background: var(--pd-accent);
+    color: #071108;
+    box-shadow: 0 14px 40px rgb(98 255 120 / 24%);
+    cursor: pointer;
+    svg {
+      width: 28px;
+      height: 28px;
+    }
+    &:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+  }
   .page-heading {
-    padding-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 0;
     h1 {
       margin-top: 16px;
       font-size: 28px;
@@ -2438,6 +2491,7 @@ function handleDel(sender) {
     }
   }
   .remote-device {
+    margin-top: 0;
     padding: 20px;
     border-radius: 18px;
   }
@@ -2485,17 +2539,57 @@ function handleDel(sender) {
     }
   }
   .workflow-guide {
-    margin: 30px 0 24px;
+    margin: 34px 0 24px;
+    padding-top: 0;
+    border-top: 0;
   }
-  .guide-heading > span:last-child {
-    display: none;
+  .guide-heading {
+    margin-bottom: 12px;
+    > span:last-child {
+      display: block;
+      color: var(--pd-muted);
+      font-family: var(--pd-mono);
+      font-size: 10px;
+    }
   }
   .guide-items {
-    gap: 14px;
+    position: relative;
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 32px 12px 12px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius-lg);
+    background: var(--pd-surface);
+    &::before,
+    &::after {
+      position: absolute;
+      top: 16px;
+      left: 18px;
+      height: 4px;
+      border-radius: 99px;
+      content: '';
+    }
+    &::before {
+      right: 18px;
+      background: var(--pd-border);
+    }
+    &::after {
+      width: 40%;
+      background: var(--pd-accent);
+      box-shadow: 0 0 18px rgb(98 255 120 / 24%);
+    }
+    > div,
     > div + div {
-      padding-left: 14px;
+      flex: 0 0 124px;
+      min-height: 112px;
+      padding: 16px;
+      border: 1px solid var(--pd-border);
+      border-radius: var(--pd-radius);
+      background: var(--pd-surface-soft);
     }
     h3 {
+      margin: 14px 0 6px;
       font-size: 12px;
     }
     p {
@@ -2523,22 +2617,19 @@ function handleDel(sender) {
     padding: 18px 0 0;
   }
   .guide-items {
-    grid-template-columns: 1fr;
-    gap: 18px;
+    gap: 8px;
     > div,
     > div + div {
-      display: grid;
-      grid-template-columns: 28px 1fr;
-      gap: 2px 12px;
-      border: 0;
-      padding: 0;
+      display: block;
+      flex: 0 0 124px;
+      padding: 16px;
+      border: 1px solid var(--pd-border);
     }
     .guide-icon {
-      grid-row: 1 / 3;
-      padding-top: 3px;
+      padding-top: 0;
     }
     h3 {
-      margin: 0;
+      margin: 14px 0 6px;
       font-size: 13px;
     }
     p {

@@ -590,8 +590,12 @@ $sidebar-width: 240px;
   }
   .sidebar,
   .browser .sidebar {
+    position: relative;
+    z-index: 10;
+    display: block;
     flex: 0 0 auto;
     width: 100%;
+    min-height: 76px;
     padding: max(18px, env(safe-area-inset-top)) 20px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--pd-border);
@@ -603,6 +607,7 @@ $sidebar-width: 240px;
   .brand {
     padding: 0;
     gap: 9px;
+    width: fit-content;
   }
   .brand-mark {
     flex-basis: 30px;
@@ -620,28 +625,33 @@ $sidebar-width: 240px;
     gap: 10px;
     font-size: 19px;
     span {
-      font-size: 9px;
+      display: none;
     }
   }
   .list {
+    position: absolute;
+    top: max(18px, env(safe-area-inset-top));
+    right: 20px;
     display: flex;
-    gap: 6px;
-    margin-top: 16px;
+    gap: 8px;
+    margin-top: 0;
   }
   .nav-label,
-  .nav-arrow,
   .sidebar-footer {
     display: none;
   }
   .item {
-    flex: 1;
+    flex: 0 0 42px;
     justify-content: center;
-    gap: 7px;
+    gap: 0;
+    width: 42px;
     min-height: 42px;
     margin: 0;
     padding: 8px;
-    font-size: 12px;
-    border-radius: 10px;
+    border-color: var(--pd-border);
+    border-radius: 50%;
+    background: var(--pd-surface-soft);
+    font-size: 0;
     svg {
       width: 17px;
       height: 17px;

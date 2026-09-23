@@ -488,9 +488,34 @@ textarea {
   background: var(--pd-accent);
 }
 @media (max-width: 480px) {
+  .viewport-shell {
+    position: relative;
+    background: #050806;
+  }
   .tools {
+    order: 3;
+    align-self: center;
+    width: calc(100% - 20px);
+    box-sizing: border-box;
+    justify-content: center;
     gap: 5px;
+    margin: 8px 10px 10px;
     padding: 6px 8px;
+    border: 1px solid var(--pd-border-strong);
+    border-radius: 999px;
+    background: rgb(16 22 18 / 94%);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 34%);
+  }
+  .video-stage {
+    order: 2;
+  }
+  .keyboard-panel {
+    order: 4;
+    margin: 0 10px 10px;
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+    border: 1px solid var(--pd-border);
+    border-radius: 24px;
+    background: #101411;
   }
   .tools button {
     width: 36px;
@@ -498,6 +523,9 @@ textarea {
     padding: 8px;
   }
   .zoom-label > span {
+    display: none;
+  }
+  .zoom-label {
     display: none;
   }
   .watch-toggle {

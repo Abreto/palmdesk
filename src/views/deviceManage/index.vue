@@ -223,7 +223,37 @@ function handleDelLinkDeviceList(item) {
   }
 }
 @media (max-width: 700px) {
+  .devices-card {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .list-heading {
+    padding-bottom: 12px;
+    border-bottom: 0;
+  }
+  .link-device-list {
+    display: grid;
+    gap: 10px;
+    padding-top: 0;
+  }
+  .link-device-item {
+    padding: 6px 8px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius);
+    background: var(--pd-surface);
+    box-shadow: var(--pd-shadow);
+    & + & {
+      border-top: 1px solid var(--pd-border);
+    }
+  }
   .empty-state {
+    min-height: 360px;
+    box-sizing: border-box;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius-lg);
+    background: var(--pd-surface);
     padding: 48px 8px;
   }
   .connect-label {
