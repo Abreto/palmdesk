@@ -1,5 +1,7 @@
 import { fetchRemoteIce, type RemoteIceConfig } from '@/api/turn';
 
+export const REMOTE_SESSION_ENDED_EVENT = 'palmdesk-remote-session-ended';
+
 export interface RemoteSessionAccess {
   id: string;
   token: string;

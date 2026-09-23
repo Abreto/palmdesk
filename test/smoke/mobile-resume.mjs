@@ -150,14 +150,16 @@ try {
       sources: true,
       enabled: true,
       dropReplies: false,
+      dropStop: false,
     };
     window.resumeFixture = state;
     const send = RTCDataChannel.prototype.send;
     RTCDataChannel.prototype.send = function (value) {
       if (
-        state.dropReplies &&
+        (state.dropReplies || state.dropStop) &&
         typeof value === 'string' &&
-        value.includes('remoteControllerStateResult')
+        (value.includes('remoteControllerStateResult') ||
+          value.includes('remoteSessionStopped'))
       )
         return;
       return send.call(this, value);
@@ -324,14 +326,6 @@ try {
     element.scrollTop = 150;
   });
   const position = await timeline.evaluate((element) => element.scrollTop);
-  await phone.getByRole('button', { name: '窗口', exact: true }).click();
-  await phone.getByRole('button', { name: '打开 Codex', exact: true }).click();
-  await phone.waitForFunction(
-    () => document.querySelector('video')?.readyState >= 2
-  );
-  const draft = phone.getByLabel('发送到电脑的文字');
-  await draft.fill('Keep this unsent draft');
-
   const active = async (value) =>
     host.waitForFunction((expected) => {
       const sender = window.resumeFixture.peers
@@ -350,6 +344,16 @@ try {
       window.resumeFixture.hidden = value;
       document.dispatchEvent(new Event('visibilitychange'));
     }, hidden);
+  await visibility(true);
+  await phone.getByRole('button', { name: '窗口', exact: true }).click();
+  await visibility(false);
+  await phone.getByRole('button', { name: '打开 Codex', exact: true }).click();
+  await phone.waitForFunction(
+    () => document.querySelector('video')?.readyState >= 2
+  );
+  const draft = phone.getByLabel('发送到电脑的文字');
+  await draft.fill('Keep this unsent draft');
+
   await active(true);
   await visibility(true);
   await active(false);
@@ -466,6 +470,9 @@ try {
     'PASS revoking reading while disconnected clears cached transcript on reconnection'
   );
 
+  await host.evaluate(() => {
+    window.resumeFixture.dropStop = true;
+  });
   await host.getByText('断开', { exact: true }).click();
   await phone
     .getByText('电脑已结束本次连接，请手动重新连接', { exact: true })

@@ -239,6 +239,7 @@ import {
 import { ipcRenderer, ipcRendererSend } from '@/utils';
 import { windowContext, type AgentBindings } from '@/utils/agent-directory';
 import { getAgent, type AgentId } from '@/utils/agent-registry';
+import { REMOTE_SESSION_ENDED_EVENT } from '@/utils/network/remote-session';
 import { ControllerRecovery } from '@/utils/remote-presence';
 import { REMOTE_VIDEO_DEFAULTS } from '@/utils/remote-video';
 import { ReaderClient } from '@/utils/session-reader-channel';
@@ -831,7 +832,13 @@ function visibilityChanged() {
   }
   if (returning) recovery.foreground(Date.now());
   checkRecovery();
-  if (listRequest && connected.value) requestWindows();
+  if (
+    connected.value &&
+    view.value === 'window' &&
+    !selectedWindow.value &&
+    !windowStarting.value
+  )
+    requestWindows();
   resumeWindow();
   if (
     selectRequest ||
@@ -839,6 +846,12 @@ function visibilityChanged() {
   )
     armWindowTimeout();
   void peer.value?.videoEl.play().catch(() => {});
+}
+
+function remoteSessionEnded(event: Event) {
+  const data = (event as CustomEvent<{ peerId?: string }>).detail;
+  if (data?.peerId === receiverId.value)
+    endConnection('电脑已结束本次连接，请手动重新连接');
 }
 
 function pageHidden() {
@@ -879,6 +892,7 @@ watch(
 );
 onMounted(() => {
   document.addEventListener('visibilitychange', visibilityChanged);
+  window.addEventListener(REMOTE_SESSION_ENDED_EVENT, remoteSessionEnded);
   window.addEventListener('pagehide', pageHidden);
   window.addEventListener('pageshow', visibilityChanged);
   window.addEventListener('online', visibilityChanged);
@@ -928,6 +942,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', visibilityChanged);
+  window.removeEventListener(REMOTE_SESSION_ENDED_EVENT, remoteSessionEnded);
   window.removeEventListener('pagehide', pageHidden);
   window.removeEventListener('pageshow', visibilityChanged);
   window.removeEventListener('online', visibilityChanged);

@@ -594,7 +594,7 @@ const captureSessionId = ref('');
 const captureLifecycle = new CaptureLifecycle();
 const windowCatalogs = new Map<string, WindowCatalog>();
 const windowResumes = new WindowResumeStore();
-const activityLeases = new Map<RTCDataChannel, VideoActivityLease>();
+const activityLeases = new WeakMap<RTCDataChannel, VideoActivityLease>();
 const stoppedPeers = new WeakSet<RTCDataChannel>();
 let captureResumeToken = '';
 const listingPeers = new Set<string>();
@@ -1748,6 +1748,20 @@ function handleDel(sender) {
   const peer = networkStore.rtcMap.get(sender);
   if (!peer) return;
   if (peer.cbDataChannel) stoppedPeers.add(peer.cbDataChannel);
+  const sessionId = peer.remoteConnection?.session.access.id;
+  if (sessionId) {
+    networkStore.wsMap.get(roomId.value)?.send({
+      requestId: getRandomString(8),
+      msgType: WsMsgTypeEnum.billdDeskEndRemote,
+      data: {
+        sender: mySocketId.value,
+        receiver: sender,
+        live_room_id: roomId.value,
+        sessionId,
+        isRemoteDesk: true,
+      },
+    });
+  }
   peer.dataChannelSend({
     msgType: WsMsgTypeEnum.remoteSessionStopped,
     requestId: getRandomString(8),
