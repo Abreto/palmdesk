@@ -412,7 +412,7 @@ $sidebar-width: 240px;
   height: 42px;
   border-radius: var(--pd-radius-sm);
   background: var(--pd-accent);
-  color: #071108;
+  color: var(--pd-on-accent);
   box-shadow: var(--pd-glow);
   svg {
     width: 24px;
@@ -483,7 +483,7 @@ $sidebar-width: 240px;
   }
   &.active {
     background: var(--pd-accent);
-    color: #071108;
+    color: var(--pd-on-accent);
     box-shadow: var(--pd-glow);
     .nav-arrow {
       opacity: 0.65;

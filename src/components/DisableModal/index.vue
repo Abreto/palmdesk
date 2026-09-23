@@ -103,13 +103,13 @@ function handleClose() {
       width: 100%;
       height: 40px;
       border-radius: 4px;
-      background-color: $theme-color-gold;
-      color: #071108;
+      background-color: var(--pd-accent);
+      color: var(--pd-on-accent);
       text-align: center;
       line-height: 40px;
       cursor: pointer;
       &:hover {
-        opacity: 0.8;
+        background-color: var(--pd-accent-hover);
       }
     }
   }

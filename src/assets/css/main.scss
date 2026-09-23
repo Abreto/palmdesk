@@ -8,8 +8,9 @@
   --pd-muted: #68756c;
   --pd-border: #d7e1d9;
   --pd-border-strong: #b9c8bc;
-  --pd-accent: #168a3a;
+  --pd-accent: #167c36;
   --pd-accent-hover: #126f2e;
+  --pd-on-accent: #ffffff;
   --pd-accent-soft: #e5f3e8;
   --pd-danger: #c43d4b;
   --pd-danger-soft: #fdebed;
@@ -20,8 +21,8 @@
   --pd-shadow: 0 18px 50px rgb(31 55 39 / 10%);
   --pd-shadow-raised: 0 30px 90px rgb(31 55 39 / 16%);
   --pd-glow: 0 10px 26px rgb(22 138 58 / 14%);
-  --pd-font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --pd-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
   --pd-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 }
 
@@ -82,7 +83,7 @@ select {
 }
 
 ::selection {
-  color: #071108;
+  color: var(--pd-on-accent);
   background: var(--pd-accent);
 }
 
@@ -176,7 +177,7 @@ select {
   border: 1px solid var(--pd-accent);
   border-radius: var(--pd-radius-sm);
   background: var(--pd-accent);
-  color: #071108;
+  color: var(--pd-on-accent);
   font-weight: 750;
   text-decoration: none;
   cursor: pointer;
@@ -190,7 +191,7 @@ select {
   &:hover:not(:disabled) {
     border-color: var(--pd-accent-hover);
     background: var(--pd-accent-hover);
-    color: #071108;
+    color: var(--pd-on-accent);
     box-shadow: 0 0 32px rgb(22 138 58 / 20%);
   }
 }

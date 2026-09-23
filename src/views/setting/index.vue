@@ -242,7 +242,7 @@ dd {
   height: 46px;
   border-radius: var(--pd-radius-sm);
   background: var(--pd-accent);
-  color: #071108;
+  color: var(--pd-on-accent);
   svg {
     width: 26px;
     height: 26px;

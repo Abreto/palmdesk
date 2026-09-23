@@ -104,10 +104,13 @@ export default defineComponent({
         font-size: 14px;
       }
       &.next {
-        background: $theme-color-gold;
-        color: #071108;
+        background: var(--pd-accent);
+        color: var(--pd-on-accent);
         font-weight: 700;
         font-size: 16px;
+        &:hover {
+          background: var(--pd-accent-hover);
+        }
         &.hiddenCancel {
           width: 100%;
         }

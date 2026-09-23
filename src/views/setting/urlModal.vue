@@ -252,7 +252,7 @@ footer {
   border-color: var(--pd-accent);
   padding: 8px 14px;
   background: var(--pd-accent);
-  color: #071108;
+  color: var(--pd-on-accent);
 }
 .error {
   color: var(--pd-danger);

@@ -54,7 +54,7 @@
           v-model="query"
           type="search"
           placeholder="搜索窗口或 Agent"
-          aria-label="搜索 Agent、应用或窗口"
+          aria-label="搜索窗口或 Agent"
         />
       </label>
       <p
@@ -571,7 +571,7 @@ select:focus-visible {
 }
 .picker-tabs button[aria-selected='true'] {
   background: var(--pd-surface);
-  box-shadow: 0 2px 12px rgb(0 0 0 / 32%);
+  box-shadow: 0 2px 12px rgb(31 55 39 / 12%);
   color: var(--pd-accent);
   font-weight: 600;
 }

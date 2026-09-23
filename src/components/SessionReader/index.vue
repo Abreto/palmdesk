@@ -674,7 +674,7 @@ h2 {
 .detail-heading .primary {
   margin-left: auto;
   background: var(--pd-accent);
-  color: #071108;
+  color: var(--pd-on-accent);
   border-color: var(--pd-accent);
 }
 .session-context {

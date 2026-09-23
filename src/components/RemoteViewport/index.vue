@@ -574,7 +574,7 @@ textarea {
   font: 16px/1.4 system-ui;
 }
 .composer button {
-  color: #071108;
+  color: var(--pd-on-accent);
   background: var(--pd-accent);
 }
 @media (max-width: 480px) {

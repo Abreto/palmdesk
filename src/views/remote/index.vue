@@ -1926,11 +1926,7 @@ function handleDel(sender) {
 
 <style lang="scss" scoped>
 .remote-wrap {
-  position: relative;
   min-height: 100%;
-  &::before {
-    display: none;
-  }
   .container {
     position: relative;
     z-index: 1;
@@ -2322,16 +2318,12 @@ function handleDel(sender) {
   min-width: 112px;
   height: 54px;
   border-radius: var(--pd-radius-sm);
-  background: linear-gradient(145deg, var(--pd-accent), #2ea84e);
-  color: #071108;
+  background: var(--pd-accent);
+  color: var(--pd-on-accent);
   box-shadow: 0 10px 24px rgb(22 138 58 / 18%);
   &:hover:not(:disabled) {
-    background: linear-gradient(
-      145deg,
-      var(--pd-accent-hover),
-      var(--pd-accent)
-    );
-    color: #071108;
+    background: var(--pd-accent-hover);
+    color: var(--pd-on-accent);
     box-shadow: 0 12px 30px rgb(22 138 58 / 24%);
   }
   &:disabled {
@@ -2664,7 +2656,7 @@ function handleDel(sender) {
     border: 1px solid var(--pd-accent);
     border-radius: var(--pd-radius);
     background: var(--pd-accent);
-    color: #071108;
+    color: var(--pd-on-accent);
     box-shadow: 0 12px 34px rgb(22 138 58 / 22%);
     cursor: pointer;
     svg {

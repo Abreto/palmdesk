@@ -99,13 +99,16 @@ const emits = defineEmits(['close']);
         width: 100%;
         height: 44px;
         border-radius: var(--pd-radius-sm);
-        background: $theme-color-gold;
-        color: #071108;
+        background: var(--pd-accent);
+        color: var(--pd-on-accent);
         text-align: center;
         font-weight: 600;
         font-size: 16px;
         line-height: 44px;
         cursor: pointer;
+        &:hover {
+          background: var(--pd-accent-hover);
+        }
       }
     }
   }

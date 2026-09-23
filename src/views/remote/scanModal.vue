@@ -259,7 +259,7 @@ video {
   inset: 0;
   display: grid;
   place-items: center;
-  color: #071108;
+  color: #eaf3ec;
   font-size: 14px;
 }
 .scan-actions {

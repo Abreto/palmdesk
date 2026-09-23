@@ -36,10 +36,10 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#168a3a',
+    primaryColor: '#167c36',
     primaryColorHover: '#126f2e',
     primaryColorPressed: '#0f5b24',
-    primaryColorSuppl: '#168a3a',
+    primaryColorSuppl: '#167c36',
     textColorBase: '#17211b',
     textColor1: '#17211b',
     textColor2: '#46564b',
@@ -54,8 +54,7 @@ const themeOverrides: GlobalThemeOverrides = {
     inputColor: '#f8faf8',
     inputColorDisabled: '#e8eee9',
     placeholderColor: '#88958d',
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
+    fontFamily: 'var(--pd-font)',
   },
   Dialog: {
     borderRadius: 'var(--pd-radius-lg)',

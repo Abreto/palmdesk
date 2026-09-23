@@ -1,4 +1,4 @@
-$theme-color-gold: #62ff78;
+$theme-color-gold: #167c36;
 $top-system-bar-height: 50px;
 
 // 自定义滚动条:https://developer.mozilla.org/zh-CN/docs/Web/CSS/::-webkit-scrollbar
@@ -21,7 +21,7 @@ $top-system-bar-height: 50px;
   // 滚动条上的滚动滑块
   &::-webkit-scrollbar-thumb {
     border-radius: 3px;
-    background: #3a4c3e;
+    background: var(--pd-border-strong);
   }
 }
 
@@ -123,6 +123,6 @@ $top-system-bar-height: 50px;
   // 滚动条上的滚动滑块
   &::-webkit-scrollbar-thumb {
     border-radius: 3px;
-    background: #3a4c3e;
+    background: var(--pd-border-strong);
   }
 }
