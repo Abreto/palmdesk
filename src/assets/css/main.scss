@@ -201,7 +201,15 @@ select {
   }
 }
 
-.pd-button:disabled,
+.pd-button:disabled {
+  border-color: var(--pd-border);
+  background: var(--pd-surface-soft);
+  color: var(--pd-muted);
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .pd-icon-button:disabled {
   opacity: 0.45;
   cursor: not-allowed;

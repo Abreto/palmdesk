@@ -2147,6 +2147,36 @@ function handleDel(sender) {
 .btn {
   min-width: 112px;
   height: 54px;
+  border-radius: 18px;
+  background: linear-gradient(145deg, var(--pd-accent), #36d85a);
+  color: #071108;
+  box-shadow: 0 12px 28px rgb(98 255 120 / 18%);
+  &:hover:not(:disabled) {
+    background: linear-gradient(
+      145deg,
+      var(--pd-accent-hover),
+      var(--pd-accent)
+    );
+    color: #071108;
+    box-shadow: 0 14px 34px rgb(98 255 120 / 25%);
+  }
+  &:disabled {
+    border-color: var(--pd-border);
+    background: var(--pd-surface-soft);
+    color: var(--pd-muted);
+    box-shadow: none;
+    opacity: 1;
+    > svg {
+      background: var(--pd-border-strong);
+    }
+  }
+  > svg {
+    width: 20px;
+    height: 20px;
+    padding: 3px;
+    border-radius: 50%;
+    background: rgb(7 17 8 / 12%);
+  }
   .loading {
     animation: rotate 1s linear infinite;
   }
