@@ -2067,6 +2067,86 @@ function handleDel(sender) {
     }
   }
 }
+// Keep the full-size connection QR in view when the desktop app opens.
+.remote-wrap:not(.browser-controller) {
+  .container {
+    padding-top: 24px;
+  }
+  .page-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding-bottom: 20px;
+    h1 {
+      margin: 6px 0 8px;
+      font-size: 32px;
+      letter-spacing: -1.2px;
+    }
+    p {
+      font-size: 13px;
+    }
+  }
+  .connection-state {
+    position: static;
+    flex-shrink: 0;
+    margin-top: 0;
+  }
+  .local-device {
+    padding: 16px;
+    margin-bottom: 16px;
+    .info {
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .info-right {
+      padding-left: 16px;
+    }
+    .txt {
+      margin-bottom: 4px;
+    }
+    .code {
+      flex: 1;
+      width: auto;
+      margin-bottom: 0;
+      font-size: 22px;
+    }
+    .ico {
+      flex-shrink: 0;
+    }
+  }
+}
+@media (max-height: 650px) {
+  .remote-wrap:not(.browser-controller) {
+    .container {
+      padding-top: 16px;
+    }
+    .page-heading {
+      margin-bottom: 12px;
+      padding-bottom: 12px;
+      h1 {
+        margin: 4px 0 6px;
+        font-size: 28px;
+      }
+    }
+    .local-device {
+      padding: 12px;
+      margin-bottom: 12px;
+      .section-heading p {
+        display: none;
+      }
+      .section-icon {
+        flex-basis: 32px;
+        width: 32px;
+        height: 32px;
+      }
+      .info {
+        margin-top: 8px;
+      }
+    }
+  }
+}
 .remote-device {
   position: relative;
   z-index: 10;

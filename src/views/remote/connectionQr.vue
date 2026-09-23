@@ -105,9 +105,9 @@ function copyInvite() {
   display: grid;
   grid-template-columns: 216px minmax(0, 1fr);
   align-items: center;
-  gap: 28px;
-  padding: 24px;
-  margin-top: 18px;
+  gap: 20px;
+  padding: 16px;
+  margin-top: 16px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-lg);
   background: var(--pd-surface-soft);
@@ -173,7 +173,13 @@ button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-@media (max-width: 900px) {
+@media (max-height: 650px) {
+  .connection-qr {
+    padding: 12px;
+    margin-top: 12px;
+  }
+}
+@media (max-width: 760px) {
   .connection-qr {
     grid-template-columns: minmax(0, 1fr);
     gap: 20px;
