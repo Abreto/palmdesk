@@ -357,10 +357,10 @@ button {
   gap: 4px;
   min-height: 36px;
   padding: 6px 10px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   background: white;
-  color: #304b41;
+  color: var(--pd-text);
   cursor: pointer;
 }
 button:disabled {
@@ -380,8 +380,8 @@ img {
   width: 64px;
   height: 64px;
   object-fit: contain;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   background: white;
 }
 .image-details {
@@ -402,13 +402,13 @@ small {
 progress {
   width: 100%;
   height: 6px;
-  accent-color: #167c65;
+  accent-color: var(--pd-accent);
 }
 .image-message {
   margin: 8px 0 0;
-  color: #167c65;
+  color: var(--pd-accent);
 }
 .image-message.error {
-  color: #a12f2f;
+  color: var(--pd-danger);
 }
 </style>

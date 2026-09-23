@@ -1,19 +1,23 @@
 <template>
-  <section class="reader-settings">
+  <section class="reader-settings pd-card">
     <label>
+      <span class="reader-icon"><ReaderOutline aria-hidden="true" /></span>
+      <span><strong>会话阅读</strong><small>在手机上跟进工作</small></span>
       <input
         type="checkbox"
+        class="pd-switch"
+        role="switch"
+        aria-label="会话阅读"
         :checked="enabled"
         :disabled="busy || !supported"
         @change="configure"
       />
-      <strong>会话阅读</strong>
     </label>
     <p>
       {{
         supported
-          ? '允许已连接设备读取此用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话，包含回复与工具输出。'
-          : '会话阅读支持 macOS 上的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话。'
+          ? '读取 Codex、Claude Code 和 Claude Desktop 的本地会话。'
+          : '仅 macOS 支持本地会话。'
       }}
     </p>
     <p
@@ -26,6 +30,7 @@
 </template>
 
 <script setup lang="ts">
+import { ReaderOutline } from '@vicons/ionicons5';
 import { onMounted, ref } from 'vue';
 
 import { IPC_EVENT } from '@/event';
@@ -72,28 +77,49 @@ onMounted(() => {
 <style scoped>
 .reader-settings {
   margin: 18px 0;
-  padding: 16px;
-  border: 1px solid #dce4ef;
-  border-radius: 12px;
 }
 label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   cursor: pointer;
 }
 input {
-  width: 18px;
-  height: 18px;
-  accent-color: #2563eb;
+  margin-left: auto;
+}
+.reader-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  color: var(--pd-accent);
+  background: var(--pd-surface-soft);
+}
+.reader-icon svg {
+  width: 22px;
+  height: 22px;
+}
+strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+small {
+  display: block;
+  margin-top: 3px;
+  color: var(--pd-muted);
+  font-size: 11px;
 }
 p {
-  margin: 8px 0 0;
-  color: #64748b;
-  font-size: 13px;
-  line-height: 1.6;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--pd-border);
+  color: var(--pd-muted);
+  font-size: 12px;
+  line-height: 1.8;
 }
 [role='alert'] {
-  color: #b91c1c;
+  color: var(--pd-danger);
 }
 </style>

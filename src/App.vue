@@ -33,8 +33,25 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#167c65',
-    primaryColorHover: '#126951',
+    primaryColor: '#25634d',
+    primaryColorHover: '#1c503d',
+    primaryColorPressed: '#184433',
+    primaryColorSuppl: '#25634d',
+    textColorBase: '#243a31',
+    textColor1: '#243a31',
+    textColor2: '#4e6257',
+    textColor3: '#66756c',
+    borderColor: '#dfe5dc',
+    borderRadius: '10px',
+    borderRadiusSmall: '6px',
+    fontFamily:
+      "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
+  },
+  Dialog: {
+    borderRadius: '20px',
+  },
+  Card: {
+    borderRadius: '20px',
   },
 };
 
@@ -81,20 +98,3 @@ async function getClient() {
   }
 }
 </script>
-
-<style lang="scss" scoped></style>
-
-<style lang="scss">
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  letter-spacing: 0;
-}
-#app {
-  user-select: none;
-}
-</style>

@@ -194,10 +194,12 @@ async function scanFile(event: Event) {
   max-height: calc(100dvh - 32px);
   margin: 16px auto;
   overflow-y: auto;
-  padding: 18px;
-  border-radius: 6px;
+  padding: 24px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-lg);
+  box-shadow: var(--pd-shadow-raised);
   background: white;
-  color: #263b32;
+  color: var(--pd-text);
 }
 header {
   display: flex;
@@ -207,7 +209,8 @@ header {
 }
 h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
+  font-weight: 600;
 }
 button {
   display: inline-flex;
@@ -216,10 +219,10 @@ button {
   gap: 8px;
   min-height: 40px;
   padding: 8px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   background: white;
-  color: #167c65;
+  color: var(--pd-accent);
   font-size: 14px;
   cursor: pointer;
 }
@@ -241,6 +244,7 @@ svg {
   position: relative;
   width: 100%;
   aspect-ratio: 1;
+  border-radius: 14px;
   overflow: hidden;
   background: #202724;
 }
@@ -268,7 +272,7 @@ video {
 }
 .scan-error {
   margin: 14px 0 0;
-  color: #b43e4e;
+  color: var(--pd-danger);
   font-size: 13px;
   overflow-wrap: anywhere;
 }

@@ -8,8 +8,8 @@
       class="empty-reader"
       role="status"
     >
-      <strong>正在连接会话通道</strong>
-      <p>可先切到窗口；若一直无法连接，请确认电脑与手机使用同一版本。</p>
+      <strong>连接中</strong>
+      <p>请先切到窗口，或确认设备版本一致。</p>
     </div>
     <div
       v-else-if="settings && !settings.enabled"
@@ -21,8 +21,8 @@
       <p>
         {{
           settings.supported
-            ? '在电脑 PalmDesk 首页打开「会话阅读」，这里就能查看 Codex、Claude Code 和 Claude Desktop 本地 Code 会话的回复。'
-            : '会话阅读支持 macOS 上的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话。'
+            ? '在电脑首页开启「会话阅读」即可查看本地会话。'
+            : '此电脑不支持本地会话。'
         }}
       </p>
       <button
@@ -36,7 +36,7 @@
     <template v-else-if="!selected">
       <div class="reader-heading">
         <div>
-          <span class="eyebrow">本地会话</span>
+          <span class="eyebrow">会话</span>
           <h2>最近会话</h2>
         </div>
         <button
@@ -54,7 +54,7 @@
         <input
           v-model="query"
           aria-label="搜索会话"
-          placeholder="搜索项目、标题或最近内容"
+          placeholder="搜索项目或内容"
           maxlength="200"
         />
         <button
@@ -90,18 +90,13 @@
           v-if="!busy && !sessions.length && !error"
           class="empty-list"
         >
-          {{
-            query
-              ? '没有匹配的会话，换个关键词试试。'
-              : '还没有可读取的 Codex、Claude Code 或 Claude Desktop 本地 Code 会话。'
-          }}
+          {{ query ? '没有匹配的会话，换个关键词试试。' : '暂无可读会话。' }}
         </p>
         <p
           v-if="total > sessions.length"
           class="list-note"
         >
-          显示最近 {{ sessions.length }} 条，共
-          {{ total }} 条。搜索可以查找更早的会话。
+          显示 {{ sessions.length }} / {{ total }} 条；搜索可查找更早会话。
         </p>
       </div>
     </template>
@@ -126,7 +121,7 @@
           class="primary"
           @click="emit('open-window')"
         >
-          去窗口继续 ↗
+          继续 ↗
         </button>
       </div>
       <div class="session-context">
@@ -145,7 +140,7 @@
           v-if="windowName"
           class="window-link"
         >
-          关联窗口：{{ windowName }} · 发送前请确认窗口中的任务
+          关联窗口：{{ windowName }} · 发送前确认任务
         </p>
       </div>
       <button
@@ -527,8 +522,8 @@ onUnmounted(() => {
   min-height: 0;
   min-width: 0;
   flex-direction: column;
-  background: #f5f7f6;
-  color: #243e33;
+  background: var(--pd-bg);
+  color: var(--pd-text);
 }
 button,
 input {
@@ -536,11 +531,11 @@ input {
 }
 button {
   cursor: pointer;
-  border: 1px solid #d4dfd9;
-  border-radius: 9px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   padding: 9px 13px;
   min-height: 40px;
-  color: #355449;
+  color: var(--pd-text);
   background: #fff;
 }
 button:disabled {
@@ -550,7 +545,7 @@ button:disabled {
 button:focus-visible,
 input:focus-visible,
 summary:focus-visible {
-  outline: 2px solid #21835d;
+  outline: 2px solid var(--pd-accent);
   outline-offset: 2px;
 }
 .reader-heading {
@@ -558,13 +553,13 @@ summary:focus-visible {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 18px 20px 10px;
+  padding: 28px 24px 18px;
 }
 .eyebrow {
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 2px;
-  color: #648474;
+  color: var(--pd-accent);
 }
 h2 {
   margin: 4px 0 0;
@@ -575,17 +570,17 @@ h2 {
 .reader-search {
   display: flex;
   gap: 8px;
-  padding: 6px 20px 14px;
+  padding: 0 24px 20px;
 }
 .reader-search input {
   flex: 1;
   min-width: 0;
   width: 0;
-  border: 1px solid #d4dfd9;
-  border-radius: 9px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   padding: 11px;
   background: white;
-  color: #243e33;
+  color: var(--pd-text);
 }
 .reader-scroll {
   flex: 1;
@@ -598,26 +593,32 @@ h2 {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 0 20px 24px;
+  width: 100%;
+  max-width: 860px;
+  box-sizing: border-box;
+  margin: 0 auto;
+  padding: 0 24px 32px;
 }
 .session-card {
   display: flex;
   flex-shrink: 0;
   flex-direction: column;
   gap: 9px;
-  padding: 16px;
+  padding: 20px;
   text-align: left;
-  border-radius: 13px;
+  border-radius: var(--pd-radius);
+  box-shadow: var(--pd-shadow);
 }
 .session-card:hover {
-  border-color: #7da992;
+  border-color: var(--pd-border-strong);
+  background: var(--pd-surface-soft);
 }
 .session-meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  color: #72867b;
+  color: var(--pd-muted);
   font-size: 11px;
 }
 .session-meta > span {
@@ -640,7 +641,7 @@ h2 {
   overflow: hidden;
   font-size: 13px;
   line-height: 1.65;
-  color: #687c71;
+  color: var(--pd-muted);
   overflow-wrap: anywhere;
 }
 .session-state {
@@ -650,19 +651,19 @@ h2 {
 .detail-heading {
   justify-content: flex-start;
   padding: 10px 16px;
-  border-bottom: 1px solid #e1e8e3;
+  border-bottom: 1px solid var(--pd-border);
   background: #fff;
 }
 .detail-heading .primary {
   margin-left: auto;
-  background: #27684c;
+  background: var(--pd-accent);
   color: white;
-  border-color: #27684c;
+  border-color: var(--pd-accent);
 }
 .session-context {
   padding: 12px 20px;
   background: #fff;
-  border-bottom: 1px solid #e1e8e3;
+  border-bottom: 1px solid var(--pd-border);
 }
 .session-context h2 {
   font-size: 17px;
@@ -670,7 +671,7 @@ h2 {
 .session-context p {
   margin: 5px 0;
   font-size: 11px;
-  color: #708479;
+  color: var(--pd-muted);
   overflow-wrap: anywhere;
 }
 .session-context > div {
@@ -690,12 +691,13 @@ h2 {
 .message-card {
   margin-bottom: 14px;
   background: white;
-  border: 1px solid #e0e7e2;
-  border-radius: 12px;
-  padding: 16px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius);
+  box-shadow: var(--pd-shadow);
+  padding: 20px;
 }
 .user-message {
-  background: #eaf1ec;
+  background: var(--pd-accent-soft);
   border-color: #dce7df;
 }
 .message-card header {
@@ -727,16 +729,16 @@ h2 {
   margin: 18px 0 8px;
 }
 .message-body :deep(a) {
-  color: #22734f;
+  color: var(--pd-accent);
   text-decoration: underline;
 }
 .message-body :deep(pre),
 pre {
   max-width: 100%;
   overflow-x: auto;
-  border-radius: 7px;
+  border-radius: var(--pd-radius-sm);
   padding: 12px;
-  background: #edf2ee;
+  background: var(--pd-surface-soft);
   color: #304e3f;
   font-size: 12px;
   line-height: 1.7;
@@ -760,8 +762,8 @@ pre {
   margin-bottom: 14px;
   padding: 12px 16px;
   border: 1px dashed #ccdacf;
-  border-radius: 10px;
-  background: #f0f4f1;
+  border-radius: var(--pd-radius);
+  background: var(--pd-surface-soft);
   font-size: 13px;
 }
 summary {
@@ -770,7 +772,7 @@ summary {
 }
 summary span {
   float: right;
-  color: #7a8e81;
+  color: var(--pd-muted);
   font-size: 11px;
 }
 .activity-item {
@@ -806,7 +808,7 @@ summary span {
 .empty-reader p,
 .empty-list,
 .list-note {
-  color: #728477;
+  color: var(--pd-muted);
   font-size: 13px;
   line-height: 1.8;
 }
@@ -824,13 +826,22 @@ summary span {
   font-size: 12px;
 }
 .error {
-  color: #a34542;
+  color: var(--pd-danger);
   background: #fff5f3;
 }
 .truncation {
   font-size: 12px;
   color: #966d3a;
   line-height: 1.7;
+}
+@media (min-width: 900px) {
+  .reader-heading:not(.detail-heading),
+  .reader-search {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 860px;
+    margin-inline: auto;
+  }
 }
 @media (max-width: 420px) {
   .reader-heading {

@@ -367,7 +367,7 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  background: #f2f4f3;
+  background: var(--pd-bg);
 }
 button {
   display: inline-flex;
@@ -377,10 +377,10 @@ button {
   width: 42px;
   height: 42px;
   padding: 10px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   background: white;
-  color: #304b41;
+  color: var(--pd-text);
   cursor: pointer;
 }
 button svg {
@@ -393,8 +393,8 @@ button:disabled {
 }
 button.active,
 button[aria-pressed='true'] {
-  border-color: #167c65;
-  background: #def0e9;
+  border-color: var(--pd-accent);
+  background: var(--pd-accent-soft);
 }
 .tools {
   display: flex;
@@ -403,7 +403,7 @@ button[aria-pressed='true'] {
   flex-wrap: wrap;
   padding: 8px 12px;
   background: white;
-  border-bottom: 1px solid #d7ddda;
+  border-bottom: 1px solid var(--pd-border);
 }
 .modes {
   display: flex;
@@ -424,8 +424,8 @@ select {
   height: 36px;
   max-width: 96px;
   padding: 4px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
   background: white;
   font-size: 13px;
 }
@@ -451,7 +451,7 @@ select {
 }
 .keyboard-panel {
   padding: 8px 12px max(10px, env(safe-area-inset-bottom));
-  border-top: 1px solid #d7ddda;
+  border-top: 1px solid var(--pd-border);
   background: white;
 }
 .key-row {
@@ -476,13 +476,13 @@ textarea {
   resize: vertical;
   max-height: 160px;
   padding: 8px;
-  border: 1px solid #c7d1cc;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
   font: 16px/1.4 system-ui;
 }
 .composer button {
   color: white;
-  background: #167c65;
+  background: var(--pd-accent);
 }
 @media (max-width: 480px) {
   .tools {

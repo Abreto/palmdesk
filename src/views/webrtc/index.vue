@@ -767,13 +767,14 @@ onUnmounted(() => {
   flex-shrink: 0;
   gap: 5px;
   align-items: center;
-  padding: 8px 14px;
-  border-bottom: 1px solid #dce5df;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--pd-border);
   background: #fff;
   button {
     border: 0;
     padding: 9px 22px;
-    border-radius: 8px;
+    min-height: 40px;
+    border-radius: var(--pd-radius-sm);
     background: transparent;
     color: #678172;
     font: inherit;
@@ -781,14 +782,14 @@ onUnmounted(() => {
     cursor: pointer;
   }
   button[aria-pressed='true'] {
-    color: #245e43;
-    background: #e5efe8;
+    color: var(--pd-accent);
+    background: var(--pd-accent-soft);
     font-weight: 600;
   }
   > span {
     margin-left: auto;
     font-size: 11px;
-    color: #829389;
+    color: var(--pd-muted);
   }
 }
 .reading-context {
@@ -821,7 +822,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   padding: 10px 16px;
-  color: #9e3046;
+  color: var(--pd-danger);
   background: #fff3f5;
   border-bottom: 1px solid #edcbd2;
   font-size: 13px;
@@ -840,7 +841,7 @@ onUnmounted(() => {
     min-height: 36px;
     padding: 6px 10px;
     border: 1px solid currentColor;
-    border-radius: 4px;
+    border-radius: var(--pd-radius-sm);
     background: white;
     color: inherit;
     font: inherit;
@@ -860,16 +861,16 @@ onUnmounted(() => {
   height: 100dvh;
   min-height: 280px;
   flex-direction: column;
-  color: #263b32;
-  background: #f2f4f3;
+  color: var(--pd-text);
+  background: var(--pd-bg);
 }
 .controller-header {
   display: flex;
   flex: 0 0 auto;
   align-items: center;
   gap: 10px;
-  padding: max(8px, env(safe-area-inset-top)) 12px 8px;
-  border-bottom: 1px solid #d7ddda;
+  padding: max(12px, env(safe-area-inset-top)) 16px 12px;
+  border-bottom: 1px solid var(--pd-border);
   background: #fff;
 }
 .controller-header > button {
@@ -878,8 +879,9 @@ onUnmounted(() => {
   height: 40px;
   padding: 8px;
   border: 0;
-  background: transparent;
-  color: #304b41;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface-soft);
+  color: var(--pd-text);
   cursor: pointer;
 }
 .controller-header svg {
@@ -891,7 +893,8 @@ onUnmounted(() => {
 }
 .heading h1 {
   margin: 0;
-  font-size: 17px;
+  font-size: 18px;
+  letter-spacing: -0.5px;
   line-height: 1.3;
 }
 .heading span {
@@ -900,16 +903,19 @@ onUnmounted(() => {
   white-space: nowrap;
   text-overflow: ellipsis;
   font-size: 12px;
-  color: #6b7871;
+  color: var(--pd-muted);
 }
 .status {
   margin-left: auto;
-  font-size: 12px;
-  color: #a13e3e;
+  padding: 5px 9px;
+  border-radius: 20px;
+  background: var(--pd-surface-soft);
+  font-size: 11px;
+  color: var(--pd-danger);
   white-space: nowrap;
 }
 .status.online {
-  color: #167c65;
+  color: var(--pd-accent);
 }
 .status.ready {
   color: #66736c;
@@ -938,10 +944,10 @@ onUnmounted(() => {
   max-width: calc(100vw - 32px);
   padding: 16px;
   box-sizing: border-box;
-  border: 1px solid #cbd6cf;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
   background: white;
-  box-shadow: 0 6px 18px #0002;
+  box-shadow: var(--pd-shadow-raised);
 }
 .options-panel label {
   display: flex;
@@ -953,6 +959,11 @@ onUnmounted(() => {
 .options-panel select {
   min-width: 100px;
   height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--pd-border);
+  border-radius: 8px;
+  background: var(--pd-bg);
+  color: var(--pd-text);
   font-size: 14px;
 }
 .options-panel > span {
@@ -973,8 +984,9 @@ onUnmounted(() => {
   width: max-content;
   max-width: calc(100% - 40px);
   box-sizing: border-box;
-  border: 1px solid #cbd6cf;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius);
+  box-shadow: var(--pd-shadow);
   background: #fff;
   font-size: 14px;
 }
@@ -985,9 +997,9 @@ onUnmounted(() => {
 }
 .connection-message button {
   padding: 8px 12px;
-  border: 1px solid #167c65;
-  border-radius: 4px;
-  color: #167c65;
+  border: 1px solid var(--pd-accent);
+  border-radius: var(--pd-radius-sm);
+  color: var(--pd-accent);
   background: white;
   cursor: pointer;
 }

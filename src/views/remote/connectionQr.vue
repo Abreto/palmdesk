@@ -23,6 +23,7 @@
       />
     </div>
     <div class="qr-details">
+      <span class="pd-eyebrow">桌面 → 掌心</span>
       <h2>手机扫码连接</h2>
       <p
         v-if="unavailable"
@@ -35,7 +36,7 @@
         v-else
         class="qr-status"
       >
-        临时连接码
+        手机扫码连接此设备。
       </p>
       <div class="qr-address">{{ clientUrl || '未设置手机网页地址' }}</div>
       <div class="qr-actions">
@@ -104,11 +105,12 @@ function copyInvite() {
   display: grid;
   grid-template-columns: 216px minmax(0, 1fr);
   align-items: center;
-  gap: 24px;
-  padding: 20px 0;
-  margin-top: 20px;
-  border-top: 1px solid #e0e6e2;
-  border-bottom: 1px solid #e0e6e2;
+  gap: 28px;
+  padding: 24px;
+  margin-top: 18px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-surface-soft);
 }
 .qr-image {
   display: grid;
@@ -116,26 +118,33 @@ function copyInvite() {
   width: 216px;
   height: 216px;
   background: white;
+  overflow: hidden;
+  border: 1px solid var(--pd-border);
+  border-radius: 16px;
+  box-shadow: var(--pd-shadow);
 }
 .qr-placeholder {
   width: 72px;
   height: 72px;
-  color: #bdc9c2;
+  color: var(--pd-border-strong);
 }
 h2 {
-  margin: 0 0 12px;
-  font-size: 18px;
-  color: #263b32;
+  margin: 12px 0 10px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--pd-text);
 }
 .qr-status,
 .qr-address {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #60726a;
+  color: var(--pd-muted);
   overflow-wrap: anywhere;
 }
 .qr-address {
   user-select: text;
+  font-family: var(--pd-mono);
+  font-size: 11px;
 }
 .qr-actions {
   display: flex;
@@ -147,11 +156,14 @@ button {
   width: 40px;
   height: 40px;
   padding: 8px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
   background: white;
-  color: #167c65;
+  color: var(--pd-accent);
   cursor: pointer;
+  &:hover:not(:disabled) {
+    background: var(--pd-accent-soft);
+  }
 }
 button svg {
   width: 20px;
@@ -161,10 +173,15 @@ button:disabled {
   opacity: 0.4;
   cursor: default;
 }
-@media (max-width: 760px) {
+@media (max-width: 900px) {
   .connection-qr {
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: 20px;
+    justify-items: center;
+    text-align: center;
+  }
+  .qr-actions {
+    justify-content: center;
   }
 }
 </style>

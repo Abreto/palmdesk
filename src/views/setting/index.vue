@@ -1,23 +1,32 @@
 <template>
-  <main class="settings-page">
-    <h1>高级设置</h1>
-    <section>
-      <header>
-        <h2>连接服务</h2>
+  <main class="settings-page pd-page">
+    <header class="pd-page-heading">
+      <span class="pd-eyebrow">设置</span>
+      <h1>按你的习惯设置。</h1>
+      <p>连接服务与使用偏好。</p>
+    </header>
+    <section class="pd-card">
+      <header class="section-heading">
+        <span class="section-icon"><ServerOutline aria-hidden="true" /></span>
+        <div>
+          <h2>连接服务</h2>
+          <p>连接与通信</p>
+        </div>
         <button
           type="button"
+          class="pd-icon-button"
           title="修改连接服务"
           aria-label="修改连接服务"
           @click="showUrlModal = true"
         >
-          <SettingsOutline />
+          <CreateOutline />
         </button>
       </header>
       <dl>
-        <template v-if="ipcRenderer">
-          <dt>手机网页地址</dt>
-          <dd>{{ getClientUrl() || '未配置' }}</dd>
-        </template>
+        <template v-if="ipcRenderer"
+          ><dt>手机网页地址</dt>
+          <dd>{{ getClientUrl() || '未配置' }}</dd></template
+        >
         <dt>服务地址</dt>
         <dd>{{ getAxiosBaseUrl() || AXIOS_BASEURL }}</dd>
         <dt>信令地址</dt>
@@ -26,34 +35,54 @@
         <dd>{{ getCoturnUrl() || COTURN_URL || '自动' }}</dd>
       </dl>
     </section>
-    <section v-if="ipcRenderer">
-      <h2>电脑客户端</h2>
+    <section
+      v-if="ipcRenderer"
+      class="pd-card"
+    >
+      <header class="section-heading">
+        <span class="section-icon"><LaptopOutline aria-hidden="true" /></span>
+        <div>
+          <h2>桌面端</h2>
+          <p>保持窗口专注</p>
+        </div>
+      </header>
       <label class="toggle"
+        ><span><strong>窗口置顶</strong><small>保持 PalmDesk 置顶</small></span
         ><input
           v-model="cacheStore.isAlwaysOnTop"
           type="checkbox"
-        />窗口置顶</label
-      >
+          class="pd-switch"
+          role="switch"
+          aria-label="窗口置顶"
+      /></label>
     </section>
-    <section>
-      <h2>{{ PRODUCT_NAME }}</h2>
-      <p>v{{ appStore.version }}</p>
-      <a
-        :href="PROJECT_GITHUB"
-        target="_blank"
-        rel="noopener"
-        @click.prevent="openProject(PROJECT_GITHUB)"
-        >PalmDesk <OpenOutline
-      /></a>
-      <p>
+    <section class="pd-card about-card">
+      <div class="about-brand">
+        <span class="about-mark"
+          ><PhonePortraitOutline aria-hidden="true"
+        /></span>
+        <div>
+          <h2>{{ PRODUCT_NAME }}</h2>
+          <p>AI-native remote control</p>
+        </div>
+        <span class="version">v{{ appStore.version }}</span>
+      </div>
+      <p class="about-description">为 Agent 工作流连接桌面与掌心。</p>
+      <div class="project-links">
         <a
+          :href="PROJECT_GITHUB"
+          target="_blank"
+          rel="noopener"
+          @click.prevent="openProject(PROJECT_GITHUB)"
+          >项目主页<OpenOutline /></a
+        ><a
           :href="UPSTREAM_GITHUB"
           target="_blank"
           rel="noopener"
           @click.prevent="openProject(UPSTREAM_GITHUB)"
-          >BilldDesk (MIT) <OpenOutline
+          >BilldDesk · MIT<OpenOutline
         /></a>
-      </p>
+      </div>
     </section>
     <UrlModal
       v-if="showUrlModal"
@@ -63,7 +92,13 @@
 </template>
 
 <script setup lang="ts">
-import { OpenOutline, SettingsOutline } from '@vicons/ionicons5';
+import {
+  CreateOutline,
+  LaptopOutline,
+  OpenOutline,
+  PhonePortraitOutline,
+  ServerOutline,
+} from '@vicons/ionicons5';
 import { ref, watch } from 'vue';
 
 import {
@@ -108,81 +143,151 @@ watch(
 </script>
 
 <style scoped lang="scss">
-.settings-page {
-  box-sizing: border-box;
-  padding: 64px 40px 32px;
-  color: #263b32;
-}
-h1 {
-  margin: 0 0 24px;
-  font-size: 24px;
-}
 section {
-  padding: 20px 0;
-  border-top: 1px solid #d7ddda;
+  margin-bottom: 18px;
 }
-header {
+.section-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 24px;
+  > button {
+    margin-left: auto;
+  }
+  p {
+    margin: 4px 0 0;
+    color: var(--pd-muted);
+    font-size: 12px;
+  }
 }
 h2 {
-  margin: 0 0 16px;
-  font-size: 16px;
-}
-header h2 {
   margin: 0;
+  font-size: 16px;
+  font-weight: 600;
 }
-button {
+.section-icon {
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
-  color: #167c65;
-  cursor: pointer;
-}
-svg {
-  width: 20px;
-  height: 20px;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: var(--pd-surface-soft);
+  color: var(--pd-accent);
+  svg {
+    width: 21px;
+    height: 21px;
+  }
 }
 dl {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr);
-  gap: 16px;
-  font-size: 14px;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px 20px;
+  margin: 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--pd-border);
+  font-size: 13px;
 }
 dt {
-  color: #60726a;
+  color: var(--pd-muted);
 }
 dd {
   margin: 0;
   overflow-wrap: anywhere;
+  font-family: var(--pd-mono);
+  font-size: 12px;
   user-select: text;
 }
 .toggle {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--pd-border);
+  cursor: pointer;
+  strong {
+    font-size: 13px;
+    font-weight: 550;
+  }
+  small {
+    display: block;
+    margin-top: 4px;
+    color: var(--pd-muted);
+    font-size: 12px;
+  }
+}
+.about-card {
+  background: var(--pd-surface-soft);
+  box-shadow: none;
+}
+.about-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  p {
+    margin: 3px 0 0;
+    color: var(--pd-muted);
+    font-size: 11px;
+  }
+}
+.about-mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--pd-accent);
+  color: white;
+  svg {
+    width: 26px;
+    height: 26px;
+  }
+}
+.version {
+  margin-left: auto;
+  padding: 3px 9px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: 20px;
+  color: var(--pd-muted);
+  font: 11px/1.6 var(--pd-mono);
+}
+.about-description {
+  margin: 20px 0;
+  color: var(--pd-muted);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.project-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--pd-border);
 }
 a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #167c65;
-}
-p {
-  font-size: 14px;
-}
-@media (max-width: 640px) {
-  .settings-page {
-    padding: 30px 18px;
+  color: var(--pd-accent);
+  font-size: 12px;
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
   }
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+@media (max-width: 700px) {
   dl {
-    grid-template-columns: 78px minmax(0, 1fr);
-    gap: 14px;
+    grid-template-columns: 86px minmax(0, 1fr);
+    gap: 16px 12px;
+    font-size: 12px;
+  }
+  .section-heading {
+    gap: 10px;
   }
 }
 </style>
