@@ -332,7 +332,7 @@ defineExpose({ paste });
 
 <style scoped lang="scss">
 .image-attachment {
-  padding: 0 8px 8px;
+  padding: 8px;
   font-size: 12px;
 }
 .image-tools,
