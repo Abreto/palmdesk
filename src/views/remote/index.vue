@@ -281,28 +281,26 @@
         class="workflow-guide"
         aria-label="连接后的工作方式"
       >
-        <div class="guide-heading">
-          <span class="pd-eyebrow">桌面 → 掌心</span><span>随时继续工作</span>
-        </div>
+        <h2 class="guide-heading pd-eyebrow">桌面 → 掌心</h2>
         <div class="guide-items">
           <div>
             <span class="guide-icon"
               ><HardwareChipOutline aria-hidden="true"
             /></span>
             <h3>发现 Agent</h3>
-            <p>找到已打开的 Agent。</p>
+            <p>找到已打开的应用</p>
           </div>
           <div>
             <span class="guide-icon"><ReaderOutline aria-hidden="true" /></span>
-            <h3>从容阅读</h3>
-            <p>查看回复与执行记录。</p>
+            <h3>阅读会话</h3>
+            <p>查看回复与执行记录</p>
           </div>
           <div>
             <span class="guide-icon"
               ><BrowsersOutline aria-hidden="true"
             /></span>
-            <h3>继续交互</h3>
-            <p>回到窗口，继续交互。</p>
+            <h3>操作窗口</h3>
+            <p>输入、点击与滚动</p>
           </div>
         </div>
       </section>
@@ -2382,52 +2380,46 @@ function handleDel(sender) {
   color: var(--pd-danger);
 }
 .workflow-guide {
-  margin: 52px 0 28px;
-  padding-top: 24px;
-  border-top: 1px solid var(--pd-border);
+  margin: 32px 0 24px;
 }
 .guide-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 22px;
-  > span:last-child {
-    color: var(--pd-muted);
-    font-size: 11px;
-  }
+  margin: 0 0 12px;
 }
 .guide-items {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   > div {
-    padding: 20px;
+    display: grid;
+    grid-template-columns: 20px minmax(0, 1fr);
+    align-content: start;
+    align-items: center;
+    gap: 8px;
+    box-sizing: border-box;
+    padding: 16px;
     border: 1px solid var(--pd-border);
     border-radius: var(--pd-radius);
     background: var(--pd-surface);
   }
-  > div + div {
-    padding-left: 20px;
-  }
   h3 {
-    margin: 18px 0 6px;
+    margin: 0;
     font-size: 13px;
     font-weight: 600;
   }
   p {
+    grid-column: 1 / -1;
     margin: 0;
     color: var(--pd-muted);
     font-size: 12px;
-    line-height: 1.9;
+    line-height: 1.6;
   }
 }
 .guide-icon {
   display: inline-flex;
   color: var(--pd-accent);
   svg {
-    width: 23px;
-    height: 23px;
+    width: 20px;
+    height: 20px;
   }
 }
 .ai-target {
@@ -2744,61 +2736,19 @@ function handleDel(sender) {
     }
   }
   .workflow-guide {
-    margin: 34px 0 24px;
-    padding-top: 0;
-    border-top: 0;
-  }
-  .guide-heading {
-    margin-bottom: 12px;
-    > span:last-child {
-      display: block;
-      color: var(--pd-muted);
-      font-family: var(--pd-mono);
-      font-size: 10px;
-    }
+    margin-top: 24px;
   }
   .guide-items {
-    position: relative;
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding: 32px 12px 12px;
-    border: 1px solid var(--pd-border);
-    border-radius: var(--pd-radius-lg);
-    background: var(--pd-surface);
-    &::before,
-    &::after {
-      position: absolute;
-      top: 16px;
-      left: 18px;
-      height: 4px;
-      border-radius: 99px;
-      content: '';
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
     }
-    &::before {
-      right: 18px;
-      background: var(--pd-border);
-    }
-    &::after {
-      width: 40%;
-      background: var(--pd-accent);
-      box-shadow: 0 0 16px rgb(22 138 58 / 20%);
-    }
-    > div,
-    > div + div {
-      flex: 0 0 124px;
-      min-height: 112px;
-      padding: 16px;
-      border: 1px solid var(--pd-border);
-      border-radius: var(--pd-radius);
-      background: var(--pd-surface-soft);
-    }
-    h3 {
-      margin: 14px 0 6px;
-      font-size: 12px;
-    }
-    p {
-      font-size: 11px;
+    > div {
+      flex: 0 0 160px;
+      padding: 14px;
     }
   }
   .target-heading {
@@ -2820,26 +2770,6 @@ function handleDel(sender) {
     border-left: 0;
     border-top: 1px solid var(--pd-border);
     padding: 18px 0 0;
-  }
-  .guide-items {
-    gap: 8px;
-    > div,
-    > div + div {
-      display: block;
-      flex: 0 0 124px;
-      padding: 16px;
-      border: 1px solid var(--pd-border);
-    }
-    .guide-icon {
-      padding-top: 0;
-    }
-    h3 {
-      margin: 14px 0 6px;
-      font-size: 13px;
-    }
-    p {
-      font-size: 12px;
-    }
   }
 }
 @media (max-width: 380px) {
