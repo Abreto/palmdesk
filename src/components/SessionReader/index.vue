@@ -4,7 +4,7 @@
     aria-label="会话阅读"
   >
     <div
-      v-if="!client"
+      v-if="!client && !selected"
       class="empty-reader"
       role="status"
     >
@@ -28,7 +28,7 @@
       <button
         type="button"
         :disabled="busy"
-        @click="initialize"
+        @click="initialize()"
       >
         重新检查
       </button>
@@ -258,7 +258,7 @@
         v-if="!settings"
         type="button"
         :disabled="busy"
-        @click="initialize"
+        @click="initialize()"
       >
         重试
       </button>
@@ -386,22 +386,31 @@ async function run<T>(
   }
 }
 
-async function initialize() {
-  generation += 1;
-  busy.value = false;
+function clearReading() {
   settings.value = undefined;
   sessions.value = [];
   selected.value = undefined;
   items.value = [];
   hasUpdate.value = false;
+  emit('select', undefined);
+}
+
+async function initialize(reset = true) {
+  generation += 1;
+  busy.value = false;
+  polling.value = false;
+  if (reset) clearReading();
   error.value = '';
   copyError.value = '';
-  emit('select', undefined);
   const state = await run<ReaderSettings>({ method: 'status' }, (value) => {
+    if (!value.enabled) clearReading();
     settings.value = value;
     emit('available', value.enabled);
   });
-  if (state?.enabled) await loadList();
+  if (state?.enabled) {
+    if (selected.value) await poll();
+    else await loadList();
+  }
 }
 
 async function loadList() {
@@ -490,6 +499,7 @@ async function copy(item: ReaderItem) {
 async function poll() {
   if (
     !props.active ||
+    !props.client ||
     document.hidden ||
     !selected.value ||
     busy.value ||
@@ -505,11 +515,18 @@ async function poll() {
 }
 
 watch(
-  () => [props.client, props.revision],
+  () => props.client,
   () => {
-    void initialize();
+    void initialize(false);
   },
   { immediate: true }
+);
+// A host reset revokes cached content even when the transport stays open.
+watch(
+  () => props.revision,
+  () => {
+    void initialize();
+  }
 );
 const pollTimer = setInterval(() => {
   void poll();

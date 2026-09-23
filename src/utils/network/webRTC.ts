@@ -48,6 +48,7 @@ export class WebRTCClass {
 
   loopGetStatsTimer: any = null;
   videoParametersQueue = Promise.resolve(1);
+  videoActive = true;
 
   constructor(data: {
     roomId: string;
@@ -176,16 +177,16 @@ export class WebRTCClass {
     return this.updateVideoSenderParameters();
   };
 
+  setVideoActive = (active: boolean) => {
+    this.videoActive = active;
+    return this.updateVideoSenderParameters();
+  };
+
   updateVideoSenderParameters = () => {
     // getParameters/setParameters transactions must not overlap during rapid
     // quality changes, renegotiation or ICE reconnection.
     this.videoParametersQueue = this.videoParametersQueue.then(async () => {
-      if (
-        this.closed ||
-        !this.peerConnection ||
-        (this.maxBitrate <= 0 && this.maxFramerate <= 0)
-      )
-        return 1;
+      if (this.closed || !this.peerConnection) return 1;
       const results = await Promise.all(
         this.peerConnection.getSenders().map(async (sender) => {
           if (sender.track?.kind !== 'video') return 1;
@@ -196,6 +197,10 @@ export class WebRTCClass {
             if (!parameters.encodings?.length) return 1;
             let changed = false;
             parameters.encodings.forEach((encoding) => {
+              if ((encoding.active !== false) !== this.videoActive) {
+                encoding.active = this.videoActive;
+                changed = true;
+              }
               if (
                 this.maxBitrate > 0 &&
                 encoding.maxBitrate !== this.maxBitrate * 1000
@@ -770,6 +775,9 @@ export class WebRTCClass {
 
   /** 更新store */
   update = () => {
+    // Channel close/open callbacks can arrive after transport teardown. Never
+    // resurrect this peer or overwrite a replacement using the same receiver.
+    if (this.closed) return;
     const networkStore = useNetworkStore();
     console.log('更新store', this.receiver);
     networkStore.rtcMap.set(this.receiver, { ...this });

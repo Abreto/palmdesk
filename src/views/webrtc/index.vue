@@ -39,7 +39,7 @@
         type="button"
         title="返回 Agent 入口"
         aria-label="返回 Agent 入口"
-        @click="connect"
+        @click="connect()"
       >
         <BrowsersOutline />
       </button>
@@ -100,11 +100,12 @@
       <span>{{ view === 'read' ? '回复与执行记录' : '监看与输入' }}</span>
     </nav>
     <SessionReader
-      v-if="connected"
+      v-if="hasCredentials"
       v-show="view === 'read'"
+      :key="readerEpoch"
       :client="readerClient"
       :revision="readerRevision"
-      :active="view === 'read'"
+      :active="visible && connected && view === 'read'"
       :window-name="
         readingSession &&
         sessionWindows[readingSession.id] === selectedWindow?.id
@@ -165,9 +166,16 @@
     <RemoteViewport
       v-if="selectedWindow"
       v-show="view === 'window'"
+      v-model:draft="draft"
       :video="peer?.videoEl"
       :connected="controlling"
-      :input-blocked="view !== 'window' || !!inputError || retryingInput"
+      :input-blocked="
+        !visible ||
+        needsWindowResume ||
+        view !== 'window' ||
+        !!inputError ||
+        retryingInput
+      "
       :image-channel="peer?.imageChannel || undefined"
       :image-paste-session="selectedWindow.imagePasteSession"
       :commit-image-paste="commitImagePaste"
@@ -183,7 +191,7 @@
       <button
         v-if="error && hasCredentials"
         type="button"
-        @click="connect"
+        @click="retryConnection"
       >
         重新连接
       </button>
@@ -231,6 +239,7 @@ import {
 import { ipcRenderer, ipcRendererSend } from '@/utils';
 import { windowContext, type AgentBindings } from '@/utils/agent-directory';
 import { getAgent, type AgentId } from '@/utils/agent-registry';
+import { ControllerRecovery } from '@/utils/remote-presence';
 import { REMOTE_VIDEO_DEFAULTS } from '@/utils/remote-video';
 import { ReaderClient } from '@/utils/session-reader-channel';
 
@@ -257,6 +266,12 @@ const retryingInput = ref(false);
 let resumeRequest = '';
 let inputTimeout: ReturnType<typeof setTimeout>;
 const hasCredentials = ref(false);
+const visible = ref(!document.hidden);
+const recovery = new ControllerRecovery();
+const needsWindowResume = ref(false);
+const draft = ref('');
+const readerEpoch = ref(0);
+const presenceRequests = new Set<string>();
 const windows = ref<IRemoteWindow[]>([]);
 const agents = ref<IRemoteAgent[]>([]);
 const agentBindings = ref<AgentBindings>({});
@@ -268,6 +283,7 @@ const selectedWindow = ref<{
   id: string;
   name: string;
   imagePasteSession?: string;
+  resumeToken?: string;
 }>();
 const view = ref<'read' | 'window'>('read');
 const readerClient = shallowRef<ReaderClient>();
@@ -294,7 +310,11 @@ const connected = computed(
     peer.value?.dataChannel?.readyState === 'open'
 );
 const controlling = computed(
-  () => connected.value && !!selectedWindow.value && videoReady.value
+  () =>
+    connected.value &&
+    !needsWindowResume.value &&
+    !!selectedWindow.value &&
+    videoReady.value
 );
 
 function setView(value: 'read' | 'window') {
@@ -337,7 +357,7 @@ watch(
 );
 
 function requestWindows() {
-  if (!connected.value || windowStarting.value) return;
+  if (!visible.value || !connected.value || windowStarting.value) return;
   clearTimeout(requestTimer);
   listRequest = getRandomString(16);
   windows.value = [];
@@ -362,7 +382,13 @@ function bindAgentWindow(source: IRemoteWindow, agentId: AgentId | undefined) {
   else delete agentBindings.value[context];
 }
 function selectWindow(source: IRemoteWindow) {
-  if (!connected.value || windowsLoading.value || windowStarting.value) return;
+  if (
+    !visible.value ||
+    !connected.value ||
+    windowsLoading.value ||
+    windowStarting.value
+  )
+    return;
   setView('window');
   associationRequest = readingSession.value?.id || '';
   clearTimeout(requestTimer);
@@ -374,9 +400,43 @@ function selectWindow(source: IRemoteWindow) {
     requestId: selectRequest,
     data: { id: source.id },
   });
+  armWindowTimeout();
+}
+
+function armWindowTimeout() {
+  clearTimeout(requestTimer);
+  if (!visible.value) return;
   requestTimer = setTimeout(() => {
-    endConnection('打开窗口超时，请重新连接');
+    if (!controlling.value) endConnection('打开窗口超时，请重新连接');
   }, 20000);
+}
+
+function resumeWindow() {
+  if (
+    !needsWindowResume.value ||
+    !selectedWindow.value ||
+    windowStarting.value ||
+    !visible.value ||
+    view.value !== 'window' ||
+    !connected.value ||
+    peer.value?.cbDataChannel?.readyState !== 'open'
+  )
+    return;
+  const token = selectedWindow.value.resumeToken;
+  if (!token) {
+    selectedWindow.value = undefined;
+    needsWindowResume.value = false;
+    requestWindows();
+    return;
+  }
+  selectRequest = getRandomString(16);
+  windowStarting.value = true;
+  peer.value!.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteWindowSelect,
+    requestId: selectRequest,
+    data: { resumeToken: token },
+  });
+  armWindowTimeout();
 }
 function receiveWindowMessage(event: MessageEvent) {
   if (typeof event.data !== 'string' || event.data.length > 65536) return;
@@ -388,6 +448,18 @@ function receiveWindowMessage(event: MessageEvent) {
   }
   if (!message?.data || typeof message.data !== 'object') return;
   const { data } = message;
+  if (message.msgType === WsMsgTypeEnum.remoteSessionStopped) {
+    endConnection('电脑已结束本次连接，请手动重新连接');
+    return;
+  }
+  if (
+    message.msgType === WsMsgTypeEnum.remoteControllerStateResult &&
+    data.supported === true &&
+    presenceRequests.delete(message.requestId)
+  ) {
+    recovery.acknowledge(Date.now());
+    return;
+  }
   if (
     message.msgType === WsMsgTypeEnum.remoteInputResult &&
     selectedWindow.value
@@ -431,7 +503,7 @@ function receiveWindowMessage(event: MessageEvent) {
       clearTimeout(requestTimer);
       listRequest = '';
       windowsLoading.value = false;
-      windowError.value = typeof data.error === 'string' ? data.error : '';
+      if (typeof data.error === 'string') windowError.value = data.error;
       const contexts = new Set(windows.value.map(windowContext));
       agentBindings.value = Object.fromEntries(
         Object.entries(agentBindings.value).filter(([context]) =>
@@ -447,8 +519,15 @@ function receiveWindowMessage(event: MessageEvent) {
     clearTimeout(requestTimer);
     selectRequest = '';
     windowStarting.value = false;
-    if (typeof data.error === 'string') windowError.value = data.error;
-    else if (typeof data.id === 'string' && typeof data.name === 'string') {
+    if (typeof data.error === 'string') {
+      if (needsWindowResume.value) {
+        selectedWindow.value = undefined;
+        needsWindowResume.value = false;
+        sessionWindows.value = {};
+        requestWindows();
+      }
+      windowError.value = data.error;
+    } else if (typeof data.id === 'string' && typeof data.name === 'string') {
       const imagePasteSession =
         typeof data.imagePasteSession === 'string' &&
         data.imagePasteSession.length <= 80
@@ -458,14 +537,17 @@ function receiveWindowMessage(event: MessageEvent) {
         id: data.id,
         name: data.name,
         imagePasteSession,
+        resumeToken:
+          typeof data.resumeToken === 'string' && data.resumeToken.length <= 80
+            ? data.resumeToken
+            : undefined,
       };
+      needsWindowResume.value = false;
       if (imagePasteSession) peer.value?.openImageChannel();
       if (associationRequest)
         sessionWindows.value[associationRequest] = data.id;
       associationRequest = '';
-      requestTimer = setTimeout(() => {
-        if (!controlling.value) endConnection('窗口视频加载超时，请重新连接');
-      }, 20000);
+      armWindowTimeout();
     }
   }
 }
@@ -483,6 +565,18 @@ watch(
     previous?.removeEventListener('loadeddata', markVideoReady);
     videoReady.value = !!video && video.readyState >= 2;
     video?.addEventListener('loadeddata', markVideoReady);
+  }
+);
+watch(
+  () => peer.value?.peerConnection,
+  (current, previous) => {
+    if (previous && current !== previous && selectedWindow.value) {
+      needsWindowResume.value = true;
+      selectedWindow.value.imagePasteSession = undefined;
+      windowStarting.value = false;
+      selectRequest = '';
+      sessionWindows.value = {};
+    }
   }
 );
 function markVideoReady() {
@@ -508,6 +602,7 @@ watch(
 );
 
 function endConnection(message: string) {
+  recovery.stop();
   clearTimeout(timeout);
   clearTimeout(requestTimer);
   clearTimeout(inputTimeout);
@@ -516,6 +611,9 @@ function endConnection(message: string) {
   networkStore.removeAllWsAndRtc();
   appStore.remoteDesk.clear();
   selectedWindow.value = undefined;
+  needsWindowResume.value = false;
+  readingSession.value = undefined;
+  readerEpoch.value += 1;
   error.value = message;
 }
 
@@ -537,8 +635,7 @@ function connectionData() {
 }
 function onConnectionResult(result: WsBilldDeskStartRemoteResult['data']) {
   if (result.code !== 0) {
-    error.value = result.msg || '连接被拒绝';
-    clearTimeout(timeout);
+    endConnection(result.msg || '连接被拒绝');
     return;
   }
   if (!result.data) return;
@@ -565,8 +662,11 @@ function requestConnection() {
     data: connectionData(),
   });
 }
-function connect() {
+function connect(preserve = false) {
   if (!hasCredentials.value) return;
+  if (!preserve) recovery.reset(Date.now());
+  recovery.started(Date.now());
+  presenceRequests.clear();
   clearTimeout(timeout);
   clearTimeout(requestTimer);
   clearTimeout(inputTimeout);
@@ -579,9 +679,14 @@ function connect() {
   hadPeer = false;
   error.value = '';
   receiverId.value = '';
-  selectedWindow.value = undefined;
+  needsWindowResume.value = preserve && !!selectedWindow.value;
+  if (selectedWindow.value) selectedWindow.value.imagePasteSession = undefined;
   sessionWindows.value = {};
-  readingSession.value = undefined;
+  if (!preserve) {
+    selectedWindow.value = undefined;
+    readingSession.value = undefined;
+    readerEpoch.value += 1;
+  }
   associationRequest = '';
   windows.value = [];
   windowsLoading.value = false;
@@ -600,6 +705,7 @@ function sendBehavior(
   data: Partial<WsBilldDeskBehaviorType['data']>,
   requestId = getRandomString(8)
 ) {
+  if (!visible.value && data.type !== Behavior.releaseAll) return;
   if (view.value !== 'window' && data.type !== Behavior.releaseAll) return;
   if (!controlling.value && data.type !== Behavior.releaseAll) return;
   if (
@@ -673,6 +779,7 @@ function updateQuality() {
 }
 function disconnect() {
   leaving = true;
+  recovery.stop();
   clearTimeout(requestTimer);
   clearTimeout(inputTimeout);
   releaseInput();
@@ -688,6 +795,71 @@ function disconnect() {
     });
   else void router.replace({ name: routerName.remote });
 }
+
+function retryConnection() {
+  recovery.reset(Date.now());
+  connect(true);
+}
+
+function sendPresence() {
+  if (leaving || peer.value?.dataChannel?.readyState !== 'open') return;
+  const requestId = getRandomString(16);
+  presenceRequests.add(requestId);
+  if (presenceRequests.size > 8)
+    presenceRequests.delete(presenceRequests.values().next().value!);
+  peer.value.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteControllerState,
+    requestId,
+    data: { visible: visible.value, video: view.value === 'window' },
+  });
+}
+
+function checkRecovery() {
+  if (leaving || !hasCredentials.value) return;
+  if (recovery.retry(Date.now(), visible.value, connected.value)) connect(true);
+  if (visible.value) sendPresence();
+}
+
+function visibilityChanged() {
+  const returning = !visible.value && !document.hidden;
+  visible.value = !document.hidden;
+  if (!visible.value) {
+    releaseInput();
+    clearTimeout(requestTimer);
+    sendPresence();
+    return;
+  }
+  if (returning) recovery.foreground(Date.now());
+  checkRecovery();
+  if (listRequest && connected.value) requestWindows();
+  resumeWindow();
+  if (
+    selectRequest ||
+    (selectedWindow.value && !needsWindowResume.value && !videoReady.value)
+  )
+    armWindowTimeout();
+  void peer.value?.videoEl.play().catch(() => {});
+}
+
+function pageHidden() {
+  visible.value = false;
+  releaseInput();
+  clearTimeout(requestTimer);
+  sendPresence();
+}
+
+watch(
+  [
+    connected,
+    view,
+    () => peer.value?.cbDataChannel?.readyState,
+    needsWindowResume,
+  ],
+  () => {
+    sendPresence();
+    resumeWindow();
+  }
+);
 watch(connectStatus, (status) => {
   if (status === WsConnectStatusEnum.connect && !leaving) requestConnection();
 });
@@ -706,6 +878,10 @@ watch(
   }
 );
 onMounted(() => {
+  document.addEventListener('visibilitychange', visibilityChanged);
+  window.addEventListener('pagehide', pageHidden);
+  window.addEventListener('pageshow', visibilityChanged);
+  window.addEventListener('online', visibilityChanged);
   let saved: Record<string, any> = {};
   try {
     saved = JSON.parse(sessionStorage.getItem('codex-remote-session') || '{}');
@@ -741,6 +917,8 @@ onMounted(() => {
     void router.replace({ name: routerName.webrtc });
   connect();
   heartbeat = setInterval(() => {
+    checkRecovery();
+    if (!visible.value) return;
     networkStore.wsMap.get(roomId.value)?.send({
       requestId: getRandomString(8),
       msgType: WsMsgTypeEnum.billdDeskUpdateUser,
@@ -749,6 +927,10 @@ onMounted(() => {
   }, 2000);
 });
 onUnmounted(() => {
+  document.removeEventListener('visibilitychange', visibilityChanged);
+  window.removeEventListener('pagehide', pageHidden);
+  window.removeEventListener('pageshow', visibilityChanged);
+  window.removeEventListener('online', visibilityChanged);
   readerClient.value?.dispose();
   leaving = true;
   clearTimeout(timeout);
