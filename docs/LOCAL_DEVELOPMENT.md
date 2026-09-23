@@ -39,6 +39,19 @@ macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`�
 
 ## Windows 桌面
 
+会话阅读与窗口捕获独立，macOS 和 Windows 均默认关闭；在电脑首页显式开启后持久化，关闭会撤销进行中和后续的读取并清空已连接阅读页。
+
+| 本地来源 | macOS 主机 | Windows 主机 |
+| --- | --- | --- |
+| Codex | 支持 | 支持原生 Windows 日志 |
+| Claude Code | 支持 | 支持原生 Windows 日志 |
+| Claude Desktop · Code | 支持 | 支持原生本地 Code 日志 |
+| Desktop Chat/Cowork、云端/SSH/WSL 抓取 | 不支持 | 不支持 |
+
+Windows 默认读取 `%USERPROFILE%\.codex`、`%USERPROFILE%\.claude`；`CODEX_HOME`、`CLAUDE_CONFIG_DIR` 可覆盖。Desktop 检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下的 `Roaming\Claude`、`Local\Claude-3p`、`Roaming\Claude-3p`。macOS 默认读取 `~/.codex`、`~/.claude`、`~/Library/Application Support/Claude` 与 `Claude-3p`。`CLAUDE_USER_DATA_DIR` 仅使用指定的 Desktop 目录。自定义变量需在启动 PalmDesk 前设置，支持空格和非 ASCII 路径。
+
+Linux 主机不启用阅读。WSL 主目录不自动发现，Desktop 的 SSH/WSL 索引也不读取；本功能不会启动 Agent、抓取云端日志或自动选择 GUI 任务。日志布局不是稳定 API，Windows 格式核对、已运行检查及真实手机验收缺口见 [Windows 会话阅读验证记录](smoke-artifacts/windows-session-reading-2026-09-24.md)。
+
 在 Windows 10 1903（build 18362）及以上或 Windows 11 x64 的 PowerShell 中运行：
 
 ```powershell
@@ -251,4 +264,4 @@ tccutil reset Accessibility 'io.github.abreto.palmdesk.local.<id>'
 
 代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。
 
-macOS 上开启「会话阅读」后，应用会读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话（含 `Claude-3p` 配置）；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。
+macOS 和 Windows 上开启「会话阅读」后，应用会读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话（含 `Claude-3p` 配置）；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。

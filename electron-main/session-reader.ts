@@ -20,12 +20,16 @@ export class DesktopSessionReader {
     this.ready = this.load();
   }
 
+  private get supported() {
+    return this.platform === 'darwin' || this.platform === 'win32';
+  }
+
   private async load() {
     try {
       const value = JSON.parse(
         await readFile(path.join(this.directory, 'session-reader.json'), 'utf8')
       );
-      this.enabled = value.enabled === true && this.platform === 'darwin';
+      this.enabled = value.enabled === true && this.supported;
     } catch {
       this.enabled = false;
     }
@@ -33,13 +37,13 @@ export class DesktopSessionReader {
 
   async settings() {
     await this.ready;
-    return { enabled: this.enabled, supported: this.platform === 'darwin' };
+    return { enabled: this.enabled, supported: this.supported };
   }
 
   async configure(enabled: unknown) {
     await this.ready;
     if (typeof enabled !== 'boolean') throw new Error('无效的读取设置');
-    if (this.platform !== 'darwin') throw new Error('会话阅读首版支持 macOS');
+    if (!this.supported) throw new Error('会话阅读支持 macOS 和 Windows');
     if (this.saving) throw new Error('正在保存，请稍后重试');
     this.saving = true;
     this.generation += 1;

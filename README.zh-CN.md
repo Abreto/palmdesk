@@ -10,9 +10,18 @@ PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](htt
 
 ## 会话阅读（预览）
 
-PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。支持 **macOS 上当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话**，按更新时间混合展示并标明来源；Windows 和其他应用继续使用窗口视图。
+PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。支持 **macOS 和 Windows 上当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话**，按更新时间混合展示并标明来源。
 
-Codex 读取 `CODEX_HOME` 或 `~/.codex`。Claude Code 读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`，支持会话重命名、文字回复和工具结果。Claude Desktop 通过 `~/Library/Application Support/Claude` 和 `Claude-3p` 的索引发现本地 **Code** 会话；设置 `CLAUDE_USER_DATA_DIR` 时使用指定目录。兼容全局及会话专属日志，使用 Desktop 标题，并对共享日志去重。自定义目录需设置在启动 PalmDesk 的环境中。不支持 Desktop Chat/Cowork、抓取云端或 SSH 会话，以及嵌套子 Agent 日志；本地日志仍需存在。
+| 本地来源 | macOS 主机 | Windows 主机 |
+| --- | --- | --- |
+| Codex | 支持 | 支持原生 Windows 日志 |
+| Claude Code | 支持 | 支持原生 Windows 日志 |
+| Claude Desktop · Code | 支持 | 支持原生本地 Code 日志 |
+| Desktop Chat/Cowork、云端/SSH/WSL 抓取 | 不支持 | 不支持 |
+
+Codex 读取 `CODEX_HOME` 或 `~/.codex`。Claude Code 读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`，支持会话重命名、文字回复和工具结果。Windows 上的 `~` 是当前用户的主目录（通常为 `%USERPROFILE%`）。Claude Desktop 在 macOS 上读取 `~/Library/Application Support/Claude` 和 `Claude-3p`；在 Windows 上检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下对应的应用包目录。`CLAUDE_USER_DATA_DIR` 可指定唯一的自定义 Desktop 目录。兼容全局及会话专属日志，保留 Desktop 标题，并对共享日志去重。
+
+自定义目录需设置在启动 PalmDesk 的环境中，支持空格和非 ASCII 路径。读取仅限本地且只读，不自动搜索 WSL 主目录，跳过 Desktop SSH/WSL 索引和嵌套子 Agent 日志，不抓取云端记录；本地日志仍需存在且可读。Linux 主机不支持会话阅读。Windows 存储核对和自动化检查见 [验证记录](docs/smoke-artifacts/windows-session-reading-2026-09-24.md)；三种来源的真实 Windows 主机 + 手机完整流程仍未验收。
 
 1. 在电脑 PalmDesk 首页开启「会话阅读」，允许已连接设备读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 回复及工具输出。设置默认关闭，保存在当前安装的应用数据目录。
 2. 用手机扫码或设备代码连接，默认进入「阅读」页，按项目、标题或最近消息搜索并打开会话。单独阅读不要求启动窗口捕获，也不需要屏幕录制和辅助功能权限。
