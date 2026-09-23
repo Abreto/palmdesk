@@ -18,6 +18,27 @@ export function resolveClaudeDesktopDataDirs(
   platform = process.platform
 ) {
   if (env.CLAUDE_USER_DATA_DIR) return [env.CLAUDE_USER_DATA_DIR];
+  if (platform === 'win32') {
+    const roaming =
+      env.APPDATA || path.win32.join(os.homedir(), 'AppData', 'Roaming');
+    const local =
+      env.LOCALAPPDATA || path.win32.join(os.homedir(), 'AppData', 'Local');
+    // MSIX virtualizes Claude's app data; PalmDesk runs outside that package.
+    const cache = path.win32.join(
+      local,
+      'Packages',
+      'Claude_pzs8sxrjxfjjc',
+      'LocalCache'
+    );
+    return [
+      path.win32.join(roaming, 'Claude'),
+      path.win32.join(local, 'Claude-3p'),
+      path.win32.join(roaming, 'Claude-3p'), // Legacy third-party profile.
+      path.win32.join(cache, 'Roaming', 'Claude'),
+      path.win32.join(cache, 'Local', 'Claude-3p'),
+      path.win32.join(cache, 'Roaming', 'Claude-3p'),
+    ];
+  }
   return platform === 'darwin'
     ? ['Claude', 'Claude-3p'].map((name) =>
         path.join(os.homedir(), 'Library', 'Application Support', name)
