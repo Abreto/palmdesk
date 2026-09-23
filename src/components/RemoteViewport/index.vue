@@ -234,7 +234,8 @@ const gestures = createViewportGestures({
   panBy: (left, top) => stage.value?.scrollBy({ left, top }),
 });
 function pointerDown(event: PointerEvent) {
-  if (!hasFrame.value || !props.connected || props.inputBlocked) return;
+  // Keep local zooming and panning available during host input errors.
+  if (!hasFrame.value || !props.connected) return;
   const local = gestures.down(event);
   const remote = !local && pointer.down(event);
   if (local || remote || event.pointerType === 'touch') {

@@ -170,6 +170,64 @@ try {
   await noRemoteInput();
   console.log('PASS watch-only pinch and one-finger pan in both local modes');
 
+  // Simulate a host input error/retry while video remains visible. The fixture's
+  // view toggle sets inputBlocked without hiding RemoteViewport.
+  await page.getByRole('button', { name: '切到阅读', exact: true }).click();
+  assert.equal(
+    await page.getByLabel('发送文字', { exact: true }).isDisabled(),
+    true
+  );
+  for (const mode of ['点击', '滚动', '拖拽']) {
+    await page.getByLabel('画面缩放').selectOption('1');
+    await page.getByLabel(mode, { exact: true }).click();
+    await clearInputs();
+    await page.touchscreen.tap(center.x, center.y);
+    await touch('touchStart', [{ id: 1, ...center }]);
+    await touch('touchMove', [{ id: 1, x: center.x - 20, y: center.y }]);
+    await touch('touchEnd', []);
+    await touch('touchStart', pair(40));
+    await touch('touchMove', pair(80));
+    const blockedZoom = await layout();
+    assert.equal(
+      blockedZoom.zoom,
+      2,
+      `${mode}: blocked input still allows pinch`
+    );
+    await touch('touchMove', pair(80, -25));
+    assert.ok((await layout()).scrollLeft > blockedZoom.scrollLeft + 20);
+    await touch('touchEnd', []);
+    await noRemoteInput();
+  }
+  for (const watchOnly of [false, true]) {
+    await page.getByLabel('画面缩放').selectOption('1');
+    if (watchOnly) {
+      await page.getByLabel('点击', { exact: true }).click();
+      await page.getByLabel('仅观看').check();
+    } else await page.getByLabel('移动画面', { exact: true }).click();
+    await clearInputs();
+    await touch('touchStart', pair(40));
+    await touch('touchMove', pair(80));
+    await touch('touchEnd', []);
+    const blockedPan = await layout();
+    assert.equal(blockedPan.zoom, 2);
+    await touch('touchStart', [{ id: 1, ...center }]);
+    await touch('touchMove', [{ id: 1, x: center.x - 30, y: center.y }]);
+    await touch('touchEnd', []);
+    assert.ok((await layout()).scrollLeft > blockedPan.scrollLeft + 25);
+    await noRemoteInput();
+  }
+  await page.getByLabel('仅观看').uncheck();
+  await page.getByRole('button', { name: '返回窗口', exact: true }).click();
+  await page.getByLabel('点击', { exact: true }).click();
+  await clearInputs();
+  await page.touchscreen.tap(center.x, center.y);
+  await page.waitForFunction(() =>
+    window.__imageSmoke.events.includes('leftClick')
+  );
+  console.log(
+    'PASS blocked host input preserves local gestures in every mode; remote input resumes only after recovery'
+  );
+
   await page.getByLabel('画面缩放').selectOption('1');
   await page.getByLabel('点击', { exact: true }).click();
   await clearInputs();
