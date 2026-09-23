@@ -849,8 +849,9 @@ function visibilityChanged() {
 }
 
 function remoteSessionEnded(event: Event) {
-  const data = (event as CustomEvent<{ peerId?: string }>).detail;
-  if (data?.peerId === receiverId.value)
+  const data = (event as CustomEvent<{ peerId?: string; reason?: string }>)
+    .detail;
+  if (data?.peerId === receiverId.value && data.reason === 'explicit')
     endConnection('电脑已结束本次连接，请手动重新连接');
 }
 
