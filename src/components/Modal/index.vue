@@ -58,7 +58,7 @@ const emits = defineEmits(['close']);
 <style lang="scss" scoped>
 .modal-wrap {
   z-index: 1100;
-  background-color: rgb(27 43 33 / 30%) !important;
+  background-color: rgb(0 0 0 / 72%) !important;
 
   backdrop-filter: blur(5px);
   @extend %maskBg;
@@ -74,7 +74,7 @@ const emits = defineEmits(['close']);
     border: 1px solid var(--pd-border);
     border-radius: var(--pd-radius-lg);
     box-shadow: var(--pd-shadow-raised);
-    background-color: #fff;
+    background-color: var(--pd-surface);
     font-size: 14px;
     transform: translate(-50%, -50%);
     .title {
@@ -89,7 +89,7 @@ const emits = defineEmits(['close']);
       height: 18px;
       cursor: pointer;
 
-      @include cross(#ccc, 3px);
+      @include cross(var(--pd-muted), 3px);
     }
     .content {
       margin: 15px 0;
@@ -100,7 +100,7 @@ const emits = defineEmits(['close']);
         height: 44px;
         border-radius: var(--pd-radius-sm);
         background: $theme-color-gold;
-        color: white;
+        color: #071108;
         text-align: center;
         font-weight: 600;
         font-size: 16px;

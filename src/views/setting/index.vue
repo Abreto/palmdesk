@@ -2,7 +2,7 @@
   <main class="settings-page pd-page">
     <header class="pd-page-heading">
       <span class="pd-eyebrow">设置</span>
-      <h1>按你的习惯设置。</h1>
+      <h1>按你的习惯<span class="heading-accent">设置。</span></h1>
       <p>连接服务与使用偏好。</p>
     </header>
     <section class="pd-card">
@@ -145,6 +145,9 @@ watch(
 <style scoped lang="scss">
 section {
   margin-bottom: 18px;
+  &:first-of-type {
+    border-color: rgb(98 255 120 / 18%);
+  }
 }
 .section-heading {
   display: flex;
@@ -172,7 +175,8 @@ h2 {
   height: 42px;
   flex-shrink: 0;
   border-radius: 12px;
-  background: var(--pd-surface-soft);
+  border: 1px solid rgb(98 255 120 / 22%);
+  background: var(--pd-accent-soft);
   color: var(--pd-accent);
   svg {
     width: 21px;
@@ -218,7 +222,8 @@ dd {
   }
 }
 .about-card {
-  background: var(--pd-surface-soft);
+  background: linear-gradient(145deg, rgb(98 255 120 / 8%), transparent 60%),
+    var(--pd-surface-soft);
   box-shadow: none;
 }
 .about-brand {
@@ -238,7 +243,7 @@ dd {
   height: 46px;
   border-radius: 12px;
   background: var(--pd-accent);
-  color: white;
+  color: #071108;
   svg {
     width: 26px;
     height: 26px;

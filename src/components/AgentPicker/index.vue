@@ -530,10 +530,11 @@ select:focus-visible {
   border: 0;
   border-radius: var(--pd-radius-sm);
   background: transparent;
-  color: #707a74;
+  color: var(--pd-muted);
 }
 .icon-button:hover:not(:disabled) {
-  background: var(--pd-surface-soft);
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
 }
 .icon-button:disabled {
   opacity: 0.45;
@@ -543,7 +544,7 @@ select:focus-visible {
   height: 20px;
 }
 .pin-button[aria-pressed='true'] {
-  color: #916c13;
+  color: var(--pd-warning);
 }
 .picker-tabs {
   display: flex;
@@ -570,7 +571,7 @@ select:focus-visible {
 }
 .picker-tabs button[aria-selected='true'] {
   background: var(--pd-surface);
-  box-shadow: 0 2px 6px #243a310a;
+  box-shadow: 0 2px 12px rgb(0 0 0 / 32%);
   color: var(--pd-accent);
   font-weight: 600;
 }
@@ -592,14 +593,14 @@ select:focus-visible {
   padding: 0 12px;
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius-sm);
-  background: #fff;
+  background: var(--pd-surface);
   margin-bottom: 20px;
 }
 .picker-search svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: #778079;
+  color: var(--pd-muted);
 }
 .picker-search input {
   width: 100%;
@@ -621,7 +622,8 @@ select:focus-visible {
   padding: 0 16px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius);
-  background: var(--pd-surface);
+  background: linear-gradient(145deg, rgb(255 255 255 / 3%), transparent 55%),
+    var(--pd-surface);
   box-shadow: var(--pd-shadow);
 }
 .agent-group:focus-within {
@@ -658,7 +660,7 @@ select:focus-visible {
   height: 44px;
   flex: 0 0 44px;
   border: 1px solid var(--pd-border);
-  background: #fff;
+  background: var(--pd-surface-soft);
   border-radius: 13px;
 }
 .agent-icon img,
@@ -666,7 +668,7 @@ select:focus-visible {
   width: 30px;
   height: 30px;
   object-fit: contain;
-  color: #60746a;
+  color: var(--pd-muted);
 }
 .agent-details {
   display: flex;
@@ -705,22 +707,22 @@ select:focus-visible {
 .agent-state > span {
   width: 5px;
   height: 5px;
-  background: #25856d;
+  background: var(--pd-accent);
   border-radius: 50%;
 }
 .agent-state > span.manual {
-  background: #6482ad;
+  background: #8aa8ff;
 }
 .entry-arrow {
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
-  color: #829087;
+  color: var(--pd-muted);
 }
 .agent-windows {
   margin: 0 0 14px 20px;
   padding-left: 18px;
-  border-left: 2px solid #cfdad4;
+  border-left: 2px solid var(--pd-border-strong);
 }
 .window-row {
   display: flex;
@@ -754,7 +756,7 @@ select:focus-visible {
   align-items: center;
   justify-content: center;
   border-radius: var(--pd-radius-sm);
-  border: 1px solid #d4dbd6;
+  border: 1px solid var(--pd-border-strong);
   background: var(--pd-surface-soft);
   overflow: hidden;
   box-sizing: border-box;
@@ -767,7 +769,7 @@ select:focus-visible {
 .window-preview svg {
   width: 24px;
   height: 24px;
-  color: #748079;
+  color: var(--pd-muted);
 }
 .window-details {
   display: flex;
@@ -814,7 +816,7 @@ select:focus-visible {
   height: 40px;
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius-sm);
-  background: #fff;
+  background: var(--pd-surface);
   padding: 0 8px;
   color: var(--pd-text);
 }
@@ -851,7 +853,7 @@ select:focus-visible {
 }
 .unlink-command {
   margin: 0 0 8px 60px;
-  color: #6d7971;
+  color: var(--pd-muted);
   font-size: 12px;
 }
 .picker-error {

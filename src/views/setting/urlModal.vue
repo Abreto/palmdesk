@@ -170,7 +170,7 @@ function save() {
   display: grid;
   place-items: center;
   padding: 16px;
-  background: rgb(27 43 33 / 30%);
+  background: rgb(0 0 0 / 72%);
   backdrop-filter: blur(5px);
 }
 .service-dialog {
@@ -181,7 +181,7 @@ function save() {
   padding: 28px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-lg);
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-text);
   box-shadow: var(--pd-shadow-raised);
 }
@@ -218,7 +218,7 @@ input {
   font-size: 16px;
   &:focus {
     border-color: var(--pd-accent);
-    box-shadow: 0 0 0 3px #25634d0c;
+    box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
   }
 }
 button {
@@ -230,7 +230,7 @@ button {
   padding: 8px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-accent);
   cursor: pointer;
 }
@@ -252,7 +252,7 @@ footer {
   border-color: var(--pd-accent);
   padding: 8px 14px;
   background: var(--pd-accent);
-  color: white;
+  color: #071108;
 }
 .error {
   color: var(--pd-danger);

@@ -1,5 +1,8 @@
 <template>
-  <n-config-provider :theme-overrides="themeOverrides">
+  <n-config-provider
+    :theme="darkTheme"
+    :theme-overrides="themeOverrides"
+  >
     <n-message-provider :max="3">
       <n-modal-provider>
         <n-dialog-provider>
@@ -13,7 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import { GlobalThemeOverrides, NConfigProvider } from 'naive-ui';
+import { darkTheme, GlobalThemeOverrides, NConfigProvider } from 'naive-ui';
 import { onMounted } from 'vue';
 
 import {
@@ -33,25 +36,32 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#25634d',
-    primaryColorHover: '#1c503d',
-    primaryColorPressed: '#184433',
-    primaryColorSuppl: '#25634d',
-    textColorBase: '#243a31',
-    textColor1: '#243a31',
-    textColor2: '#4e6257',
-    textColor3: '#66756c',
-    borderColor: '#dfe5dc',
-    borderRadius: '10px',
-    borderRadiusSmall: '6px',
+    primaryColor: '#62ff78',
+    primaryColorHover: '#89ff98',
+    primaryColorPressed: '#35e85a',
+    primaryColorSuppl: '#62ff78',
+    textColorBase: '#f1f7ed',
+    textColor1: '#f1f7ed',
+    textColor2: '#c5d5c8',
+    textColor3: '#96a69a',
+    borderColor: '#26352b',
+    borderRadius: '12px',
+    borderRadiusSmall: '8px',
+    bodyColor: '#090d0b',
+    cardColor: '#101612',
+    modalColor: '#101612',
+    popoverColor: '#101612',
+    inputColor: '#151d17',
+    inputColorDisabled: '#0f1511',
+    placeholderColor: '#718277',
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif",
   },
   Dialog: {
-    borderRadius: '20px',
+    borderRadius: '26px',
   },
   Card: {
-    borderRadius: '20px',
+    borderRadius: '18px',
   },
 };
 

@@ -198,7 +198,7 @@ async function scanFile(event: Event) {
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-lg);
   box-shadow: var(--pd-shadow-raised);
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-text);
 }
 header {
@@ -221,7 +221,7 @@ button {
   padding: 8px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface-soft);
   color: var(--pd-accent);
   font-size: 14px;
   cursor: pointer;
@@ -246,7 +246,7 @@ svg {
   aspect-ratio: 1;
   border-radius: 14px;
   overflow: hidden;
-  background: #202724;
+  background: #050806;
 }
 video {
   display: block;
@@ -259,7 +259,7 @@ video {
   inset: 0;
   display: grid;
   place-items: center;
-  color: white;
+  color: #071108;
   font-size: 14px;
 }
 .scan-actions {

@@ -43,7 +43,13 @@ function handleClick() {
   box-sizing: border-box;
   width: 100vw;
   height: 100vh;
-  color: #666;
+  background: radial-gradient(
+      circle at 50% 0%,
+      rgb(98 255 120 / 12%),
+      transparent 18rem
+    ),
+    var(--pd-bg);
+  color: var(--pd-text);
   font-size: 16px;
   .item {
     margin: 0 auto;
@@ -54,7 +60,8 @@ function handleClick() {
     margin-top: 50px;
     width: 100px;
     height: 100px;
-    color: #167c65;
+    color: var(--pd-accent);
+    filter: drop-shadow(0 0 18px rgb(98 255 120 / 18%));
   }
   .name {
     padding-top: 15px;
@@ -70,13 +77,14 @@ function handleClick() {
     bottom: 30px;
     left: 50%;
     width: 100vw;
-    color: #888;
+    color: var(--pd-muted);
     text-align: center;
     font-size: 14px;
     transform: translate(-50%, 0%);
   }
 
   .link {
+    color: var(--pd-accent);
     font-weight: bold;
     cursor: pointer;
   }

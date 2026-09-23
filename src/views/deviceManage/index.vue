@@ -2,7 +2,7 @@
   <main class="devices-page pd-page">
     <header class="pd-page-heading">
       <span class="pd-eyebrow">设备</span>
-      <h1>随时连接设备。</h1>
+      <h1>随时<span class="heading-accent">连接设备。</span></h1>
       <p>选择最近连接的电脑。</p>
     </header>
     <section
@@ -134,7 +134,7 @@ function handleDelLinkDeviceList(item) {
   place-items: center;
   width: 76px;
   height: 76px;
-  border: 1px solid #dce5d6;
+  border: 1px solid rgb(98 255 120 / 24%);
   border-radius: 24px;
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
@@ -171,7 +171,7 @@ function handleDelLinkDeviceList(item) {
   text-align: left;
   cursor: pointer;
   &:hover {
-    background: var(--pd-surface-soft);
+    background: var(--pd-accent-soft);
   }
 }
 .device-icon {
@@ -181,7 +181,7 @@ function handleDelLinkDeviceList(item) {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--pd-surface-soft);
+  background: var(--pd-accent-soft);
   color: var(--pd-accent);
   svg {
     width: 24px;

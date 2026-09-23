@@ -7,7 +7,7 @@
       <header class="page-heading pd-page-heading">
         <div>
           <span class="pd-eyebrow">远程工作</span>
-          <h1>随时继续工作。</h1>
+          <h1>随时<span class="heading-accent">继续工作。</span></h1>
           <p>连接电脑，阅读会话，操作窗口。</p>
         </div>
         <span
@@ -1807,13 +1807,32 @@ function handleDel(sender) {
 <style lang="scss" scoped>
 .remote-wrap {
   position: relative;
+  min-height: 100%;
+  &::before {
+    position: absolute;
+    top: -120px;
+    right: 8%;
+    width: 320px;
+    height: 320px;
+    border: 1px solid rgb(98 255 120 / 10%);
+    border-radius: 50%;
+    box-shadow:
+      0 0 0 24px rgb(98 255 120 / 2%),
+      0 0 100px rgb(98 255 120 / 8%);
+    content: '';
+    pointer-events: none;
+  }
+  .container {
+    position: relative;
+    z-index: 1;
+  }
 }
 .page-heading {
   position: relative;
-  padding-bottom: 30px;
+  padding-bottom: 40px;
   border-bottom: 1px solid var(--pd-border);
   h1 {
-    margin-top: 20px;
+    max-width: 700px;
   }
   p {
     max-width: 540px;
@@ -1829,6 +1848,8 @@ function handleDel(sender) {
   border-radius: 30px;
   background: var(--pd-surface-soft);
   color: var(--pd-muted);
+  font-family: var(--pd-mono);
+  letter-spacing: 0.2px;
   font-size: 11px;
   > span {
     width: 6px;
@@ -1840,7 +1861,7 @@ function handleDel(sender) {
     color: var(--pd-accent);
     > span {
       background: var(--pd-accent);
-      box-shadow: 0 0 0 3px #25634d0c;
+      box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
     }
   }
   &.failed {
@@ -1866,7 +1887,7 @@ function handleDel(sender) {
   flex: 0 0 44px;
   width: 44px;
   height: 44px;
-  border: 1px solid #dce6d6;
+  border: 1px solid rgb(98 255 120 / 24%);
   border-radius: 13px;
   background: var(--pd-accent-soft);
   color: var(--pd-accent);
@@ -1883,6 +1904,7 @@ function handleDel(sender) {
 }
 .local-device {
   margin-bottom: 18px;
+  border-color: rgb(98 255 120 / 18%);
   .info {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1940,6 +1962,10 @@ function handleDel(sender) {
   margin-top: 18px;
   padding: 28px;
   border-radius: var(--pd-radius-lg);
+  border-color: rgb(98 255 120 / 22%);
+  box-shadow:
+    var(--pd-shadow),
+    inset 0 1px 0 rgb(98 255 120 / 7%);
 }
 .connection-heading {
   display: flex;
@@ -1970,7 +1996,7 @@ function handleDel(sender) {
     height: 18px;
   }
   &:hover:not(:disabled) {
-    background: var(--pd-surface-soft);
+    background: var(--pd-accent-soft);
     border-color: var(--pd-border-strong);
   }
   &:disabled {
@@ -2015,8 +2041,8 @@ function handleDel(sender) {
   }
   &:focus {
     border-color: var(--pd-accent);
-    box-shadow: 0 0 0 3px #25634d0c;
-    background: white;
+    box-shadow: 0 0 0 3px rgb(98 255 120 / 12%);
+    background: var(--pd-surface-soft);
   }
   &:disabled {
     opacity: 0.6;
@@ -2137,7 +2163,9 @@ function handleDel(sender) {
   color: var(--pd-danger);
 }
 .workflow-guide {
-  margin: 36px 0 28px;
+  margin: 52px 0 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--pd-border);
 }
 .guide-heading {
   display: flex;
@@ -2153,13 +2181,19 @@ function handleDel(sender) {
 .guide-items {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 12px;
+  > div {
+    padding: 20px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius);
+    background: linear-gradient(145deg, rgb(255 255 255 / 3%), transparent 56%),
+      var(--pd-surface);
+  }
   > div + div {
-    padding-left: 24px;
-    border-left: 1px solid var(--pd-border);
+    padding-left: 20px;
   }
   h3 {
-    margin: 12px 0 6px;
+    margin: 18px 0 6px;
     font-size: 13px;
     font-weight: 600;
   }
@@ -2172,7 +2206,7 @@ function handleDel(sender) {
 }
 .guide-icon {
   display: inline-flex;
-  color: #658060;
+  color: var(--pd-accent);
   svg {
     width: 23px;
     height: 23px;
@@ -2210,7 +2244,7 @@ function handleDel(sender) {
   padding: 10px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: var(--pd-surface);
+  background: var(--pd-surface-soft);
   text-align: left;
   cursor: pointer;
   &:hover:not(:disabled),

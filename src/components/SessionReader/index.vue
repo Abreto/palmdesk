@@ -536,7 +536,7 @@ button {
   padding: 9px 13px;
   min-height: 40px;
   color: var(--pd-text);
-  background: #fff;
+  background: var(--pd-surface);
 }
 button:disabled {
   cursor: default;
@@ -579,7 +579,7 @@ h2 {
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
   padding: 11px;
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-text);
 }
 .reader-scroll {
@@ -646,23 +646,23 @@ h2 {
 }
 .session-state {
   font-size: 11px;
-  color: #567667;
+  color: var(--pd-accent);
 }
 .detail-heading {
   justify-content: flex-start;
   padding: 10px 16px;
   border-bottom: 1px solid var(--pd-border);
-  background: #fff;
+  background: var(--pd-surface);
 }
 .detail-heading .primary {
   margin-left: auto;
   background: var(--pd-accent);
-  color: white;
+  color: #071108;
   border-color: var(--pd-accent);
 }
 .session-context {
   padding: 12px 20px;
-  background: #fff;
+  background: var(--pd-surface);
   border-bottom: 1px solid var(--pd-border);
 }
 .session-context h2 {
@@ -678,11 +678,11 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  color: #658371;
+  color: var(--pd-muted);
   font-size: 11px;
 }
 .session-context .window-link {
-  color: #526f60;
+  color: var(--pd-accent);
 }
 .timeline {
   position: relative;
@@ -690,7 +690,7 @@ h2 {
 }
 .message-card {
   margin-bottom: 14px;
-  background: white;
+  background: var(--pd-surface);
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius);
   box-shadow: var(--pd-shadow);
@@ -698,13 +698,13 @@ h2 {
 }
 .user-message {
   background: var(--pd-accent-soft);
-  border-color: #dce7df;
+  border-color: rgb(98 255 120 / 22%);
 }
 .message-card header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  color: #648373;
+  color: var(--pd-muted);
   font-size: 11px;
 }
 .message-card header button {
@@ -738,8 +738,8 @@ pre {
   overflow-x: auto;
   border-radius: var(--pd-radius-sm);
   padding: 12px;
-  background: var(--pd-surface-soft);
-  color: #304e3f;
+  background: #0a100c;
+  color: #b9e8be;
   font-size: 12px;
   line-height: 1.7;
   white-space: pre;
@@ -751,8 +751,8 @@ pre {
 .message-body :deep(blockquote) {
   margin-left: 0;
   padding-left: 14px;
-  border-left: 3px solid #b7d0bf;
-  color: #627a6d;
+  border-left: 3px solid var(--pd-accent);
+  color: var(--pd-muted);
 }
 .message-body :deep(ul),
 .message-body :deep(ol) {
@@ -761,7 +761,7 @@ pre {
 .activity-group {
   margin-bottom: 14px;
   padding: 12px 16px;
-  border: 1px dashed #ccdacf;
+  border: 1px dashed var(--pd-border-strong);
   border-radius: var(--pd-radius);
   background: var(--pd-surface-soft);
   font-size: 13px;
@@ -794,8 +794,8 @@ summary span {
 .update-banner {
   border: 0;
   border-radius: 0;
-  background: #deefe4;
-  color: #256545;
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
   font-size: 13px;
 }
 .empty-reader {
@@ -821,17 +821,17 @@ summary span {
   flex-shrink: 0;
   margin: 0;
   padding: 8px 16px;
-  color: #63836e;
-  background: white;
+  color: var(--pd-muted);
+  background: var(--pd-surface);
   font-size: 12px;
 }
 .error {
   color: var(--pd-danger);
-  background: #fff5f3;
+  background: var(--pd-danger-soft);
 }
 .truncation {
   font-size: 12px;
-  color: #966d3a;
+  color: var(--pd-warning);
   line-height: 1.7;
 }
 @media (min-width: 900px) {

@@ -379,7 +379,7 @@ button {
   padding: 10px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-text);
   cursor: pointer;
 }
@@ -402,7 +402,7 @@ button[aria-pressed='true'] {
   align-items: center;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: white;
+  background: var(--pd-surface);
   border-bottom: 1px solid var(--pd-border);
 }
 .modes {
@@ -426,7 +426,8 @@ select {
   padding: 4px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface-soft);
+  color: var(--pd-text);
   font-size: 13px;
 }
 .video-stage {
@@ -435,7 +436,7 @@ select {
   min-height: 120px;
   overflow: auto;
   display: flex;
-  background: #252a28;
+  background: #050806;
   touch-action: none;
   overscroll-behavior: contain;
 }
@@ -452,7 +453,7 @@ select {
 .keyboard-panel {
   padding: 8px 12px max(10px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--pd-border);
-  background: white;
+  background: var(--pd-surface);
 }
 .key-row {
   display: flex;
@@ -478,10 +479,12 @@ textarea {
   padding: 8px;
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg);
+  color: var(--pd-text);
   font: 16px/1.4 system-ui;
 }
 .composer button {
-  color: white;
+  color: #071108;
   background: var(--pd-accent);
 }
 @media (max-width: 480px) {

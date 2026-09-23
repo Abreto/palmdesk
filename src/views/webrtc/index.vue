@@ -769,14 +769,14 @@ onUnmounted(() => {
   align-items: center;
   padding: 10px 16px;
   border-bottom: 1px solid var(--pd-border);
-  background: #fff;
+  background: var(--pd-surface);
   button {
     border: 0;
     padding: 9px 22px;
     min-height: 40px;
     border-radius: var(--pd-radius-sm);
     background: transparent;
-    color: #678172;
+    color: var(--pd-muted);
     font: inherit;
     font-size: 13px;
     cursor: pointer;
@@ -798,8 +798,8 @@ onUnmounted(() => {
   gap: 8px;
   align-items: center;
   padding: 9px 14px;
-  background: #edf5ef;
-  color: #54745f;
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
   font-size: 12px;
   line-height: 1.6;
   > span:first-child {
@@ -811,9 +811,9 @@ onUnmounted(() => {
     color: inherit;
     font: inherit;
     padding: 8px;
-    border: 1px solid #cbdece;
+    border: 1px solid rgb(98 255 120 / 22%);
     border-radius: 7px;
-    background: white;
+    background: var(--pd-surface);
     cursor: pointer;
   }
 }
@@ -823,8 +823,8 @@ onUnmounted(() => {
   gap: 12px;
   padding: 10px 16px;
   color: var(--pd-danger);
-  background: #fff3f5;
-  border-bottom: 1px solid #edcbd2;
+  background: var(--pd-danger-soft);
+  border-bottom: 1px solid rgb(255 125 137 / 24%);
   font-size: 13px;
   flex-shrink: 0;
 
@@ -842,7 +842,7 @@ onUnmounted(() => {
     padding: 6px 10px;
     border: 1px solid currentColor;
     border-radius: var(--pd-radius-sm);
-    background: white;
+    background: var(--pd-surface);
     color: inherit;
     font: inherit;
     cursor: pointer;
@@ -871,7 +871,7 @@ onUnmounted(() => {
   gap: 10px;
   padding: max(12px, env(safe-area-inset-top)) 16px 12px;
   border-bottom: 1px solid var(--pd-border);
-  background: #fff;
+  background: var(--pd-surface);
 }
 .controller-header > button {
   flex: 0 0 40px;
@@ -918,7 +918,7 @@ onUnmounted(() => {
   color: var(--pd-accent);
 }
 .status.ready {
-  color: #66736c;
+  color: var(--pd-muted);
 }
 .connection-options {
   position: relative;
@@ -946,7 +946,7 @@ onUnmounted(() => {
   box-sizing: border-box;
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface);
   box-shadow: var(--pd-shadow-raised);
 }
 .options-panel label {
@@ -968,7 +968,7 @@ onUnmounted(() => {
 }
 .options-panel > span {
   font-size: 12px;
-  color: #64776b;
+  color: var(--pd-muted);
 }
 .connection-message {
   position: absolute;
@@ -987,7 +987,7 @@ onUnmounted(() => {
   border: 1px solid var(--pd-border-strong);
   border-radius: var(--pd-radius);
   box-shadow: var(--pd-shadow);
-  background: #fff;
+  background: var(--pd-surface);
   font-size: 14px;
 }
 .connection-message > span {
@@ -1000,7 +1000,7 @@ onUnmounted(() => {
   border: 1px solid var(--pd-accent);
   border-radius: var(--pd-radius-sm);
   color: var(--pd-accent);
-  background: white;
+  background: var(--pd-surface-soft);
   cursor: pointer;
 }
 </style>

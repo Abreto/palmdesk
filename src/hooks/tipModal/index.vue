@@ -98,14 +98,14 @@ export default defineComponent({
       user-select: none;
 
       &.return {
-        border: 1px solid rgba(153, 153, 153, 0.3);
-        background: #ffffff;
-        color: #666;
+        border: 1px solid var(--pd-border);
+        background: var(--pd-surface-soft);
+        color: var(--pd-muted);
         font-size: 14px;
       }
       &.next {
         background: $theme-color-gold;
-        color: white;
+        color: #071108;
         font-weight: 700;
         font-size: 16px;
         &.hiddenCancel {

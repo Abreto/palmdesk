@@ -345,10 +345,10 @@ defineExpose({ paste });
 }
 .image-connection {
   margin-top: 8px;
-  color: #64726a;
+  color: var(--pd-muted);
 }
 .image-tools > span {
-  color: #64726a;
+  color: var(--pd-muted);
   font-size: 11px;
 }
 button {
@@ -359,7 +359,7 @@ button {
   padding: 6px 10px;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface);
   color: var(--pd-text);
   cursor: pointer;
 }
@@ -382,7 +382,7 @@ img {
   object-fit: contain;
   border: 1px solid var(--pd-border);
   border-radius: var(--pd-radius-sm);
-  background: white;
+  background: var(--pd-surface-soft);
 }
 .image-details {
   display: flex;
@@ -397,7 +397,7 @@ img {
   white-space: nowrap;
 }
 small {
-  color: #64726a;
+  color: var(--pd-muted);
 }
 progress {
   width: 100%;

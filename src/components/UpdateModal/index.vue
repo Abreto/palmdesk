@@ -52,7 +52,7 @@ const emits = defineEmits(['confirm', 'close']);
   position: relative;
   z-index: 20;
   .mask {
-    background-color: rgba($color: #000000, $alpha: 0.3) !important;
+    background-color: rgba($color: #000000, $alpha: 0.72) !important;
 
     @extend %maskBg;
   }
@@ -66,8 +66,9 @@ const emits = defineEmits(['confirm', 'close']);
     width: 320px;
     // height: 350px;
     border-radius: 10px;
-    background-color: white;
-    box-shadow: 0 2px 20px rgb(0 0 0 / 20%);
+    background-color: var(--pd-surface);
+    border: 1px solid var(--pd-border);
+    box-shadow: var(--pd-shadow-raised);
     transform: translate(-50%, -50%);
     .top {
       display: flex;
@@ -82,7 +83,7 @@ const emits = defineEmits(['confirm', 'close']);
         height: 14px;
         cursor: pointer;
 
-        @include cross(#666, 2px);
+        @include cross(var(--pd-muted), 2px);
       }
     }
     .update-content {
@@ -98,7 +99,7 @@ const emits = defineEmits(['confirm', 'close']);
     }
     .other {
       margin-top: 10px;
-      color: #666;
+      color: var(--pd-muted);
       text-align: right;
       font-size: 12px;
     }
@@ -108,7 +109,7 @@ const emits = defineEmits(['confirm', 'close']);
       height: 40px;
       border-radius: 4px;
       background-color: $theme-color-gold;
-      color: white;
+      color: #071108;
       text-align: center;
       line-height: 40px;
       cursor: pointer;

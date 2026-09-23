@@ -309,12 +309,12 @@ const moving = (e: MouseEvent) => {
 </script>
 
 <style lang="scss" scoped>
-$sidebar-width: 224px;
+$sidebar-width: 240px;
 .layout {
   display: flex;
   width: 100%;
   height: 100dvh;
-  background: var(--pd-bg);
+  background: transparent;
 }
 .system-bar {
   position: fixed;
@@ -322,7 +322,8 @@ $sidebar-width: 224px;
   z-index: 999;
   display: flex;
   height: $top-system-bar-height;
-  background: var(--pd-bg);
+  background: rgb(11 16 13 / 92%);
+  border-bottom: 1px solid var(--pd-border);
   user-select: none;
   &.drag {
     -webkit-app-region: drag;
@@ -382,14 +383,33 @@ $sidebar-width: 224px;
   }
 }
 .sidebar {
+  position: relative;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
   flex: 0 0 $sidebar-width;
   width: $sidebar-width;
   padding: 70px 18px 22px;
-  background: var(--pd-sidebar);
+  background: radial-gradient(
+      circle at 20% 0%,
+      rgb(98 255 120 / 8%),
+      transparent 17rem
+    ),
+    var(--pd-sidebar);
   border-right: 1px solid var(--pd-border);
+  &::after {
+    position: absolute;
+    right: -70px;
+    bottom: 80px;
+    width: 180px;
+    height: 180px;
+    border: 1px solid rgb(98 255 120 / 12%);
+    border-radius: 50%;
+    box-shadow: 0 0 0 18px rgb(98 255 120 / 3%);
+    content: '';
+    pointer-events: none;
+  }
 }
 .brand {
   display: flex;
@@ -398,6 +418,8 @@ $sidebar-width: 224px;
   padding: 0 4px;
   text-decoration: none;
   color: var(--pd-text);
+  position: relative;
+  z-index: 1;
 }
 .brand-mark {
   display: grid;
@@ -407,36 +429,42 @@ $sidebar-width: 224px;
   height: 42px;
   border-radius: 12px;
   background: var(--pd-accent);
-  color: #f1f5e9;
-  box-shadow: 0 3px 8px #25634d18;
+  color: #071108;
+  box-shadow: var(--pd-glow);
   svg {
     width: 24px;
     height: 24px;
   }
 }
 .brand-name {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.7px;
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -1px;
   line-height: 1.3;
   span {
     display: block;
     margin-top: 4px;
     color: var(--pd-muted);
-    font-size: 9px;
-    font-weight: 450;
-    letter-spacing: 0;
+    font-family: var(--pd-mono);
+    font-size: 8px;
+    font-weight: 500;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
   }
 }
 .list {
-  margin-top: 44px;
+  position: relative;
+  z-index: 1;
+  margin-top: 56px;
 }
 .nav-label {
   display: block;
   margin: 0 14px 12px;
-  color: var(--pd-muted);
-  font-size: 10px;
-  letter-spacing: 2px;
+  color: var(--pd-accent);
+  font-family: var(--pd-mono);
+  font-size: 9px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
 }
 .item {
   display: flex;
@@ -450,7 +478,7 @@ $sidebar-width: 224px;
   border-radius: 12px;
   color: var(--pd-muted);
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 650;
   text-decoration: none;
   transition:
     background-color 160ms ease,
@@ -467,25 +495,27 @@ $sidebar-width: 224px;
     opacity: 0;
   }
   &:hover {
-    background: #e3e9df;
+    background: var(--pd-accent-soft);
     color: var(--pd-text);
   }
   &.active {
     background: var(--pd-accent);
-    color: white;
-    box-shadow: 0 4px 10px #25634d12;
+    color: #071108;
+    box-shadow: var(--pd-glow);
     .nav-arrow {
       opacity: 0.65;
     }
   }
 }
 .sidebar-footer {
+  position: relative;
+  z-index: 1;
   margin-top: auto;
   padding: 40px 12px 0;
   color: var(--pd-muted);
   .footer-symbol {
     font-size: 32px;
-    color: #6f8861;
+    color: var(--pd-accent);
   }
   p {
     margin: 10px 0 28px;
@@ -496,8 +526,11 @@ $sidebar-width: 224px;
     display: flex;
     justify-content: space-between;
     padding-top: 14px;
-    border-top: 1px solid var(--pd-border-strong);
-    font-size: 10px;
+    border-top: 1px solid var(--pd-border);
+    color: var(--pd-muted);
+    font-family: var(--pd-mono);
+    font-size: 9px;
+    letter-spacing: 0.5px;
   }
 }
 .view {
@@ -537,13 +570,13 @@ $sidebar-width: 224px;
   .sidebar {
     flex-basis: 192px;
     width: 192px;
-    padding-inline: 12px;
+    padding-inline: 14px;
   }
   .system-bar .top-left {
     width: 192px;
   }
   .brand-name {
-    font-size: 18px;
+    font-size: 19px;
     span {
       font-size: 8px;
     }
@@ -562,6 +595,7 @@ $sidebar-width: 224px;
     padding: max(18px, env(safe-area-inset-top)) 20px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--pd-border);
+    background: var(--pd-sidebar);
   }
   .layout:not(.browser) .sidebar {
     padding-top: 60px;
@@ -584,7 +618,7 @@ $sidebar-width: 224px;
     display: flex;
     align-items: baseline;
     gap: 10px;
-    font-size: 18px;
+    font-size: 19px;
     span {
       font-size: 9px;
     }
