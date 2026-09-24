@@ -41,7 +41,7 @@
     "typecheck": "vue-tsc --noEmit",
     "test:smoke": "node --test test/smoke/*.test.cjs session-core/test/*.test.mjs",
     "test:session-core": "node --test session-core/test/*.test.mjs",
-    "gen-icons": "electron-icon-builder --input=./build/source/billd.png --output=./build/ --flatten",
+    "gen-icons": "electron-icon-builder --input=./build/source/palmdesk.png --output=./build/ --flatten",
     "lint": "eslint . --config ./eslint.config.js --cache",
     "lint:fix": "eslint . --config ./eslint.config.js --cache --fix",
     "preview": "vite preview",

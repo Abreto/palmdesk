@@ -14,6 +14,6 @@ Dependencies retain their own licenses; PalmDesk's MIT license does not replace 
 
 The lockfile records exact dependency versions. Before binary distribution, collect the applicable LICENSE and NOTICE files for the complete packaged dependency tree and bundled browser assets, including Electron / Chromium notices. This document is an attribution overview, not a complete binary license bundle.
 
-Legacy application icons and marketing images are inherited from upstream. Their independent provenance has not been verified; replace the application icons or establish their license before distributing PalmDesk installers.
+Legacy marketing images are inherited from upstream. Their independent provenance has not been verified. PalmDesk's current application icons are original project assets; review any remaining upstream imagery before distributing installers.
 
 OpenAI, Codex, ChatGPT and Claude identify the third-party applications the project works with or plans to support. PalmDesk is independently maintained and is not an official product of those vendors.

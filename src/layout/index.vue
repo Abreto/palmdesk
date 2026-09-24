@@ -36,10 +36,10 @@
       class="sidebar"
       aria-label="主导航"
     >
-      <PhonePortraitOutline
+      <img
         class="brand-icon"
-        role="img"
-        aria-label="PalmDesk"
+        :src="palmdeskMark"
+        alt="PalmDesk"
       />
       <div class="list">
         <div
@@ -109,11 +109,11 @@
 </template>
 
 <script lang="ts" setup>
-import { PhonePortraitOutline } from '@vicons/ionicons5';
 import { getRandomString, windowReload } from 'billd-utils';
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import palmdeskMark from '@/assets/img/palmdesk-mark.svg';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
@@ -434,7 +434,7 @@ $sidebar-width: 160px;
   display: block;
   width: 36px;
   height: 36px;
-  color: #167c65;
+  object-fit: contain;
   margin: 0 auto 12px;
 }
 .layout.browser .sidebar {
