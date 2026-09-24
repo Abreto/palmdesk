@@ -89,15 +89,35 @@ export class CaptureSession {
     return result;
   }
 
-  private async release() {
+  private async release(required = false) {
     const keys = [...this.keys];
     const buttons = [...this.buttons];
     this.keys.clear();
     this.buttons.clear();
-    await Promise.allSettled([
-      ...(keys.length ? [this.driver.keysUp(keys)] : []),
-      ...buttons.map((button) => this.driver.buttonUp(button)),
-    ]);
+    const releases = [
+      ...(keys.length
+        ? [
+            {
+              run: () => this.driver.keysUp(keys),
+              retain: () => keys.forEach((key) => this.keys.add(key)),
+            },
+          ]
+        : []),
+      ...buttons.map((button) => ({
+        run: () => this.driver.buttonUp(button),
+        retain: () => this.buttons.add(button),
+      })),
+    ];
+    const results = await Promise.allSettled(
+      releases.map(({ run }) => Promise.resolve().then(run))
+    );
+    results.forEach((result, index) => {
+      if (result.status === 'rejected') releases[index].retain();
+    });
+    if (required && results.some((result) => result.status === 'rejected'))
+      throw new InputUnavailableError(
+        '无法释放电脑上按下的键或鼠标按钮，请松开后手动重试'
+      );
   }
 
   begin(
@@ -207,11 +227,11 @@ export class CaptureSession {
           !this.driver.canPasteImage?.(active.source) ||
           !this.driver.pasteImage
         )
-          throw new Error('图片粘贴目前仅支持 macOS 上的 Codex');
+          throw new Error('图片粘贴目前仅支持 macOS 或 Windows 上的 Codex');
         if (active.inputError)
           throw new InputUnavailableError(active.inputError);
         validateImage(image);
-        await this.release();
+        await this.release(true);
         if (!current()) throw new Error('图片粘贴已取消');
         const source = await this.focus(active.source);
         if (!current()) throw new Error('图片粘贴已取消');
