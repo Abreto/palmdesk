@@ -133,6 +133,23 @@ node scripts/dev.mjs --prepare-only
 
 该测试用隐藏的临时 Electron 窗口验证原生 PNG/JPEG 解码、macOS 图片剪贴板和粘贴事件；结束时若剪贴板仍是测试图片，会恢复先前的文字、HTML、RTF 和图片。它使用测试窗口的 `webContents.paste()`，不验证系统 `Cmd+V` 或操作真实 Codex，结果写入 `.local/image-paste/electron-result.json`。
 
+Windows 图片粘贴复用相同的手机选图、预览和认证传输，只对进程身份匹配 `codex.exe` 的窗口开放。主进程串行释放按键和鼠标按钮、聚焦选定窗口；原生辅助程序在写入剪贴板前及执行 `Ctrl+V` 前复核 HWND、PID、可执行文件完整路径、进程启动时间、前台焦点和进程权限。粘贴阶段不会重新抢回焦点，排队中的原生请求会在提交前复核取消状态；快捷键已经交给操作系统后无法撤销，结果未确认时必须先检查附件，不自动重放。
+
+在已解锁的 Windows 桌面运行以下 PowerShell 命令验证真实系统剪贴板和快捷键。测试会临时聚焦自己创建的窗口，只在测试目录编译一个名为 `Codex.exe` 的 fixture 来通过生产代码的进程识别，不操作已安装的 Codex，也不发送消息：
+
+```powershell
+pnpm build:native
+$env:PALMDESK_NATIVE_SMOKE = 'true'
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+node --test test/smoke/native-window-windows.test.cjs
+node node_modules/electron/cli.js test/smoke/windows-image-paste.cjs
+Remove-Item Env:PALMDESK_NATIVE_SMOKE
+```
+
+该测试读取剪贴板的 PNG 格式（保留透明度），逐像素比较 PNG/JPEG 解码内容，验证 `Ctrl+V`、中英文混合草稿、按键释放、取消、过期进程身份、焦点变化和关闭目标；不会把 Windows Forms 的旧式 DIB 格式当作 Chromium 的 PNG 附件。测试结束且剪贴板仍是测试内容时恢复常用剪贴板格式，结果写入 `.local/image-paste/windows-result.json`。浏览器烟测另覆盖原始字节传输、阅读/仅观看取消和图片通道重连。两者均不能替代手机连接真实 Codex 的附件验收；记录和待验收步骤见 [Windows 图片粘贴验证记录](smoke-artifacts/windows-image-paste-2026-09-24.md)。
+
+Windows 权限错误需要以相同权限级别运行 Codex 与 PalmDesk，通常关闭目标的「以管理员身份运行」即可；前台焦点错误需要关闭阻挡的对话框并切回所选窗口。按键占用错误需释放所有按键和鼠标按钮。处理后手动点击粘贴即可重新校验；其他应用、HEIC/GIF、多图、任意文件、裁剪和标注仍不在本功能范围内。
+
 窗口画质回归测试不需要后端，只捕获测试程序自己创建的文字窗口，验证旧 1080P 约束与新默认画质的实际尺寸、先建立 DataChannel 再添加视频时的编码参数，以及 720P 降档后恢复原始尺寸。macOS 上使用当前工作区的隔离开发应用运行：
 
 ```bash

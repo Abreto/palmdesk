@@ -23,7 +23,11 @@ import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
 import { assertUniqueApplicationIdentity } from './app-identity';
 import { CaptureSession, InputUnavailableError } from './capture-session';
-import { pasteClipboardImage, supportsImagePaste } from './image-paste';
+import {
+  pasteClipboardImage,
+  pasteWindowsClipboardImage,
+  supportsImagePaste,
+} from './image-paste';
 import {
   NativeWindowBridge,
   NativeWindowError,
@@ -150,14 +154,24 @@ const captureSession = new CaptureSession(
     validKey: (key) =>
       typeof key === 'number' && Object.values(nutjs.Key).includes(key),
     canPasteImage: (source) => supportsImagePaste(source, platform),
-    pasteImage: (image, _source, current) =>
-      pasteClipboardImage(image, current, {
+    pasteImage: (image, source, current) => {
+      const clipboardDriver = {
         decode: (bytes) => nativeImage.createFromBuffer(Buffer.from(bytes)),
         write: (value) => clipboard.writeImage(value),
+      };
+      if (platform === 'win32')
+        return pasteWindowsClipboardImage(image, source, current, {
+          ...clipboardDriver,
+          request: (command, target, current) =>
+            nativeWindows.request(command, target, current),
+        });
+      return pasteClipboardImage(image, current, {
+        ...clipboardDriver,
         press: () => nutjs.keyboard.pressKey(nutjs.Key.LeftCmd, nutjs.Key.V),
         release: () =>
           nutjs.keyboard.releaseKey(nutjs.Key.V, nutjs.Key.LeftCmd),
-      }),
+      });
+    },
   },
   listCaptureSources,
   async (source) => {

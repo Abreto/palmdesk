@@ -117,6 +117,8 @@ export function matchCaptureSources(
 
 export class NativeWindowBridge {
   private child?: ChildProcessWithoutNullStreams;
+  private serial: Promise<unknown> = Promise.resolve();
+  private generation = 0;
   private sequence = 0;
   private pending = new Map<
     number,
@@ -166,6 +168,28 @@ export class NativeWindowBridge {
   }
 
   request<T>(
+    command: string,
+    target?: Partial<NativeWindow> & {
+      windows?: WindowIdentity[];
+      text?: string;
+    },
+    current?: () => boolean
+  ): Promise<T> {
+    const generation = this.generation;
+    // Keep waiting commands in JS, where session cancellation can still
+    // withdraw a paste. Never leave input queued behind native focus/list work.
+    const result = this.serial.then(() => {
+      if (generation !== this.generation)
+        throw new Error('原生窗口服务不可用，请重新启动客户端');
+      if (current && !current())
+        throw new NativeWindowError('图片粘贴已取消', 'cancelled');
+      return this.dispatch<T>(command, target);
+    });
+    this.serial = result.catch(() => {});
+    return result;
+  }
+
+  private dispatch<T>(
     command: string,
     target?: Partial<NativeWindow> & {
       windows?: WindowIdentity[];
@@ -228,6 +252,7 @@ export class NativeWindowBridge {
   }
 
   close() {
+    this.generation += 1;
     const child = this.child;
     this.child = undefined;
     child?.kill();

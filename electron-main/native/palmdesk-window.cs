@@ -109,6 +109,7 @@ internal static class PalmDeskWindow
     [DllImport("user32.dll")] private static extern bool ShowWindowAsync(IntPtr window, int command);
     [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint from, uint to, bool attach);
     [DllImport("user32.dll")] private static extern uint SendInput(uint count, Input[] inputs, int size);
+    [DllImport("user32.dll")] private static extern short GetAsyncKeyState(int key);
     [DllImport("user32.dll")] private static extern bool SetProcessDpiAwarenessContext(IntPtr context);
     [DllImport("shcore.dll")] private static extern int SetProcessDpiAwareness(int awareness);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
@@ -358,6 +359,62 @@ internal static class PalmDeskWindow
         return applications;
     }
 
+    private static TargetWindow VerifyImagePaste(Dictionary<string, object> request)
+    {
+        var window = new IntPtr(Integer(request, "nativeId"));
+        uint pid = (uint)Integer(request, "ownerPid");
+        object bundle;
+        if (!request.TryGetValue("bundleId", out bundle) || !(bundle is string) ||
+            String.IsNullOrWhiteSpace((string)bundle))
+            throw new WindowFailure("invalid", "Missing executable identity");
+        var target = VerifyWindow(window, pid, (string)bundle);
+        // ReadProcess supplies a full executable path plus its creation time.
+        // The caller cannot opt another application in by changing its title.
+        string executable = target.bundleId.Substring(6, target.bundleId.LastIndexOf('#') - 6);
+        if (!String.Equals(Path.GetFileName(executable), "codex.exe", StringComparison.OrdinalIgnoreCase))
+            throw new WindowFailure("invalid", "Image paste requires a verified Windows Codex window");
+        CheckInputPermission(pid);
+        if (!target.isOnScreen || !IsWindowEnabled(window) || GetForegroundWindow() != window)
+            throw new WindowFailure("focus", "The selected Codex window must remain in the foreground");
+        // Remote-held inputs were released by CaptureSession. Do not combine
+        // Ctrl+V with any held key (including auto-repeat) or mouse button.
+        for (int key = 1; key < 255; key++)
+            if ((GetAsyncKeyState(key) & 0x8000) != 0)
+                throw new WindowFailure("input_busy", "Release held modifiers and V before pasting");
+        return target;
+    }
+
+    private static Input KeyInput(ushort key, bool up)
+    {
+        return new Input { Type = 1, Data = new InputData {
+            Keyboard = new KeyboardInput { VirtualKey = key, Flags = up ? 2U : 0U }
+        } };
+    }
+
+    private static object PasteImage(Dictionary<string, object> request)
+    {
+        var target = VerifyImagePaste(request);
+        var inputs = new[] {
+            KeyInput(0x11, false), KeyInput(0x56, false),
+            KeyInput(0x56, true), KeyInput(0x11, true)
+        };
+        if (GetForegroundWindow().ToInt64() != target.nativeId)
+            throw new WindowFailure("focus", "The selected Codex window lost foreground focus");
+        uint inserted = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(Input)));
+        if (inserted != inputs.Length)
+        {
+            if (inserted > 0)
+            {
+                var release = new[] { KeyInput(0x56, true), KeyInput(0x11, true) };
+                SendInput((uint)release.Length, release, Marshal.SizeOf(typeof(Input)));
+            }
+            // Never replay a partially accepted shortcut: an attachment may
+            // already exist. Key-up cleanup cannot create another paste.
+            throw new WindowFailure("paste_unconfirmed", "Windows did not confirm the complete paste shortcut");
+        }
+        return new { };
+    }
+
     private static object Dispatch(Dictionary<string, object> request)
     {
         object command;
@@ -368,6 +425,8 @@ internal static class PalmDeskWindow
             case "applications": return ListApplications();
             case "focus": return FocusWindow(request);
             case "text": return TypeText(request);
+            case "verifyImagePaste": return VerifyImagePaste(request);
+            case "pasteImage": return PasteImage(request);
             case "permissions": return new { accessibility = true, captureSupported = SupportsCapture() };
             case "thumbnails": return new object[0];
             case "diagnostics":
