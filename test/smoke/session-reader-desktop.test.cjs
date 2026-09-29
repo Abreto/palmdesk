@@ -5,7 +5,9 @@ const path = require('node:path');
 const test = require('node:test');
 const load = require('./load-source.cjs');
 
-test('desktop reader is off by default, persists opt-in, rejects writes and revokes in-flight reads', async (t) => {
+for (const platform of ['darwin', 'win32']) {
+for (const method of ['list', 'read']) {
+test(`${platform}: desktop reader persists opt-in and revokes in-flight ${method}`, async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-settings-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   let unblock;
@@ -13,28 +15,50 @@ test('desktop reader is off by default, persists opt-in, rejects writes and revo
   const entered = new Promise((resolve) => { started = resolve; });
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
     '../session-core/index.mjs': { createSessionReader: () => ({
-      list: () => { started(); return new Promise((resolve) => { unblock = resolve; }); },
+      [method]: () => { started(); return new Promise((resolve) => { unblock = resolve; }); },
     }) },
   });
-  const reader = new DesktopSessionReader(directory, 'darwin');
+  const reader = new DesktopSessionReader(directory, platform);
   assert.deepEqual(await reader.request({ method: 'status' }), { enabled: false, supported: true });
   await assert.rejects(reader.request({ method: 'list' }), /开启/);
   await reader.configure(true);
-  assert.equal((await new DesktopSessionReader(directory, 'darwin').settings()).enabled, true);
+  assert.equal((await new DesktopSessionReader(directory, platform).settings()).enabled, true);
   await assert.rejects(reader.request({ method: 'follow-up', prompt: 'execute' }), /不支持/);
-  const pending = reader.request({ method: 'list' });
+  const pending = reader.request({ method });
   const rejected = assert.rejects(pending, /已关闭/);
   await entered;
   await reader.configure(false);
+  await assert.rejects(reader.request({ method: 'read', id: 'anything' }), /开启/);
+  assert.equal((await new DesktopSessionReader(directory, platform).settings()).enabled, false);
+  // Re-enabling must not allow a result from the previous permission generation.
+  await reader.configure(true);
   unblock({ sessions: [{ text: 'should never escape' }] });
   await rejected;
-  assert.equal((await new DesktopSessionReader(directory, 'darwin').settings()).enabled, false);
-  const windows = new DesktopSessionReader(directory, 'win32');
-  assert.deepEqual(await windows.settings(), { enabled: false, supported: false });
-  await assert.rejects(windows.configure(true), /macOS/);
+});
+}
+
+test(`${platform}: malformed settings and failed persistence leave reading disabled`, async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-fail-closed-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
+    '../session-core/index.mjs': { createSessionReader: () => assert.fail('reader must stay disabled') },
+  });
+  for (const saved of ['null', '{', '{"enabled":"true"}']) {
+    await writeFile(path.join(directory, 'session-reader.json'), saved);
+    assert.deepEqual(await new DesktopSessionReader(directory, platform).settings(), { enabled: false, supported: true });
+  }
+  const reader = new DesktopSessionReader(directory, platform);
+  await assert.rejects(reader.configure('true'), /无效/);
+  // A directory at the temporary-file path makes persistence fail on both hosts.
+  await mkdir(path.join(directory, 'session-reader.json.tmp'));
+  await assert.rejects(reader.configure(true));
+  assert.equal((await reader.settings()).enabled, false);
+  await assert.rejects(reader.request({ method: 'list' }), /开启/);
+  await rm(path.join(directory, 'session-reader.json.tmp'), { recursive: true });
+  assert.equal((await reader.configure(true)).enabled, true);
 });
 
-test('desktop requests read Claude transcripts through the same opt-in boundary', async (t) => {
+test(`${platform}: desktop requests read Claude transcripts through the same opt-in boundary`, async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-desktop-claude-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const claudeConfigDir = path.join(directory, 'claude');
@@ -42,7 +66,7 @@ test('desktop requests read Claude transcripts through the same opt-in boundary'
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
     '../session-core/index.mjs': await import('../../session-core/index.mjs'),
   });
-  const reader = new DesktopSessionReader(directory, 'darwin', path.join(directory, 'no-codex'), claudeConfigDir, '');
+  const reader = new DesktopSessionReader(directory, platform, path.join(directory, 'no-codex'), claudeConfigDir, '');
   const id = 'claude-code:session-file:33333333-3333-4333-8333-333333333333';
   await assert.rejects(reader.request({ method: 'read', id }), /开启/);
   await reader.configure(true);
@@ -56,7 +80,7 @@ test('desktop requests read Claude transcripts through the same opt-in boundary'
   await assert.rejects(reader.request({ method: 'read', id }), /开启/);
 });
 
-test('desktop requests discover Claude Desktop Code records and revoke access with the same setting', async (t) => {
+test(`${platform}: desktop requests discover Claude Desktop Code records and revoke access with the same setting`, async (t) => {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-claude-desktop-opt-in-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const claudeDesktopDataDir = path.join(directory, 'Claude');
@@ -71,7 +95,7 @@ test('desktop requests discover Claude Desktop Code records and revoke access wi
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
     '../session-core/index.mjs': await import('../../session-core/index.mjs'),
   });
-  const reader = new DesktopSessionReader(directory, 'darwin', path.join(directory, 'no-codex'), path.join(directory, 'no-cli'), claudeDesktopDataDir);
+  const reader = new DesktopSessionReader(directory, platform, path.join(directory, 'no-codex'), path.join(directory, 'no-cli'), claudeDesktopDataDir);
   const id = 'claude-code:session-file:33333333-3333-4333-8333-333333333333';
   await assert.rejects(reader.request({ method: 'read', id }), /开启/);
   await reader.configure(true);
@@ -84,4 +108,18 @@ test('desktop requests discover Claude Desktop Code records and revoke access wi
   assert.ok(page.items.some((item) => item.detail === 'tests passed'));
   await reader.configure(false);
   await assert.rejects(reader.request({ method: 'read', id }), /开启/);
+});
+}
+
+test('unsupported hosts ignore saved opt-in and reject configuration', async (t) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-unsupported-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await writeFile(path.join(directory, 'session-reader.json'), JSON.stringify({ enabled: true }));
+  const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
+    '../session-core/index.mjs': { createSessionReader: () => assert.fail('reader must stay disabled') },
+  });
+  const reader = new DesktopSessionReader(directory, 'linux');
+  assert.deepEqual(await reader.settings(), { enabled: false, supported: false });
+  await assert.rejects(reader.configure(true), /macOS.*Windows/);
+  await assert.rejects(reader.request({ method: 'list' }), /开启/);
 });

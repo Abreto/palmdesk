@@ -10,9 +10,18 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 
 ## Session Reading Preview
 
-PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS**, listed together by last update with a source label. Windows hosts and other applications retain the window view.
+PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS and Windows**, listed together by last update with a source label.
 
-Codex reads from `CODEX_HOME` or `~/.codex`. Claude Code reads `projects/*/*.jsonl` under `CLAUDE_CONFIG_DIR` or `~/.claude`, including renamed sessions, text replies and tool results. Claude Desktop's local **Code** sessions are also discovered through its indexes in `~/Library/Application Support/Claude` and `Claude-3p`, or `CLAUDE_USER_DATA_DIR` when set. This covers both global and per-session transcripts, displays Desktop titles and deduplicates shared logs. Set custom directories in the environment that launches PalmDesk. Desktop Chat/Cowork, fetching cloud/SSH sessions and nested subagent transcripts are not supported; a local transcript must still exist.
+| Local source | macOS host | Windows host |
+| --- | --- | --- |
+| Codex | Supported | Supported (native Windows logs) |
+| Claude Code | Supported | Supported (native Windows logs) |
+| Claude Desktop · Code | Supported | Supported (native local Code logs) |
+| Desktop Chat/Cowork, cloud/SSH/WSL retrieval | Unsupported | Unsupported |
+
+Codex reads from `CODEX_HOME` or `~/.codex`. Claude Code reads `projects/*/*.jsonl` under `CLAUDE_CONFIG_DIR` or `~/.claude`, including renamed sessions, text replies and tool results. On Windows, `~` is the current user's home (normally `%USERPROFILE%`). Claude Desktop uses `~/Library/Application Support/Claude` and `Claude-3p` on macOS; on Windows it checks `%APPDATA%\Claude`, `%LOCALAPPDATA%\Claude-3p`, legacy `%APPDATA%\Claude-3p`, and their packaged-app locations under `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache`. `CLAUDE_USER_DATA_DIR` selects a single custom Desktop directory. This covers global and per-session transcripts, preserves Desktop titles and deduplicates shared logs.
+
+Set custom directories in the environment that launches PalmDesk; spaces and non-ASCII names are supported. Reading stays local and read-only. WSL homes are not automatically searched, Desktop SSH/WSL indexes and nested subagent transcripts are excluded, and no cloud logs are fetched. A readable local transcript must exist. Linux hosts do not support session reading. Windows storage and automated checks are recorded in the [validation notes](docs/smoke-artifacts/windows-session-reading-2026-09-24.md); a physical Windows host + phone run for all three sources is still unvalidated.
 
 Enable **会话阅读** (Session reading) on the desktop home page, then connect from your phone using the QR code or device credentials. The controller opens the **阅读** (Read) tab, which lists searchable sessions and renders Markdown, copyable replies, paginated history and collapsed tool output. Reading works without starting window capture or granting Screen Recording and Accessibility permissions. While visible, the reader checks the selected session for updates every eight seconds and offers a button to view new content without moving your reading position automatically.
 

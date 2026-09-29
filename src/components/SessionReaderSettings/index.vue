@@ -16,8 +16,8 @@
     <p>
       {{
         supported
-          ? '读取 Codex、Claude Code 和 Claude Desktop 的本地会话。'
-          : '仅 macOS 支持本地会话。'
+          ? '读取 Codex、Claude Code 和 Claude Desktop Code 的本地会话。'
+          : '会话阅读支持 macOS 和 Windows。'
       }}
     </p>
     <p

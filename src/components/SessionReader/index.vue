@@ -22,7 +22,7 @@
         {{
           settings.supported
             ? '在电脑首页开启「会话阅读」即可查看本地会话。'
-            : '此电脑不支持本地会话。'
+            : '会话阅读支持 macOS 和 Windows。'
         }}
       </p>
       <button
