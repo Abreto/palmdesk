@@ -40,7 +40,7 @@ critical 公告涉及 [form-data](https://github.com/advisories/GHSA-fjxv-7rqg-7
 ## 安装包与对外服务
 
 - [ ] 处理高风险依赖，重新审计并记录剩余告警的可达性。
-- [ ] 替换继承的应用图标或核实独立许可，收集完整第三方 LICENSE / NOTICE。
+- [x] 已替换继承的应用图标；仍需收集完整第三方 LICENSE / NOTICE。
 - [ ] 验收真实 Codex / ChatGPT 窗口捕获、系统输入、焦点变化和权限恢复。
 - [ ] 验收 iOS Safari、蜂窝网络、断线恢复与强制 TURN 中继。
 - [ ] 完成自己的 macOS 签名和公证，再发布面向普通用户的安装包。

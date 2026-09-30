@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <title>PalmDesk</title>
+  <desc>A desktop window resting in an open palm</desc>
+  <defs><linearGradient id="forest" x1="0" y1="0" x2="0.8" y2="1"><stop stop-color="#218D73"/><stop offset=".55" stop-color="#167C65"/><stop offset="1" stop-color="#116B57"/></linearGradient></defs><rect x="8" y="8" width="112" height="112" rx="25" fill="url(#forest)"/>
+  <g transform="translate(19.2 17.6) scale(.7)"><g fill="#F6F7F2">
+    <!-- Window: rounded frame, title bar, and an open working area. -->
+    <path
+      fill-rule="evenodd"
+      d="M36 12H80C88.837 12 96 19.163 96 28V57C96 65.837 88.837 73 80 73H36C27.163 73 20 65.837 20 57V28C20 19.163 27.163 12 36 12ZM32 25A2.5 2.5 0 0 0 32 30H84A2.5 2.5 0 0 0 84 25ZM33 39A3 3 0 0 0 30 42V56A7 7 0 0 0 37 63H79A7 7 0 0 0 86 56V42A3 3 0 0 0 83 39Z"
+    />
+    <!-- A single continuous silhouette; the thumb never overlaps the palm. -->
+    <path
+      d="M8 81C17 76 30 83 43 88C49 90.3 53 92 58 90C65 87 75 85 86 85C92 85 94 91 88 95L72 103C70 104 70 106 74 105C89 101 98 95 101 84L105 69C107 62 112 57 117 59C123 61 122 67 120 75L115 92C109 112 94 120 69 120C41 120 21 108 9 91C6 87 5 83 8 81Z"
+    />
+  </g></g>
+</svg>
