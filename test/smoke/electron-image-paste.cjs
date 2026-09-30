@@ -1,11 +1,15 @@
+/* eslint-disable no-restricted-syntax, require-await -- Clipboard cases run in sequence; async input-driver doubles match the production contract. */
 // Exercise real macOS image decoding and clipboard paste in a disposable,
 // hidden Electron window. This does not target Codex or synthesize OS keys.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
+
 const { app, BrowserWindow, clipboard, nativeImage } = require('electron');
+
 const load = require('./load-source.cjs');
+
 const { pasteClipboardImage } = load('electron-main/image-paste.ts');
 const root = path.resolve(__dirname, '../..');
 const output = path.join(root, '.local/image-paste');
@@ -64,6 +68,7 @@ app
             clipboard.writeImage(image);
             lastWritten = clipboard.readImage().toPNG();
           },
+          read: () => clipboard.readImage(),
           press: async () => {
             window.webContents.paste();
           },

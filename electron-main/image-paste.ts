@@ -20,6 +20,7 @@ export function supportsImagePaste(source: ICaptureSource, platform: string) {
 type ClipboardDriver = {
   decode: (bytes: Uint8Array) => Electron.NativeImage;
   write: (image: Electron.NativeImage) => void;
+  read: () => Electron.NativeImage;
 };
 
 export async function pasteClipboardImage(
@@ -43,8 +44,21 @@ export async function pasteClipboardImage(
   // immediately can race Codex's asynchronous reading of the pasteboard.
   try {
     driver.write(image);
+    // Electron can return without writing when Windows cannot acquire the
+    // clipboard. Confirm the decoded pixels before allowing the paste shortcut.
+    const copied = driver.read();
+    const copiedSize = copied.getSize();
+    if (
+      copied.isEmpty() ||
+      copiedSize.width !== size.width ||
+      copiedSize.height !== size.height ||
+      !copied.toBitmap().equals(image.toBitmap())
+    )
+      throw new Error('Clipboard image did not match');
   } catch {
-    throw new Error('无法写入电脑剪贴板，请关闭占用剪贴板的应用后手动重试');
+    throw new Error(
+      '无法写入或确认电脑剪贴板中的图片，请关闭占用剪贴板的应用后手动重试'
+    );
   }
   try {
     if (!current()) throw new Error('图片粘贴已取消');

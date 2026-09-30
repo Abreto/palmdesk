@@ -146,7 +146,7 @@ node node_modules/electron/cli.js test/smoke/windows-image-paste.cjs
 Remove-Item Env:PALMDESK_NATIVE_SMOKE
 ```
 
-该测试读取剪贴板的 PNG 格式（保留透明度），逐像素比较 PNG/JPEG 解码内容，验证 `Ctrl+V`、中英文混合草稿、按键释放、取消、过期进程身份、焦点变化和关闭目标；不会把 Windows Forms 的旧式 DIB 格式当作 Chromium 的 PNG 附件。测试结束且剪贴板仍是测试内容时恢复常用剪贴板格式，结果写入 `.local/image-paste/windows-result.json`。浏览器烟测另覆盖原始字节传输、阅读/仅观看取消和图片通道重连。两者均不能替代手机连接真实 Codex 的附件验收；记录和待验收步骤见 [Windows 图片粘贴验证记录](smoke-artifacts/windows-image-paste-2026-09-24.md)。
+该测试读取剪贴板的 PNG 格式（保留透明度），逐像素比较 PNG/JPEG 解码内容，验证 `Ctrl+V`、中英文混合草稿、按键释放、取消、过期进程身份、焦点变化和关闭目标；不会把 Windows Forms 的旧式 DIB 格式当作 Chromium 的 PNG 附件。测试还让独立进程锁定剪贴板，确认 Electron 静默写入失败时不会发送粘贴快捷键，释放锁后允许显式重试。测试结束且剪贴板仍是测试内容时恢复常用剪贴板格式，结果写入 `.local/image-paste/windows-result.json`。浏览器烟测另覆盖原始字节传输、阅读/仅观看取消和图片通道重连。两者均不能替代手机连接真实 Codex 的附件验收；记录和待验收步骤见 [Windows 图片粘贴验证记录](smoke-artifacts/windows-image-paste-2026-09-24.md)。
 
 Windows 权限错误需要以相同权限级别运行 Codex 与 PalmDesk，通常关闭目标的「以管理员身份运行」即可；前台焦点错误需要关闭阻挡的对话框并切回所选窗口。按键占用错误需释放所有按键和鼠标按钮。处理后手动点击粘贴即可重新校验；其他应用、HEIC/GIF、多图、任意文件、裁剪和标注仍不在本功能范围内。
 

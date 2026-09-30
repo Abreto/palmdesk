@@ -48,6 +48,14 @@ internal static class NativeMethods
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool OpenClipboard(IntPtr window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetCursorPos(out Point point);
 
     [DllImport("user32.dll")]
@@ -151,6 +159,7 @@ internal sealed class FixtureContext : ApplicationContext
     private readonly long[] handles = new long[2];
     private readonly int ownerPid = Process.GetCurrentProcess().Id;
     private bool stopping;
+    private bool clipboardLocked;
 
     internal FixtureContext()
     {
@@ -264,6 +273,16 @@ internal sealed class FixtureContext : ApplicationContext
             {
                 case "status":
                     break;
+                case "lockClipboard":
+                    if (clipboardLocked || !NativeMethods.OpenClipboard(dispatcher.Handle))
+                        throw new InvalidOperationException("Cannot lock clipboard");
+                    clipboardLocked = true;
+                    break;
+                case "unlockClipboard":
+                    if (!clipboardLocked || !NativeMethods.CloseClipboard())
+                        throw new InvalidOperationException("Cannot unlock clipboard");
+                    clipboardLocked = false;
+                    break;
                 case "minimize":
                     NativeMethods.ShowWindow(OwnedWindow(request).Handle, 7);
                     break;
@@ -349,6 +368,11 @@ internal sealed class FixtureContext : ApplicationContext
     {
         if (stopping) return;
         stopping = true;
+        if (clipboardLocked)
+        {
+            NativeMethods.CloseClipboard();
+            clipboardLocked = false;
+        }
         foreach (TestWindow window in windows)
             if (window != null && !window.IsDisposed) window.Close();
         dispatcher.Dispose();

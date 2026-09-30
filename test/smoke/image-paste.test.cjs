@@ -179,12 +179,25 @@ test('failed key or button release prevents paste and is retried on the next exp
 
 function windowsDriver() {
   const events = [];
+  const native = {
+    isEmpty: () => false,
+    getSize: () => ({ width: 238, height: 48 }),
+    toBitmap: () => Buffer.alloc(238 * 48 * 4, 127),
+  };
+  let clipboardImage;
   const driver = {
     decode: (bytes) => {
       assert.deepEqual(bytes, image.bytes);
-      return { isEmpty: () => false, getSize: () => inspectImage(bytes) };
+      return native;
     },
-    write: () => events.push('write'),
+    write: (value) => {
+      events.push('write');
+      clipboardImage = value;
+    },
+    read: () => {
+      events.push('read');
+      return clipboardImage;
+    },
     request: async (command, target) => {
       assert.deepEqual(target, {
         nativeId: 10,
@@ -197,10 +210,56 @@ function windowsDriver() {
   return { events, driver };
 }
 
-test('Windows clipboard is verified before writing and uses the guarded native paste command once', async () => {
+test('Windows target is verified before writing and clipboard contents before the guarded paste', async () => {
   const { events, driver } = windowsDriver();
   await pasteWindowsClipboardImage(image, windowsSource, () => true, driver);
-  assert.deepEqual(events, ['verifyImagePaste', 'write', 'pasteImage']);
+  assert.deepEqual(events, ['verifyImagePaste', 'write', 'read', 'pasteImage']);
+});
+
+test('a silent Windows clipboard write failure cannot paste old text or an old image', async () => {
+  for (const contents of [
+    {
+      isEmpty: () => true,
+      getSize: () => ({ width: 0, height: 0 }),
+      toBitmap: () => Buffer.alloc(0),
+    },
+    {
+      isEmpty: () => false,
+      getSize: () => ({ width: 238, height: 48 }),
+      toBitmap: () => Buffer.alloc(238 * 48 * 4, 126),
+    },
+    {
+      isEmpty: () => false,
+      getSize: () => ({ width: 48, height: 238 }),
+      toBitmap: () => Buffer.alloc(238 * 48 * 4, 127),
+    },
+  ]) {
+    const { events, driver } = windowsDriver();
+    driver.write = () => events.push('write');
+    driver.read = () => contents;
+    await assert.rejects(
+      pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
+      /剪贴板.*手动重试/
+    );
+    assert.deepEqual(events, ['verifyImagePaste', 'write']);
+  }
+});
+
+test('a clipboard read failure stops input and permits a later explicit paste', async () => {
+  const { events, driver } = windowsDriver();
+  const read = driver.read;
+  driver.read = () => {
+    throw new Error('clipboard is locked');
+  };
+  await assert.rejects(
+    pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
+    /剪贴板.*手动重试/
+  );
+  assert.deepEqual(events, ['verifyImagePaste', 'write']);
+  events.length = 0;
+  driver.read = read;
+  await pasteWindowsClipboardImage(image, windowsSource, () => true, driver);
+  assert.deepEqual(events, ['verifyImagePaste', 'write', 'read', 'pasteImage']);
 });
 
 test('Windows verification failures leave the clipboard untouched and explain recovery', async () => {
@@ -239,15 +298,16 @@ test('cancellation during Windows verification prevents clipboard writes and nat
 test('cancellation after a clipboard write prevents the Windows paste shortcut', async () => {
   const { events, driver } = windowsDriver();
   let current = true;
-  driver.write = () => {
-    events.push('write');
+  const write = driver.write;
+  driver.write = (value) => {
+    write(value);
     current = false;
   };
   await assert.rejects(
     pasteWindowsClipboardImage(image, windowsSource, () => current, driver),
     /取消/
   );
-  assert.deepEqual(events, ['verifyImagePaste', 'write']);
+  assert.deepEqual(events, ['verifyImagePaste', 'write', 'read']);
 });
 
 test('a failed Windows shortcut reports an unconfirmed result without replaying input', async () => {
@@ -265,7 +325,7 @@ test('a failed Windows shortcut reports an unconfirmed result without replaying 
     pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
     /未确认.*Codex/
   );
-  assert.deepEqual(events, ['verifyImagePaste', 'write', 'pasteImage']);
+  assert.deepEqual(events, ['verifyImagePaste', 'write', 'read', 'pasteImage']);
 });
 
 test('image paste releases held keys and serializes with text input', async () => {
@@ -343,6 +403,7 @@ test('clipboard write precedes the paste shortcut, and modifiers release even on
   const native = {
     isEmpty: () => false,
     getSize: () => inspectImage(image.bytes),
+    toBitmap: () => Buffer.alloc(238 * 48 * 4, 127),
   };
   const driver = {
     decode: () => native,
@@ -350,6 +411,7 @@ test('clipboard write precedes the paste shortcut, and modifiers release even on
       assert.equal(value, native);
       events.push('write');
     },
+    read: () => native,
     press: async () => {
       events.push('paste');
       throw new Error('keyboard failed');

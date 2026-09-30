@@ -158,6 +158,7 @@ const captureSession = new CaptureSession(
       const clipboardDriver = {
         decode: (bytes) => nativeImage.createFromBuffer(Buffer.from(bytes)),
         write: (value) => clipboard.writeImage(value),
+        read: () => clipboard.readImage(),
       };
       if (platform === 'win32')
         return pasteWindowsClipboardImage(image, source, current, {

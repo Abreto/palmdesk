@@ -86,6 +86,7 @@ app
           lastImage = clipboard.readImage().toPNG();
           writes += 1;
         },
+        read: () => clipboard.readImage(),
         request: (command, identity, current) =>
           native.request(command, identity, current),
       };
@@ -95,6 +96,38 @@ app
         nativeId: target.nativeId,
         text: draft,
       });
+      const payload = {
+        mime: 'image/png',
+        bytes: new Uint8Array(
+          fs.readFileSync(path.join(root, 'src/assets/img/logo.png'))
+        ),
+      };
+      clipboard.writeText(marker);
+      await fixture.request('lockClipboard');
+      try {
+        await assert.rejects(
+          pasteWindowsClipboardImage(payload, target, () => true, driver),
+          /剪贴板.*手动重试/
+        );
+        assert.equal(
+          writes,
+          1,
+          'Electron silently returned from the locked write'
+        );
+      } finally {
+        await fixture.request('unlockClipboard');
+      }
+      assert.equal(
+        clipboard.readText(),
+        marker,
+        'the failed write left old text'
+      );
+      const afterLock = await fixture.request('status');
+      assert.equal(afterLock.windows[0].text, draft);
+      assert.equal(afterLock.windows[0].images.length, 0);
+      assert.equal(afterLock.windows[1].images.length, 0);
+      assert.equal(afterLock.controlHeld, false);
+      assert.equal(afterLock.pasteKeyHeld, false);
       const results = [];
       for (const [filename, mime] of [
         ['logo.png', 'image/png'],
@@ -147,12 +180,6 @@ app
           draftPreserved: true,
         });
       }
-      const payload = {
-        mime: 'image/png',
-        bytes: new Uint8Array(
-          fs.readFileSync(path.join(root, 'src/assets/img/logo.png'))
-        ),
-      };
       clipboard.writeText(marker);
       await assert.rejects(
         pasteWindowsClipboardImage(payload, target, () => false, driver),
@@ -206,8 +233,8 @@ app
       );
       assert.equal(
         writes,
-        3,
-        'only the two successful pastes and the focus-race case wrote an image'
+        4,
+        'only the locked write, two successful pastes and the focus-race case attempted an image write'
       );
       await fixture.request('close', { nativeId: target.nativeId });
       await assert.rejects(
@@ -227,6 +254,7 @@ app
             electron: process.versions.electron,
             results,
             rejected: [
+              'silent clipboard write failure while locked by another process',
               'cancelled',
               'cancelled during verification',
               'stale PID/path/start time',
@@ -242,7 +270,7 @@ app
         )
       );
       console.log(
-        'PASS real Windows PNG/JPEG clipboard pixels, Ctrl+V, Chinese/English draft, key release, cancellation and stale/focus/closed-target rejection'
+        'PASS real Windows PNG/JPEG clipboard pixels, Ctrl+V, Chinese/English draft, key release, locked clipboard failure and explicit retry, cancellation and stale/focus/closed-target rejection'
       );
     } finally {
       fixture.close();
