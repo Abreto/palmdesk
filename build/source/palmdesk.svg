@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <title>PalmDesk</title>
   <desc>A desktop window resting in an open palm</desc>
-  <rect x="0" y="0" width="128" height="128" rx="29" fill="#167C65"/>
-  <g transform="translate(12.8 11.2) scale(.8)"><g fill="#F6F7F2">
+  <defs><linearGradient id="forest" x1="0" y1="0" x2="0.8" y2="1"><stop stop-color="#218D73"/><stop offset=".55" stop-color="#167C65"/><stop offset="1" stop-color="#116B57"/></linearGradient></defs><rect x="8" y="8" width="112" height="112" rx="25" fill="url(#forest)"/>
+  <g transform="translate(19.2 17.6) scale(.7)"><g fill="#F6F7F2">
     <!-- Window: rounded frame, title bar, and an open working area. -->
     <path
       fill-rule="evenodd"

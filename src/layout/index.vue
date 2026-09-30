@@ -42,7 +42,11 @@
         aria-label="PalmDesk 首页"
       >
         <span class="brand-mark">
-          <img :src="palmdeskMark" alt="" aria-hidden="true" />
+          <img
+            :src="palmdeskMark"
+            alt=""
+            aria-hidden="true"
+          />
         </span>
         <span class="brand-name"
           >PalmDesk<span>AI-native remote control</span></span
@@ -407,16 +411,14 @@ $sidebar-width: 240px;
 .brand-mark {
   display: grid;
   place-items: center;
-  flex: 0 0 38px;
-  width: 38px;
+  flex: 0 0 42px;
+  width: 42px;
   height: 42px;
-  border-radius: var(--pd-radius-sm);
-  background: var(--pd-accent);
-  color: var(--pd-on-accent);
-  box-shadow: var(--pd-glow);
-  svg {
-    width: 24px;
-    height: 24px;
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 }
 .brand-name {
@@ -593,14 +595,9 @@ $sidebar-width: 240px;
     width: fit-content;
   }
   .brand-mark {
-    flex-basis: 30px;
-    width: 30px;
+    flex-basis: 32px;
+    width: 32px;
     height: 32px;
-    border-radius: var(--pd-radius-sm);
-    svg {
-      width: 20px;
-      height: 20px;
-    }
   }
   .brand-name {
     display: flex;
