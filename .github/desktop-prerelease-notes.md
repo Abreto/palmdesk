@@ -1,15 +1,14 @@
 Experimental PalmDesk desktop installers for testing.
 
-## What's new in v0.0.5
+## What's new in v0.0.6
 
-- Pinch with two fingers to zoom the remote window from fit to 300%, centered on your gesture. Pan with both fingers, or continue panning with one after lifting the other. The toolbar and text composer stay in place; choose Fit to reset.
-- Pause video when the phone browser goes into the background or switches to Read mode. If the browser cannot notify the desktop before suspension, video pauses after ten seconds without controller updates.
-- Resume or reconnect when returning to the same browser page, preserving the reading position and unsent text. After a disconnect, the selected window can be restored for five minutes for the same authenticated controller, after checking that the original window still exists. Closed or expired windows return to the picker.
-- Refresh the desktop and mobile interface with a light theme, green actions and status indicators, compact navigation, clearer device cards, and concise copy across settings, dialogs, session reading, and window controls.
+- Read local Codex, Claude Code and Claude Desktop Code sessions on Windows, alongside the existing macOS support. Enable Session reading on the host to browse searchable sessions, Markdown replies, history and tool output from your phone. Reading is off by default and stays read-only; cloud, SSH, WSL and Desktop Chat/Cowork sessions are not included.
+- Paste a single PNG/JPEG from your phone into a Windows Codex prompt, with the same 10 MiB limit as macOS. Click the intended prompt first, then explicitly paste. PalmDesk verifies the target window, focus and clipboard image before sending Ctrl+V; text drafts remain intact and messages are not submitted automatically. Pasting replaces the host clipboard. Cancelled or uncertain operations are not retried automatically.
+- Introduce the original Palm Window identity: a desktop window resting in an open palm, with refreshed macOS and Windows application icons, browser icons, and desktop/mobile navigation marks.
 
-Update the desktop app and refresh the phone web client together for pause/resume support. Recovery preserves state only in the same surviving browser page; reloading or discarding the page clears it. Reading mode does not restart window capture until you return to Window. Gesture and recovery behavior has browser smoke-test coverage; physical iOS Safari, Android Chrome, and network handoffs still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.5/README.md) for details and limits.
+Update the desktop app and refresh the phone web client together for the new Windows features. Windows session discovery and image paste have automated and native-fixture coverage; end-to-end testing with a physical phone and the actual agent apps remains incomplete. iOS Safari, Android Chrome, elevated Windows targets and network handoffs still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.6/README.md) for details and limits.
 
-[Changes since v0.0.4](https://github.com/Abreto/palmdesk/compare/v0.0.4...v0.0.5)
+[Changes since v0.0.5](https://github.com/Abreto/palmdesk/compare/v0.0.5...v0.0.6)
 
 ## Installation
 
@@ -31,22 +30,21 @@ Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
 These builds pass source checks and packaging verification in CI. Real screen capture, input, permission recovery and phone/network behavior still require testing on physical devices.
 
 `SHA256SUMS.txt` contains SHA256 hashes of the two installers.
-This prerelease does not resolve the known dependency and license review items in [release prerequisites](https://github.com/Abreto/palmdesk/blob/main/docs/OPEN_SOURCE_READINESS.md).
+This prerelease does not resolve the known dependency and license review items in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.6/docs/OPEN_SOURCE_READINESS.md).
 
 ## 中文说明
 
 供测试使用的 PalmDesk 桌面安装包。
 
-### v0.0.5 更新内容
+### v0.0.6 更新内容
 
-- 支持围绕双指手势位置，将远程窗口从「适合」连续缩放至 300%。双指可平移画面，抬起一指后另一指可继续平移；工具栏和文字输入框保持原位，选择「适合」可重置。
-- 手机浏览器进入后台或切换到阅读模式时暂停视频。若浏览器挂起前未能通知电脑，电脑端会在十秒未收到控制端状态后暂停视频。
-- 返回同一浏览器页面时恢复连接或自动重连，保留阅读位置和未发送的文字。断线后五分钟内，同一已认证控制端可在重新校验原窗口身份后恢复所选窗口；窗口已关闭或恢复信息过期时返回选窗。
-- 更新桌面端和手机端界面，采用浅色主题、绿色操作与状态提示、紧凑导航和更清晰的设备卡片，并精简设置、弹窗、会话阅读及窗口控制中的文案。
+- 将本地 Codex、Claude Code 和 Claude Desktop Code 会话阅读扩展到 Windows，保留已有 macOS 支持。在电脑端开启「会话阅读」后，可从手机搜索会话、阅读 Markdown 回复、历史记录和工具输出。阅读默认关闭且保持只读；不包含云端、SSH、WSL 和 Desktop Chat/Cowork 会话。
+- 支持从手机向 Windows Codex 的 prompt 粘贴单张 PNG/JPEG，最大 10 MiB，与 macOS 一致。先点击目标输入框，再明确执行粘贴；PalmDesk 校验目标窗口、焦点和剪贴板图片后发送 Ctrl+V，保留文字草稿，不自动提交消息。粘贴会替换电脑剪贴板，取消或结果不确定时不会自动重试。
+- 引入原创 Palm Window 品牌形象：掌心托起桌面窗口，更新 macOS、Windows 应用图标、浏览器图标以及桌面端和手机端导航标识。
 
-请更新桌面 App 并刷新手机网页，以使用暂停与恢复功能。状态仅保留在同一存活页面中，刷新页面或页面被系统回收后会清除；阅读模式重连后，只有切回「窗口」才重新捕获。手势和恢复行为已有浏览器烟测覆盖，iOS Safari、Android Chrome 以及网络切换仍需实机验收。详细说明及限制见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.5/README.zh-CN.md)。
+请更新桌面 App 并刷新手机网页，以使用新的 Windows 功能。Windows 会话发现和图片粘贴已有自动化及原生测试窗口验证，但真实手机连接实际 Agent 应用的完整验收尚未完成。iOS Safari、Android Chrome、Windows 提权目标以及网络切换仍需实机验收。详细说明及限制见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.6/README.zh-CN.md)。
 
-[查看自 v0.0.4 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.4...v0.0.5)
+[查看自 v0.0.5 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.5...v0.0.6)
 
 ### 安装说明
 
@@ -67,4 +65,4 @@ This prerelease does not resolve the known dependency and license review items i
 这些构建已通过 CI 中的源码检查和打包验证。真实的屏幕捕获、输入、权限恢复以及手机和网络行为仍需在实体设备上测试。
 
 `SHA256SUMS.txt` 包含两个安装包的 SHA256 校验和。
-本测试版未解决[发行前提](https://github.com/Abreto/palmdesk/blob/main/docs/OPEN_SOURCE_READINESS.md)中已知的依赖和许可证审查事项。
+本测试版未解决[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.6/docs/OPEN_SOURCE_READINESS.md)中已知的依赖和许可证审查事项。
