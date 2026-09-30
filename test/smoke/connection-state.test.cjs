@@ -8,6 +8,9 @@ test('controller becomes connected when the native connection event follows Data
   const app = { setLiveLine() {}, remoteDesk: new Map() };
   class Connection extends EventTarget {
     connectionState = 'connecting';
+    getSenders() {
+      return [];
+    }
     createDataChannel() {
       return markRaw({ readyState: 'connecting', close() {} });
     }
@@ -53,17 +56,28 @@ test('controller becomes connected when the native connection event follows Data
   rtc.peerConnection.connectionState = 'connected';
   rtc.peerConnection.dispatchEvent(new Event('connectionstatechange'));
   assert.equal(connected.value, true);
-  rtc.peerConnection.remoteDescription = { type: 'answer', sdp: 'previous-generation' };
-  rtc.peerConnection.addIceCandidate = () => assert.fail('must queue while a new remote description is pending');
+  rtc.peerConnection.remoteDescription = {
+    type: 'answer',
+    sdp: 'previous-generation',
+  };
+  rtc.peerConnection.addIceCandidate = () =>
+    assert.fail('must queue while a new remote description is pending');
   rtc.awaitingRemoteDescription = true;
   await rtc.addIceCandidate({ candidate: 'new-generation-candidate' });
   assert.equal(rtc.pendingCandidates.length, 1);
   const native = rtc.peerConnection;
+  const reader = rtc.readerChannel;
   rtc.close();
   native.dispatchEvent(new Event('connectionstatechange'));
+  reader.onclose();
   assert.equal(
     network.rtcMap.size,
     0,
     'late events must not restore a closed connection'
   );
+  const replacement = { live: true };
+  network.rtcMap.set('host', replacement);
+  reader.onopen();
+  reader.onclose();
+  assert.deepEqual(network.rtcMap.get('host'), replacement);
 });

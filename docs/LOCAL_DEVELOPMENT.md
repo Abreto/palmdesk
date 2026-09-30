@@ -39,6 +39,19 @@ macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`�
 
 ## Windows 桌面
 
+会话阅读与窗口捕获独立，macOS 和 Windows 均默认关闭；在电脑首页显式开启后持久化，关闭会撤销进行中和后续的读取并清空已连接阅读页。
+
+| 本地来源 | macOS 主机 | Windows 主机 |
+| --- | --- | --- |
+| Codex | 支持 | 支持原生 Windows 日志 |
+| Claude Code | 支持 | 支持原生 Windows 日志 |
+| Claude Desktop · Code | 支持 | 支持原生本地 Code 日志 |
+| Desktop Chat/Cowork、云端/SSH/WSL 抓取 | 不支持 | 不支持 |
+
+Windows 默认读取 `%USERPROFILE%\.codex`、`%USERPROFILE%\.claude`；`CODEX_HOME`、`CLAUDE_CONFIG_DIR` 可覆盖。Desktop 检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下的 `Roaming\Claude`、`Local\Claude-3p`、`Roaming\Claude-3p`。macOS 默认读取 `~/.codex`、`~/.claude`、`~/Library/Application Support/Claude` 与 `Claude-3p`。`CLAUDE_USER_DATA_DIR` 仅使用指定的 Desktop 目录。自定义变量需在启动 PalmDesk 前设置，支持空格和非 ASCII 路径。
+
+Linux 主机不启用阅读。WSL 主目录不自动发现，Desktop 的 SSH/WSL 索引也不读取；本功能不会启动 Agent、抓取云端日志或自动选择 GUI 任务。日志布局不是稳定 API，Windows 格式核对、已运行检查及真实手机验收缺口见 [Windows 会话阅读验证记录](smoke-artifacts/windows-session-reading-2026-09-24.md)。
+
 在 Windows 10 1903（build 18362）及以上或 Windows 11 x64 的 PowerShell 中运行：
 
 ```powershell
@@ -106,6 +119,15 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
+窗口手势烟测复用图片粘贴测试页中的真实 `RemoteViewport` 和输入 DataChannel，无须后端。按下文安装 Playwright 后，分别启动测试页和测试：
+
+```bash
+pnpm exec vite --config test/smoke/image-paste.vite.mjs
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/viewport-gestures-browser.mjs
+```
+
+使用 Chrome 的真实触摸事件验证双指缩放的焦点、连续缩放比例、适合至 300% 的范围、双指及单指平移、缩放后的远程点击坐标、仅观看、取消、横屏和文字草稿保留，并检查手势没有产生远程输入或整页缩放。手势仲裁、拖拽释放、长按取消、指针丢失和三指切换由 `pnpm test:smoke` 覆盖。手机 Safari 和 Android Chrome 仍需真机验收。
+
 图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。按下文安装 Playwright 后，分别启动测试页和测试：
 
 ```bash
@@ -124,6 +146,23 @@ node scripts/dev.mjs --prepare-only
 
 该测试用隐藏的临时 Electron 窗口验证原生 PNG/JPEG 解码、macOS 图片剪贴板和粘贴事件；结束时若剪贴板仍是测试图片，会恢复先前的文字、HTML、RTF 和图片。它使用测试窗口的 `webContents.paste()`，不验证系统 `Cmd+V` 或操作真实 Codex，结果写入 `.local/image-paste/electron-result.json`。
 
+Windows 图片粘贴复用相同的手机选图、预览和认证传输，只对进程身份匹配 `codex.exe` 的窗口开放。主进程串行释放按键和鼠标按钮、聚焦选定窗口；原生辅助程序在写入剪贴板前及执行 `Ctrl+V` 前复核 HWND、PID、可执行文件完整路径、进程启动时间、前台焦点和进程权限。粘贴阶段不会重新抢回焦点，排队中的原生请求会在提交前复核取消状态；快捷键已经交给操作系统后无法撤销，结果未确认时必须先检查附件，不自动重放。
+
+在已解锁的 Windows 桌面运行以下 PowerShell 命令验证真实系统剪贴板和快捷键。测试会临时聚焦自己创建的窗口，只在测试目录编译一个名为 `Codex.exe` 的 fixture 来通过生产代码的进程识别，不操作已安装的 Codex，也不发送消息：
+
+```powershell
+pnpm build:native
+$env:PALMDESK_NATIVE_SMOKE = 'true'
+Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+node --test test/smoke/native-window-windows.test.cjs
+node node_modules/electron/cli.js test/smoke/windows-image-paste.cjs
+Remove-Item Env:PALMDESK_NATIVE_SMOKE
+```
+
+该测试读取剪贴板的 PNG 格式（保留透明度），逐像素比较 PNG/JPEG 解码内容，验证 `Ctrl+V`、中英文混合草稿、按键释放、取消、过期进程身份、焦点变化和关闭目标；不会把 Windows Forms 的旧式 DIB 格式当作 Chromium 的 PNG 附件。测试还让独立进程锁定剪贴板，确认 Electron 静默写入失败时不会发送粘贴快捷键，释放锁后允许显式重试。测试结束且剪贴板仍是测试内容时恢复常用剪贴板格式，结果写入 `.local/image-paste/windows-result.json`。浏览器烟测另覆盖原始字节传输、阅读/仅观看取消和图片通道重连。两者均不能替代手机连接真实 Codex 的附件验收；记录和待验收步骤见 [Windows 图片粘贴验证记录](smoke-artifacts/windows-image-paste-2026-09-24.md)。
+
+Windows 权限错误需要以相同权限级别运行 Codex 与 PalmDesk，通常关闭目标的「以管理员身份运行」即可；前台焦点错误需要关闭阻挡的对话框并切回所选窗口。按键占用错误需释放所有按键和鼠标按钮。处理后手动点击粘贴即可重新校验；其他应用、HEIC/GIF、多图、任意文件、裁剪和标注仍不在本功能范围内。
+
 窗口画质回归测试不需要后端，只捕获测试程序自己创建的文字窗口，验证旧 1080P 约束与新默认画质的实际尺寸、先建立 DataChannel 再添加视频时的编码参数，以及 720P 降档后恢复原始尺寸。macOS 上使用当前工作区的隔离开发应用运行：
 
 ```bash
@@ -141,6 +180,16 @@ NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/business-flow.mjs
 ```
 
 默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
+
+手机后台恢复烟测自行启动本机 HTTP / Socket.IO 服务，使用真实 Vue 页面、会话认证模块和 WebRTC；设备存储、窗口捕获、输入及会话记录使用合成数据，不需要部署后端或控制真实窗口：
+
+```bash
+npm install --prefix .local/smoke --no-package-lock --no-save playwright socket.io
+pnpm build:prod
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs
+```
+
+覆盖后台／阅读暂停视频、未送达状态消息后的主机超时暂停、断线重认证、阅读位置与草稿保留、恢复原窗口及关闭窗口后的拒绝恢复。页面可见性由测试事件模拟，不能代替 iOS Safari 切换应用、锁屏以及 Wi-Fi／蜂窝切换的实机验收。
 
 Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 PalmDesk 实例占用单实例锁：
 
@@ -232,4 +281,4 @@ tccutil reset Accessibility 'io.github.abreto.palmdesk.local.<id>'
 
 代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。
 
-macOS 上开启「会话阅读」后，应用会读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话（含 `Claude-3p` 配置）；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。
+macOS 和 Windows 上开启「会话阅读」后，应用会读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话（含 `Claude-3p` 配置）；默认关闭，读取范围和测试入口见 [会话阅读集成说明](GLASSLINE_INTEGRATION.md)。视频捕获使用窗口源，输入使用操作系统鼠标、键盘和前台焦点。真实窗口和手机验收项目见 [验证报告](CODEX_REMOTE_REPAIR_RESULTS.md)。

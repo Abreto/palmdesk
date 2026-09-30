@@ -1,6 +1,6 @@
 // Modified for PalmDesk: head/tail summaries, per-turn message deduplication,
 // and a bounded detail-file read. Original Glassline code is Apache-2.0.
-import { open, readFile, readdir, stat } from "node:fs/promises";
+import { lstat, open, readFile, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -619,6 +619,9 @@ async function findSessionJsonlFiles(root) {
     const entryGroups = await Promise.all(
       batch.map(async (directory) => {
         try {
+          // Dirents exclude nested links; also check the root (and directories
+          // replaced since enumeration). On Windows this rejects junctions too.
+          if (!(await lstat(directory)).isDirectory()) return { directory, entries: [] };
           const entries = await readdir(directory, { withFileTypes: true });
           return { directory, entries };
         } catch {

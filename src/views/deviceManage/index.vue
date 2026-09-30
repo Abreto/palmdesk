@@ -1,16 +1,38 @@
 <template>
-  <div class="setting-wrap">
-    <div class="nav"></div>
-    <div class="container">
-      <div class="label">最近连接</div>
-      <div v-if="!cacheStore.linkDeviceList.length">暂无记录</div>
+  <main class="devices-page pd-page">
+    <header class="pd-page-heading">
+      <span class="pd-eyebrow">设备</span>
+      <h1>随时<span class="heading-accent">连接设备。</span></h1>
+      <p>选择最近连接的电脑。</p>
+    </header>
+    <section
+      class="devices-card pd-card"
+      aria-labelledby="recent-devices-title"
+    >
+      <div class="list-heading">
+        <h2 id="recent-devices-title">最近连接</h2>
+        <span>{{ cacheStore.linkDeviceList.length }} 台设备</span>
+      </div>
+      <div
+        v-if="!cacheStore.linkDeviceList.length"
+        class="empty-state"
+      >
+        <span class="empty-icon"><LaptopOutline aria-hidden="true" /></span>
+        <h3>开始连接</h3>
+        <p>连接记录会显示在这里。</p>
+        <RouterLink
+          class="pd-button"
+          :to="{ name: routerName.remote }"
+          >连接电脑<ArrowForwardOutline aria-hidden="true"
+        /></RouterLink>
+      </div>
       <div
         v-else
         class="link-device-list"
       >
         <div
-          v-for="(item, index) in cacheStore.linkDeviceList"
-          :key="index"
+          v-for="item in cacheStore.linkDeviceList"
+          :key="item.remoteDeskUserUuid"
           class="link-device-item"
         >
           <button
@@ -18,27 +40,38 @@
             type="button"
             @click="selectDevice(item)"
           >
-            <LaptopOutline />{{ item.remoteDeskUserUuid }}
-          </button>
-          <div class="right">
-            <button
-              class="del"
-              type="button"
-              title="移除记录"
-              :aria-label="`移除 ${item.remoteDeskUserUuid}`"
-              @click="handleDelLinkDeviceList(item)"
+            <span class="device-icon"
+              ><LaptopOutline aria-hidden="true"
+            /></span>
+            <span class="device-details"
+              ><strong>{{ item.remoteDeskUserUuid }}</strong
+              ><span>已保存的设备</span></span
             >
-              <TrashOutline />
-            </button>
-          </div>
+            <span class="connect-label"
+              >连接<ArrowForwardOutline aria-hidden="true"
+            /></span>
+          </button>
+          <button
+            class="del pd-icon-button"
+            type="button"
+            title="移除记录"
+            :aria-label="`移除 ${item.remoteDeskUserUuid}`"
+            @click="handleDelLinkDeviceList(item)"
+          >
+            <TrashOutline />
+          </button>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <script lang="ts" setup>
-import { LaptopOutline, TrashOutline } from '@vicons/ionicons5';
+import {
+  ArrowForwardOutline,
+  LaptopOutline,
+  TrashOutline,
+} from '@vicons/ionicons5';
 
 import router, { routerName } from '@/router';
 import { usePiniaCacheStore } from '@/store/cache';
@@ -58,101 +91,181 @@ function handleDelLinkDeviceList(item) {
 </script>
 
 <style lang="scss" scoped>
-.setting-wrap {
-  box-sizing: border-box;
-  height: 100vh;
-  .nav {
-    height: $top-system-bar-height;
+.list-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--pd-border);
+  h2 {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
   }
-  .container {
-    overflow: scroll;
-    padding: 0 40px;
-    height: calc(100vh - $top-system-bar-height);
-
-    @extend %customScrollbarHide;
-    &:hover {
-      @extend %customScrollbar;
-    }
-
-    .label {
-      margin-bottom: 10px;
-      font-weight: 500;
-      font-size: 16px;
-    }
-
-    .link-device-list {
-      position: relative;
-      overflow: scroll;
-      box-sizing: border-box;
-      max-height: 200px;
-      width: 100%;
-      border: 1px solid rgba(153, 153, 153, 0.2);
-      border-radius: 2px;
-      background-color: #fff;
-
-      @extend %hideScrollbar;
-      .link-device-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        box-sizing: border-box;
-        padding: 0 15px;
-        width: 100%;
-        height: 40px;
-        &:hover {
-          background-color: #f8f8fb;
-        }
-        .left {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex: 1;
-          height: 40px;
-          padding: 0;
-          border: 0;
-          background: transparent;
-          color: #167c65;
-          cursor: pointer;
-          font-size: 16px;
-          svg {
-            width: 20px;
-            height: 20px;
-          }
-        }
-        .right {
-          .del {
-            display: grid;
-            place-items: center;
-            width: 36px;
-            height: 36px;
-            padding: 8px;
-            border: 0;
-            background: transparent;
-            color: #66756e;
-            cursor: pointer;
-            svg {
-              width: 20px;
-              height: 20px;
-            }
-          }
-        }
-      }
-    }
+  > span {
+    padding: 3px 9px;
+    border-radius: var(--pd-radius-sm);
+    background: var(--pd-surface-soft);
+    color: var(--pd-muted);
+    font-size: 11px;
   }
 }
-</style>
-
-<style scoped lang="scss">
-@media (max-width: 640px) {
-  .setting-wrap {
-    height: auto;
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 64px 20px;
+  text-align: center;
+  h3 {
+    margin: 22px 0 8px;
+    font-size: 18px;
+    font-weight: 550;
   }
-  .setting-wrap .nav {
-    display: none;
+  p {
+    margin: 0 0 24px;
+    color: var(--pd-muted);
+    font-size: 13px;
+    line-height: 1.9;
   }
-  .setting-wrap .container {
-    height: auto;
-    padding: 30px 18px;
+}
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
+  transform: rotate(-6deg);
+  svg {
+    width: 34px;
+    height: 34px;
+    transform: rotate(6deg);
+  }
+}
+.link-device-list {
+  padding-top: 8px;
+}
+.link-device-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  & + & {
+    border-top: 1px solid var(--pd-border);
+  }
+}
+.left {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 12px 8px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: transparent;
+  color: var(--pd-text);
+  text-align: left;
+  cursor: pointer;
+  &:hover {
+    background: var(--pd-accent-soft);
+  }
+}
+.device-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
+  svg {
+    width: 24px;
+    height: 24px;
+  }
+}
+.device-details {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
+  strong {
+    font: 550 16px var(--pd-mono);
+    letter-spacing: 1px;
+    overflow-wrap: anywhere;
+  }
+  > span {
+    color: var(--pd-muted);
+    font-size: 11px;
+  }
+}
+.connect-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  color: var(--pd-accent);
+  font-size: 12px;
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+.del {
+  border-color: transparent;
+  &:hover {
+    color: var(--pd-danger);
+    background: var(--pd-danger-soft);
+  }
+}
+@media (max-width: 700px) {
+  .devices-card {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .list-heading {
+    padding-bottom: 12px;
+    border-bottom: 0;
+  }
+  .link-device-list {
+    display: grid;
+    gap: 10px;
+    padding-top: 0;
+  }
+  .link-device-item {
+    padding: 6px 8px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius);
+    background: var(--pd-surface);
+    box-shadow: var(--pd-shadow);
+    & + & {
+      border-top: 1px solid var(--pd-border);
+    }
+  }
+  .empty-state {
+    min-height: 360px;
+    box-sizing: border-box;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius-lg);
+    background: var(--pd-surface);
+    padding: 48px 8px;
+  }
+  .connect-label {
+    font-size: 0;
+    gap: 0;
+  }
+  .link-device-item {
+    gap: 4px;
+  }
+  .left {
+    gap: 10px;
+    padding-inline: 0;
   }
 }
 </style>

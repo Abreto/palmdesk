@@ -32,13 +32,20 @@
       <label class="zoom-label"
         ><span>缩放</span
         ><select
-          v-model.number="zoom"
+          :value="zoom"
           aria-label="画面缩放"
+          @change="selectZoom"
         >
           <option :value="1">适合</option>
           <option :value="1.5">150%</option>
           <option :value="2">200%</option>
           <option :value="3">300%</option>
+          <option
+            v-if="![1, 1.5, 2, 3].includes(zoom)"
+            :value="zoom"
+          >
+            {{ Math.round(zoom * 100) }}%
+          </option>
         </select></label
       >
       <button
@@ -62,13 +69,12 @@
     <div
       ref="stage"
       class="video-stage"
-      :class="{ watching: watchOnly || touchMode === 'pan' }"
       @pointerdown="pointerDown"
-      @pointermove="pointer.move"
+      @pointermove="pointerMove"
       @pointerup="pointerUp"
-      @pointercancel="pointer.cancel"
-      @lostpointercapture="pointer.lostCapture"
-      @contextmenu.prevent="pointer.context"
+      @pointercancel="pointerCancel"
+      @lostpointercapture="lostPointerCapture"
+      @contextmenu.prevent="contextMenu"
       @wheel.prevent="wheel"
     ></div>
     <div
@@ -154,6 +160,10 @@ import type { WsBilldDeskBehaviorType } from '@/types/websocket';
 import { BilldDeskBehaviorEnum as Behavior } from '@/types/websocket';
 import { createPointerController } from '@/utils/controller-input';
 import { videoPoint } from '@/utils/remote-input';
+import {
+  clampViewportZoom,
+  createViewportGestures,
+} from '@/utils/viewport-gestures';
 
 const props = defineProps<{
   video?: HTMLVideoElement;
@@ -172,7 +182,7 @@ const touchMode = ref<'tap' | 'scroll' | 'drag' | 'pan'>('tap');
 const watchOnly = ref(false);
 const zoom = ref(1);
 const showKeyboard = ref(true);
-const draft = ref('');
+const draft = defineModel<string>('draft', { default: '' });
 const imageAttachment = ref<InstanceType<typeof ImageAttachment>>();
 const imageBusy = ref(false);
 const hasFrame = ref(false);
@@ -206,20 +216,54 @@ function point(event: { clientX: number; clientY: number }, clamp = false) {
 const pointer = createPointerController({
   send,
   enabled: () =>
-    canControl.value && !imageBusy.value && touchMode.value !== 'pan',
+    canControl.value &&
+    !imageBusy.value &&
+    touchMode.value !== 'pan' &&
+    !gestures.active(),
   mode: () => (touchMode.value === 'pan' ? 'tap' : touchMode.value),
   point,
 });
+const gestures = createViewportGestures({
+  view: () => {
+    const rect = props.video?.getBoundingClientRect();
+    return rect ? { zoom: zoom.value, rect } : undefined;
+  },
+  localPan: () => watchOnly.value || touchMode.value === 'pan',
+  cancelInput: () => pointer.cancel(),
+  zoomAt,
+  panBy: (left, top) => stage.value?.scrollBy({ left, top }),
+});
 function pointerDown(event: PointerEvent) {
-  if (pointer.down(event)) {
+  // Keep local zooming and panning available during host input errors.
+  if (!hasFrame.value || !props.connected) return;
+  const local = gestures.down(event);
+  const remote = !local && pointer.down(event);
+  if (local || remote || event.pointerType === 'touch') {
     event.preventDefault();
     stage.value?.setPointerCapture(event.pointerId);
   }
 }
+function pointerMove(event: PointerEvent) {
+  if (!gestures.move(event)) pointer.move(event);
+}
 function pointerUp(event: PointerEvent) {
-  pointer.up(event);
+  if (!gestures.up(event)) pointer.up(event);
+  releaseCapture(event);
+}
+function releaseCapture(event: PointerEvent) {
   if (stage.value?.hasPointerCapture(event.pointerId))
     stage.value.releasePointerCapture(event.pointerId);
+}
+function pointerCancel(event: PointerEvent) {
+  gestures.cancel(event);
+  pointer.cancel();
+  releaseCapture(event);
+}
+function lostPointerCapture(event: PointerEvent) {
+  if (!gestures.cancel(event)) pointer.lostCapture();
+}
+function contextMenu(event: MouseEvent) {
+  if (!gestures.active()) pointer.context(event);
 }
 function wheel(event: WheelEvent) {
   if (watchOnly.value || touchMode.value === 'pan') {
@@ -262,6 +306,7 @@ function sendText() {
 const heldKeys = new Set<number>();
 function releaseAll() {
   pointer.cancel();
+  gestures.reset();
   heldKeys.clear();
   if (props.connected) send({ type: Behavior.releaseAll });
 }
@@ -291,7 +336,14 @@ function visibility() {
 }
 function resizeVideo() {
   const video = props.video;
-  if (!video || !stage.value || !video.videoWidth || !video.videoHeight) return;
+  if (
+    !video ||
+    !stage.value?.clientWidth ||
+    !stage.value.clientHeight ||
+    !video.videoWidth ||
+    !video.videoHeight
+  )
+    return;
   hasFrame.value = true;
   const fit =
     Math.min(
@@ -300,6 +352,42 @@ function resizeVideo() {
     ) * zoom.value;
   video.style.width = `${Math.max(1, Math.round(video.videoWidth * fit))}px`;
   video.style.height = `${Math.max(1, Math.round(video.videoHeight * fit))}px`;
+}
+function zoomAt(
+  value: number,
+  anchor: { x: number; y: number },
+  center: { clientX: number; clientY: number }
+) {
+  zoom.value = clampViewportZoom(value);
+  // Resize synchronously so each move uses the actual scrolled video bounds.
+  resizeVideo();
+  const rect = props.video?.getBoundingClientRect();
+  if (!rect || !stage.value) return;
+  stage.value.scrollLeft += rect.left + anchor.x * rect.width - center.clientX;
+  stage.value.scrollTop += rect.top + anchor.y * rect.height - center.clientY;
+}
+function selectZoom(event: Event) {
+  releaseAll();
+  const value = Number((event.target as HTMLSelectElement).value);
+  const rect = props.video?.getBoundingClientRect();
+  const element = stage.value;
+  if (!rect?.width || !rect.height || !element) {
+    zoom.value = clampViewportZoom(value);
+    return;
+  }
+  const bounds = element.getBoundingClientRect();
+  const center = {
+    clientX: bounds.left + element.clientWidth / 2,
+    clientY: bounds.top + element.clientHeight / 2,
+  };
+  zoomAt(
+    value,
+    {
+      x: (center.clientX - rect.left) / rect.width,
+      y: (center.clientY - rect.top) / rect.height,
+    },
+    center
+  );
 }
 async function fullscreen() {
   if (document.fullscreenElement) await document.exitFullscreen();
@@ -311,6 +399,7 @@ async function fullscreen() {
 watch(
   () => props.video,
   async (video, old) => {
+    releaseAll();
     old?.removeEventListener('loadeddata', resizeVideo);
     old?.removeEventListener('resize', resizeVideo);
     old?.remove();
@@ -338,12 +427,15 @@ function setImageBusy(busy: boolean) {
   }
   imageBusy.value = busy;
 }
-watch([zoom, showKeyboard], () => nextTick(resizeVideo));
+watch(showKeyboard, () => nextTick(resizeVideo));
 watch(
   () => props.inputBlocked,
   () => nextTick(resizeVideo)
 );
-useResizeObserver(stage, resizeVideo);
+useResizeObserver(stage, () => {
+  if (gestures.active()) gestures.reset();
+  resizeVideo();
+});
 onMounted(() => {
   window.addEventListener('keydown', keyboard);
   window.addEventListener('keyup', keyboard);
@@ -367,7 +459,7 @@ onUnmounted(() => {
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  background: #f2f4f3;
+  background: var(--pd-bg);
 }
 button {
   display: inline-flex;
@@ -377,10 +469,10 @@ button {
   width: 42px;
   height: 42px;
   padding: 10px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
-  color: #304b41;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface);
+  color: var(--pd-text);
   cursor: pointer;
 }
 button svg {
@@ -393,8 +485,8 @@ button:disabled {
 }
 button.active,
 button[aria-pressed='true'] {
-  border-color: #167c65;
-  background: #def0e9;
+  border-color: var(--pd-accent);
+  background: var(--pd-accent-soft);
 }
 .tools {
   display: flex;
@@ -402,8 +494,8 @@ button[aria-pressed='true'] {
   align-items: center;
   flex-wrap: wrap;
   padding: 8px 12px;
-  background: white;
-  border-bottom: 1px solid #d7ddda;
+  background: var(--pd-surface);
+  border-bottom: 1px solid var(--pd-border);
 }
 .modes {
   display: flex;
@@ -424,9 +516,10 @@ select {
   height: 36px;
   max-width: 96px;
   padding: 4px;
-  border: 1px solid #d7ddda;
-  border-radius: 4px;
-  background: white;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface-soft);
+  color: var(--pd-text);
   font-size: 13px;
 }
 .video-stage {
@@ -435,12 +528,10 @@ select {
   min-height: 120px;
   overflow: auto;
   display: flex;
-  background: #252a28;
+  background: #0a0d0c;
   touch-action: none;
   overscroll-behavior: contain;
-}
-.video-stage.watching {
-  touch-action: pan-x pan-y;
+  overflow-anchor: none;
 }
 .video-stage :deep(video) {
   display: block;
@@ -451,8 +542,8 @@ select {
 }
 .keyboard-panel {
   padding: 8px 12px max(10px, env(safe-area-inset-bottom));
-  border-top: 1px solid #d7ddda;
-  background: white;
+  border-top: 1px solid var(--pd-border);
+  background: var(--pd-surface);
 }
 .key-row {
   display: flex;
@@ -476,18 +567,45 @@ textarea {
   resize: vertical;
   max-height: 160px;
   padding: 8px;
-  border: 1px solid #c7d1cc;
-  border-radius: 4px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-bg);
+  color: var(--pd-text);
   font: 16px/1.4 system-ui;
 }
 .composer button {
-  color: white;
-  background: #167c65;
+  color: var(--pd-on-accent);
+  background: var(--pd-accent);
 }
 @media (max-width: 480px) {
+  .viewport-shell {
+    position: relative;
+    background: #0a0d0c;
+  }
   .tools {
+    order: 3;
+    align-self: center;
+    width: calc(100% - 20px);
+    box-sizing: border-box;
+    justify-content: center;
     gap: 5px;
+    margin: 8px 10px 10px;
     padding: 6px 8px;
+    border: 1px solid var(--pd-border-strong);
+    border-radius: var(--pd-radius);
+    background: rgb(255 255 255 / 96%);
+    box-shadow: 0 12px 30px rgb(0 0 0 / 34%);
+  }
+  .video-stage {
+    order: 2;
+  }
+  .keyboard-panel {
+    order: 4;
+    margin: 0 10px 10px;
+    padding: 8px 10px max(10px, env(safe-area-inset-bottom));
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius);
+    background: var(--pd-surface);
   }
   .tools button {
     width: 36px;
@@ -495,6 +613,9 @@ textarea {
     padding: 8px;
   }
   .zoom-label > span {
+    display: none;
+  }
+  .zoom-label {
     display: none;
   }
   .watch-toggle {

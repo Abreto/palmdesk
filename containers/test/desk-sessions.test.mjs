@@ -90,5 +90,9 @@ test('ending or disconnecting a session invalidates both access tokens immediate
     else await phone.receive('billdDeskEndRemote', { receiver: host.id, sessionId: a.id });
     for (const token of [a.token, b.token]) await assert.rejects(sessions.authorize(token), { status: 401 });
     assert.equal(host.last('billdDeskSessionEnded').sessionId, a.id);
+    assert.equal(
+      host.last('billdDeskSessionEnded').reason,
+      disconnect ? 'disconnect' : 'explicit'
+    );
   }
 });

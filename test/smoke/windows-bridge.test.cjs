@@ -3,6 +3,7 @@ const { EventEmitter } = require('node:events');
 const path = require('node:path');
 const { PassThrough } = require('node:stream');
 const test = require('node:test');
+
 const load = require('./load-source.cjs');
 
 test('Windows capture enables WGC while preserving other Chromium features', () => {
@@ -40,11 +41,11 @@ test('explicitly disabled WGC cannot silently fall back to incompatible capture 
 
 test('whitespace around disabled WGC cannot permit fallback capture', () => {
   const { enableWindowsCapture } = load('electron-main/native-window.ts');
-  for (const disabled of [
+  [
     'Other, AllowWgcWindowCapturer',
     'AllowWgcWindowCapturer ,Other',
     'Other,\tAllowWgcWindowCapturer<Trial ',
-  ]) {
+  ].forEach((disabled) => {
     assert.equal(
       enableWindowsCapture({
         getSwitchValue: (key) => (key === 'disable-features' ? disabled : ''),
@@ -52,7 +53,7 @@ test('whitespace around disabled WGC cannot permit fallback capture', () => {
       }),
       false
     );
-  }
+  });
 });
 
 test('whitespace around enabled WGC preserves its parameters without duplication', () => {
@@ -144,6 +145,69 @@ test('unsupported hosts never launch a native helper', async () => {
   });
   const bridge = new NativeWindowBridge('unused', 'linux');
   await assert.rejects(bridge.request('list'), /macOS.*Windows/);
+});
+
+test('native work queues locally so cancellation prevents a waiting paste from reaching the helper', async () => {
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.stdin = new PassThrough();
+  child.kill = () => {};
+  const { NativeWindowBridge } = load('electron-main/native-window.ts', {
+    'node:child_process': { spawn: () => child },
+  });
+  const requests = [];
+  child.stdin.on('data', (buffer) =>
+    requests.push(JSON.parse(buffer.toString()))
+  );
+  const bridge = new NativeWindowBridge('fixture.exe', 'win32');
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  let current = true;
+  try {
+    const listing = bridge.request('list');
+    await tick();
+    const paste = bridge.request('pasteImage', {}, () => current);
+    const rejected = assert.rejects(paste, /取消/);
+    await tick();
+    // Cancellation arrives while another native command is still running.
+    current = false;
+    child.stdout.write(
+      `${JSON.stringify({ requestId: requests[0].requestId, data: [] })}\n`
+    );
+    await listing;
+    await rejected;
+    assert.deepEqual(
+      requests.map((request) => request.command),
+      ['list']
+    );
+  } finally {
+    bridge.close();
+  }
+});
+
+test('closing the native helper rejects queued work instead of restarting it to replay input', async () => {
+  let spawned = 0;
+  const child = new EventEmitter();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+  child.stdin = new PassThrough();
+  child.kill = () => {};
+  const { NativeWindowBridge } = load('electron-main/native-window.ts', {
+    'node:child_process': {
+      spawn: () => {
+        spawned += 1;
+        return child;
+      },
+    },
+  });
+  const bridge = new NativeWindowBridge('fixture.exe', 'win32');
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  const listing = assert.rejects(bridge.request('list'), /不可用/);
+  await tick();
+  const paste = assert.rejects(bridge.request('pasteImage'), /不可用/);
+  bridge.close();
+  await Promise.all([listing, paste]);
+  assert.equal(spawned, 1);
 });
 
 test('Windows AI app preference comes from executable identity, not a window title', () => {

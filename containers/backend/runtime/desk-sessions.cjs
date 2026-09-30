@@ -11,14 +11,14 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
   const socketFor = (id) => io.of('/').sockets.get(id);
   const clientIp = (socket) => socket.handshake.headers?.['x-real-ip'] || socket.handshake.address;
 
-  async function end(id) {
+  async function end(id, reason = 'disconnect') {
     const session = active.get(id);
     if (!session) return;
     active.delete(id);
     for (const member of session.members) {
       const socket = socketFor(member.socketId);
       socket?.data.deskPeers?.delete(member.peerId);
-      socket?.emit('billdDeskSessionEnded', { sessionId: id, peerId: member.peerId });
+      socket?.emit('billdDeskSessionEnded', { sessionId: id, peerId: member.peerId, reason });
     }
     await redis.del(session.members.flatMap((member) => [tokenKey(member.token), `palmdesk:ice:${id}:${member.socketId}`]));
   }
@@ -157,7 +157,7 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
     });
     on('heartbeat', () => {});
     on('billdDeskEndRemote', (data) => {
-      if (socket.data.deskPeers?.get(data.receiver) === data.sessionId) return end(data.sessionId);
+      if (socket.data.deskPeers?.get(data.receiver) === data.sessionId) return end(data.sessionId, 'explicit');
     });
     for (const event of ['nativeWebRtcOffer', 'nativeWebRtcAnswer', 'nativeWebRtcCandidate', 'nativeWebRtcRestart']) {
       on(event, (data) => relay(socket, event, data));

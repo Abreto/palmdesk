@@ -1,3 +1,4 @@
+import '../../src/assets/css/main.scss';
 import { createApp, defineComponent, h, markRaw, ref, shallowRef } from 'vue';
 import Viewport from '../../src/components/RemoteViewport/index.vue';
 import {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Web.Script.Serialization;
@@ -43,6 +44,17 @@ internal static class NativeMethods
     internal static extern IntPtr GetForegroundWindow();
 
     [DllImport("user32.dll")]
+    internal static extern short GetAsyncKeyState(int key);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool OpenClipboard(IntPtr window);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    internal static extern bool CloseClipboard();
+
+    [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool GetCursorPos(out Point point);
 
@@ -82,9 +94,39 @@ internal static class NativeMethods
     }
 }
 
+internal sealed class ImageTextBox : TextBox
+{
+    internal readonly List<string> Images = new List<string>();
+
+    protected override void WndProc(ref Message message)
+    {
+        if (message.Msg == 0x302 && Clipboard.ContainsImage())
+        {
+            // Chromium/Electron consume the registered PNG format, which
+            // preserves alpha. Windows Forms GetImage prefers legacy CF_DIB.
+            using (var png = Clipboard.GetData("PNG") as MemoryStream)
+            {
+                if (png != null)
+                {
+                    Images.Add(Convert.ToBase64String(png.ToArray()));
+                    return;
+                }
+            }
+            using (Image image = Clipboard.GetImage())
+            using (var bytes = new MemoryStream())
+            {
+                image.Save(bytes, System.Drawing.Imaging.ImageFormat.Png);
+                Images.Add(Convert.ToBase64String(bytes.ToArray()));
+            }
+            return;
+        }
+        base.WndProc(ref message);
+    }
+}
+
 internal sealed class TestWindow : Form
 {
-    internal readonly TextBox Input = new TextBox();
+    internal readonly ImageTextBox Input = new ImageTextBox();
     internal int ClickCount;
     internal int InputClickCount;
 
@@ -117,6 +159,7 @@ internal sealed class FixtureContext : ApplicationContext
     private readonly long[] handles = new long[2];
     private readonly int ownerPid = Process.GetCurrentProcess().Id;
     private bool stopping;
+    private bool clipboardLocked;
 
     internal FixtureContext()
     {
@@ -190,7 +233,8 @@ internal sealed class FixtureContext : ApplicationContext
                 text = closed ? null : window.Input.Text,
                 clickCount = window.ClickCount,
                 inputClickCount = window.InputClickCount,
-                inputFocused = !closed && window.Input.Focused
+                inputFocused = !closed && window.Input.Focused,
+                images = window.Input.Images
             });
         }
         NativeMethods.Point cursor;
@@ -199,6 +243,8 @@ internal sealed class FixtureContext : ApplicationContext
         {
             ownerPid = ownerPid,
             foregroundNativeId = NativeMethods.GetForegroundWindow().ToInt64(),
+            controlHeld = (NativeMethods.GetAsyncKeyState(0x11) & 0x8000) != 0,
+            pasteKeyHeld = (NativeMethods.GetAsyncKeyState(0x56) & 0x8000) != 0,
             cursor = hasCursor ? new { x = cursor.X, y = cursor.Y } : null,
             windows = state
         };
@@ -227,8 +273,24 @@ internal sealed class FixtureContext : ApplicationContext
             {
                 case "status":
                     break;
+                case "lockClipboard":
+                    if (clipboardLocked || !NativeMethods.OpenClipboard(dispatcher.Handle))
+                        throw new InvalidOperationException("Cannot lock clipboard");
+                    clipboardLocked = true;
+                    break;
+                case "unlockClipboard":
+                    if (!clipboardLocked || !NativeMethods.CloseClipboard())
+                        throw new InvalidOperationException("Cannot unlock clipboard");
+                    clipboardLocked = false;
+                    break;
                 case "minimize":
                     NativeMethods.ShowWindow(OwnedWindow(request).Handle, 7);
+                    break;
+                case "draft":
+                    ImageTextBox input = OwnedWindow(request).Input;
+                    input.Text = Convert.ToString(request["text"]);
+                    input.SelectionStart = input.TextLength;
+                    input.Focus();
                     break;
                 case "move":
                     TestWindow window = OwnedWindow(request);
@@ -306,6 +368,11 @@ internal sealed class FixtureContext : ApplicationContext
     {
         if (stopping) return;
         stopping = true;
+        if (clipboardLocked)
+        {
+            NativeMethods.CloseClipboard();
+            clipboardLocked = false;
+        }
         foreach (TestWindow window in windows)
             if (window != null && !window.IsDisposed) window.Close();
         dispatcher.Dispose();

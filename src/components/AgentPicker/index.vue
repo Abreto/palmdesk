@@ -53,8 +53,8 @@
         <input
           v-model="query"
           type="search"
-          placeholder="搜索 Agent、应用或窗口"
-          aria-label="搜索 Agent、应用或窗口"
+          placeholder="搜索窗口或 Agent"
+          aria-label="搜索窗口或 Agent"
         />
       </label>
       <p
@@ -69,7 +69,7 @@
         class="picker-status"
         role="status"
       >
-        {{ disabled ? '正在打开窗口…' : '正在更新入口…' }}
+        {{ disabled ? '打开中…' : '刷新中…' }}
       </p>
 
       <div
@@ -120,7 +120,7 @@
                     ? agent.windows[0].name
                     : agent.windows.length
                       ? `${agent.windows.length} 个窗口`
-                      : '暂无可控制窗口'
+                      : '暂无窗口'
                 }}</span>
                 <span class="agent-state"
                   ><span :class="{ manual: !agent.discovered }"></span
@@ -478,9 +478,9 @@ function bindWindow(source: IRemoteWindow, event: Event) {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 24px max(16px, env(safe-area-inset-right))
-    max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
-  color: #242b28;
+  padding: 32px max(20px, env(safe-area-inset-right))
+    max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+  color: var(--pd-text);
 }
 .picker-content {
   max-width: 780px;
@@ -498,7 +498,7 @@ h2 {
   line-height: 1.4;
 }
 .picker-heading span {
-  color: #68716c;
+  color: var(--pd-muted);
   font-size: 13px;
 }
 button,
@@ -516,7 +516,7 @@ button:disabled {
 }
 button:focus-visible,
 select:focus-visible {
-  outline: 2px solid #167c65;
+  outline: 2px solid var(--pd-accent);
   outline-offset: 2px;
 }
 .icon-button {
@@ -528,12 +528,13 @@ select:focus-visible {
   height: 40px;
   padding: 9px;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
-  color: #707a74;
+  color: var(--pd-muted);
 }
 .icon-button:hover:not(:disabled) {
-  background: #e5ebe7;
+  background: var(--pd-accent-soft);
+  color: var(--pd-accent);
 }
 .icon-button:disabled {
   opacity: 0.45;
@@ -543,12 +544,15 @@ select:focus-visible {
   height: 20px;
 }
 .pin-button[aria-pressed='true'] {
-  color: #916c13;
+  color: var(--pd-warning);
 }
 .picker-tabs {
   display: flex;
-  gap: 24px;
-  border-bottom: 1px solid #d7ddda;
+  gap: 4px;
+  padding: 5px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius);
+  background: var(--pd-surface-soft);
   margin-bottom: 18px;
 }
 .picker-tabs button {
@@ -556,16 +560,19 @@ select:focus-visible {
   align-items: center;
   gap: 7px;
   min-height: 44px;
-  padding: 0 2px 10px;
+  flex: 1;
+  justify-content: center;
+  padding: 8px 12px;
   border: 0;
-  border-bottom: 2px solid transparent;
+  border-radius: var(--pd-radius-sm);
   background: transparent;
   font-size: 14px;
-  color: #69716c;
+  color: var(--pd-muted);
 }
 .picker-tabs button[aria-selected='true'] {
-  border-bottom-color: #167c65;
-  color: #176d5a;
+  background: var(--pd-surface);
+  box-shadow: 0 2px 12px rgb(31 55 39 / 12%);
+  color: var(--pd-accent);
   font-weight: 600;
 }
 .picker-tabs svg {
@@ -573,24 +580,27 @@ select:focus-visible {
   height: 18px;
 }
 .picker-tabs span {
-  font-size: 12px;
-  font-weight: 400;
+  padding: 0 6px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-accent-soft);
+  font-size: 11px;
+  font-weight: 500;
 }
 .picker-search {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 0 12px;
-  border: 1px solid #cbd3ce;
-  border-radius: 4px;
-  background: #fff;
-  margin-bottom: 10px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface);
+  margin-bottom: 20px;
 }
 .picker-search svg {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  color: #778079;
+  color: var(--pd-muted);
 }
 .picker-search input {
   width: 100%;
@@ -601,14 +611,22 @@ select:focus-visible {
   outline: 0;
   background: transparent;
   font-size: 16px;
-  color: #242b28;
+  color: var(--pd-text);
 }
 .picker-search:focus-within {
-  outline: 2px solid #167c65;
+  outline: 2px solid var(--pd-accent);
   outline-offset: 2px;
 }
 .agent-group {
-  border-bottom: 1px solid #dce1dd;
+  margin-bottom: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius);
+  background: var(--pd-surface);
+  box-shadow: var(--pd-shadow);
+}
+.agent-group:focus-within {
+  border-color: var(--pd-border-strong);
 }
 .agent-row {
   display: flex;
@@ -620,7 +638,7 @@ select:focus-visible {
   align-items: center;
   flex: 1;
   min-width: 0;
-  min-height: 112px;
+  min-height: 106px;
   gap: 16px;
   padding: 18px 0;
   border: 0;
@@ -631,7 +649,7 @@ select:focus-visible {
   color: inherit;
 }
 .agent-entry:hover:not(:disabled) .agent-name {
-  color: #167c65;
+  color: var(--pd-accent);
 }
 .agent-icon {
   display: flex;
@@ -640,16 +658,16 @@ select:focus-visible {
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
-  border: 1px solid #dce1dd;
-  background: #fff;
-  border-radius: 8px;
+  border: 1px solid var(--pd-border);
+  background: var(--pd-surface-soft);
+  border-radius: var(--pd-radius-sm);
 }
 .agent-icon img,
 .agent-icon svg {
   width: 30px;
   height: 30px;
   object-fit: contain;
-  color: #60746a;
+  color: var(--pd-muted);
 }
 .agent-details {
   display: flex;
@@ -669,41 +687,41 @@ select:focus-visible {
 }
 .recent-label {
   font-size: 11px;
-  color: #69756e;
+  color: var(--pd-muted);
   font-weight: 400;
 }
 .agent-context {
   font-size: 13px;
   line-height: 1.5;
   overflow-wrap: anywhere;
-  color: #69716c;
+  color: var(--pd-muted);
 }
 .agent-state {
   display: flex;
   align-items: center;
   gap: 6px;
   font-size: 11px;
-  color: #66766d;
+  color: var(--pd-muted);
 }
 .agent-state > span {
   width: 5px;
   height: 5px;
-  background: #25856d;
+  background: var(--pd-accent);
   border-radius: 50%;
 }
 .agent-state > span.manual {
-  background: #6482ad;
+  background: #8aa8ff;
 }
 .entry-arrow {
   width: 18px;
   height: 18px;
   flex: 0 0 18px;
-  color: #829087;
+  color: var(--pd-muted);
 }
 .agent-windows {
   margin: 0 0 14px 20px;
   padding-left: 18px;
-  border-left: 2px solid #cfdad4;
+  border-left: 2px solid var(--pd-border-strong);
 }
 .window-row {
   display: flex;
@@ -724,7 +742,7 @@ select:focus-visible {
   text-align: left;
 }
 .window-item:hover:not(:disabled) {
-  color: #167c65;
+  color: var(--pd-accent);
 }
 .window-item:disabled {
   opacity: 0.6;
@@ -736,9 +754,9 @@ select:focus-visible {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  border: 1px solid #d4dbd6;
-  background: #e8ece9;
+  border-radius: var(--pd-radius-sm);
+  border: 1px solid var(--pd-border-strong);
+  background: var(--pd-surface-soft);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -750,7 +768,7 @@ select:focus-visible {
 .window-preview svg {
   width: 24px;
   height: 24px;
-  color: #748079;
+  color: var(--pd-muted);
 }
 .window-details {
   display: flex;
@@ -767,11 +785,15 @@ select:focus-visible {
 .window-app {
   font-size: 11px;
   line-height: 1.5;
-  color: #69716c;
+  color: var(--pd-muted);
   overflow-wrap: anywhere;
 }
 .other-window {
-  border-bottom: 1px solid #dce1dd;
+  margin-bottom: 12px;
+  padding: 4px 14px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius);
+  background: var(--pd-surface);
 }
 .binding-row {
   display: flex;
@@ -791,18 +813,18 @@ select:focus-visible {
   min-width: 0;
   flex: 1;
   height: 40px;
-  border: 1px solid #cbd3ce;
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface);
   padding: 0 8px;
-  color: #263b32;
+  color: var(--pd-text);
 }
 .picker-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 48px 16px;
-  color: #748078;
+  color: var(--pd-muted);
   text-align: center;
   font-size: 14px;
 }
@@ -820,7 +842,7 @@ select:focus-visible {
   padding: 8px 0;
   border: 0;
   background: transparent;
-  color: #176d5a;
+  color: var(--pd-accent);
   font-size: 13px;
 }
 .text-command svg,
@@ -830,19 +852,19 @@ select:focus-visible {
 }
 .unlink-command {
   margin: 0 0 8px 60px;
-  color: #6d7971;
+  color: var(--pd-muted);
   font-size: 12px;
 }
 .picker-error {
   margin: 12px 0;
-  color: #9e3046;
+  color: var(--pd-danger);
   font-size: 13px;
   line-height: 1.6;
   overflow-wrap: anywhere;
 }
 .picker-status {
   margin: 10px 0;
-  color: #69716c;
+  color: var(--pd-muted);
   font-size: 12px;
 }
 .spinning {

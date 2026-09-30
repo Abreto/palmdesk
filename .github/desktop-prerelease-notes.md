@@ -1,14 +1,15 @@
 Experimental PalmDesk desktop installers for testing.
 
-## What's new in v0.0.4
+## What's new in v0.0.5
 
-- Select or paste an image on your phone, preview it, then paste it into a macOS Codex prompt. Supports one PNG/JPEG at a time, up to 10 MiB and approximately 25 megapixels, with original resolution preserved.
-- Tap the Codex prompt in the remote video before choosing “粘贴到 Codex” (Paste into Codex). PalmDesk preserves the order of the click and paste, keeps your text draft, and leaves sending the message to you. Pasting replaces the computer's clipboard with the image.
-- Cancel or explicitly retry image transfers, and reconnect the image channel independently. Closing the input panel restores control; selecting a replacement image cannot accidentally send the previous image.
+- Pinch with two fingers to zoom the remote window from fit to 300%, centered on your gesture. Pan with both fingers, or continue panning with one after lifting the other. The toolbar and text composer stay in place; choose Fit to reset.
+- Pause video when the phone browser goes into the background or switches to Read mode. If the browser cannot notify the desktop before suspension, video pauses after ten seconds without controller updates.
+- Resume or reconnect when returning to the same browser page, preserving the reading position and unsent text. After a disconnect, the selected window can be restored for five minutes for the same authenticated controller, after checking that the original window still exists. Closed or expired windows return to the picker.
+- Refresh the desktop and mobile interface with a light theme, green actions and status indicators, compact navigation, clearer device cards, and concise copy across settings, dialogs, session reading, and window controls.
 
-Update the desktop app and refresh the phone web client together. Image paste currently supports macOS Codex only; Windows image paste is not enabled. Clipboard reads need HTTPS and browser paste permission; use the image picker when unavailable. Physical iOS Safari and actual Codex attachment display still require validation. See the [image paste guide](https://github.com/Abreto/palmdesk/blob/v0.0.4/README.md#paste-images-into-codex-from-your-phone-macos) for details and limits.
+Update the desktop app and refresh the phone web client together for pause/resume support. Recovery preserves state only in the same surviving browser page; reloading or discarding the page clears it. Reading mode does not restart window capture until you return to Window. Gesture and recovery behavior has browser smoke-test coverage; physical iOS Safari, Android Chrome, and network handoffs still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.5/README.md) for details and limits.
 
-[Changes since v0.0.3](https://github.com/Abreto/palmdesk/compare/v0.0.3...v0.0.4)
+[Changes since v0.0.4](https://github.com/Abreto/palmdesk/compare/v0.0.4...v0.0.5)
 
 ## Installation
 
@@ -36,15 +37,16 @@ This prerelease does not resolve the known dependency and license review items i
 
 供测试使用的 PalmDesk 桌面安装包。
 
-### v0.0.4 更新内容
+### v0.0.5 更新内容
 
-- 支持从手机选择或粘贴图片，预览后粘贴到 macOS Codex 的 prompt。每次支持一张 PNG/JPEG，最大 10 MiB、约 2500 万像素，保留原始分辨率。
-- 先在远程画面中点击 Codex 输入框，再点击「粘贴到 Codex」。点击与粘贴按顺序执行，文字草稿保留，由你确认附件后发送消息。粘贴会将电脑剪贴板替换为图片。
-- 支持取消、手动重试和单独重连图片通道；收起输入面板后恢复控制，替换图片时不会误发旧图。
+- 支持围绕双指手势位置，将远程窗口从「适合」连续缩放至 300%。双指可平移画面，抬起一指后另一指可继续平移；工具栏和文字输入框保持原位，选择「适合」可重置。
+- 手机浏览器进入后台或切换到阅读模式时暂停视频。若浏览器挂起前未能通知电脑，电脑端会在十秒未收到控制端状态后暂停视频。
+- 返回同一浏览器页面时恢复连接或自动重连，保留阅读位置和未发送的文字。断线后五分钟内，同一已认证控制端可在重新校验原窗口身份后恢复所选窗口；窗口已关闭或恢复信息过期时返回选窗。
+- 更新桌面端和手机端界面，采用浅色主题、绿色操作与状态提示、紧凑导航和更清晰的设备卡片，并精简设置、弹窗、会话阅读及窗口控制中的文案。
 
-请更新桌面 App 并刷新手机网页。图片粘贴目前只支持 macOS Codex，Windows 尚未开放。读取手机剪贴板需要 HTTPS 和浏览器允许粘贴，不可用时可选择图片。iOS Safari 和真实 Codex 附件显示仍需实机验收。详细说明及限制见[图片粘贴指南](https://github.com/Abreto/palmdesk/blob/v0.0.4/README.zh-CN.md#从手机给-codex-粘贴图片macos)。
+请更新桌面 App 并刷新手机网页，以使用暂停与恢复功能。状态仅保留在同一存活页面中，刷新页面或页面被系统回收后会清除；阅读模式重连后，只有切回「窗口」才重新捕获。手势和恢复行为已有浏览器烟测覆盖，iOS Safari、Android Chrome 以及网络切换仍需实机验收。详细说明及限制见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.5/README.zh-CN.md)。
 
-[查看自 v0.0.3 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.3...v0.0.4)
+[查看自 v0.0.4 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.4...v0.0.5)
 
 ### 安装说明
 

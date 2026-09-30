@@ -10,13 +10,24 @@ PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the o
 
 ## Session Reading Preview
 
-PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS**, listed together by last update with a source label. Windows hosts and other applications retain the window view.
+PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS and Windows**, listed together by last update with a source label.
 
-Codex reads from `CODEX_HOME` or `~/.codex`. Claude Code reads `projects/*/*.jsonl` under `CLAUDE_CONFIG_DIR` or `~/.claude`, including renamed sessions, text replies and tool results. Claude Desktop's local **Code** sessions are also discovered through its indexes in `~/Library/Application Support/Claude` and `Claude-3p`, or `CLAUDE_USER_DATA_DIR` when set. This covers both global and per-session transcripts, displays Desktop titles and deduplicates shared logs. Set custom directories in the environment that launches PalmDesk. Desktop Chat/Cowork, fetching cloud/SSH sessions and nested subagent transcripts are not supported; a local transcript must still exist.
+| Local source | macOS host | Windows host |
+| --- | --- | --- |
+| Codex | Supported | Supported (native Windows logs) |
+| Claude Code | Supported | Supported (native Windows logs) |
+| Claude Desktop · Code | Supported | Supported (native local Code logs) |
+| Desktop Chat/Cowork, cloud/SSH/WSL retrieval | Unsupported | Unsupported |
+
+Codex reads from `CODEX_HOME` or `~/.codex`. Claude Code reads `projects/*/*.jsonl` under `CLAUDE_CONFIG_DIR` or `~/.claude`, including renamed sessions, text replies and tool results. On Windows, `~` is the current user's home (normally `%USERPROFILE%`). Claude Desktop uses `~/Library/Application Support/Claude` and `Claude-3p` on macOS; on Windows it checks `%APPDATA%\Claude`, `%LOCALAPPDATA%\Claude-3p`, legacy `%APPDATA%\Claude-3p`, and their packaged-app locations under `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache`. `CLAUDE_USER_DATA_DIR` selects a single custom Desktop directory. This covers global and per-session transcripts, preserves Desktop titles and deduplicates shared logs.
+
+Set custom directories in the environment that launches PalmDesk; spaces and non-ASCII names are supported. Reading stays local and read-only. WSL homes are not automatically searched, Desktop SSH/WSL indexes and nested subagent transcripts are excluded, and no cloud logs are fetched. A readable local transcript must exist. Linux hosts do not support session reading. Windows storage and automated checks are recorded in the [validation notes](docs/smoke-artifacts/windows-session-reading-2026-09-24.md); a physical Windows host + phone run for all three sources is still unvalidated.
 
 Enable **会话阅读** (Session reading) on the desktop home page, then connect from your phone using the QR code or device credentials. The controller opens the **阅读** (Read) tab, which lists searchable sessions and renders Markdown, copyable replies, paginated history and collapsed tool output. Reading works without starting window capture or granting Screen Recording and Accessibility permissions. While visible, the reader checks the selected session for updates every eight seconds and offers a button to view new content without moving your reading position automatically.
 
-Choose **去窗口继续** (Continue in window) to open the window view and select an application window if none is selected. Window associations are navigation hints for the current connection: confirm the active task in the GUI before sending a prompt. Switching between reading and the window retains the connection, reading position and unsent input draft. The Read tab releases held keys and blocks window input; an existing video stream keeps running. Returning to the Agent directory to choose another window reconnects and clears the reading selection and window associations.
+Choose **去窗口继续** (Continue in window) to open the window view and select an application window if none is selected. Window associations are navigation hints for the current connection: confirm the active task in the GUI before sending a prompt. Switching between reading and the window retains the connection, reading position and unsent input draft. The Read tab releases held keys, blocks window input and pauses video transmission. Returning to the Agent directory to choose another window reconnects and clears the reading selection and window associations.
+
+Switching to another phone app or locking the screen pauses video transmission; if the browser is suspended before it can notify the host, the desktop pauses video after ten seconds without controller updates. Returning to the same browser page resumes video or reconnects automatically, preserving the reading position and text draft. After a disconnect, the desktop can restore the selected window for five minutes, only for the same authenticated controller and after checking its native identity again. A closed or expired window returns to the picker. Reading mode does not restart capture until you return to Window. Both clients must support this feature. Browser background connections are not guaranteed, and reloading/discarding the page does not preserve this in-memory state. Physical iOS Safari validation is still required.
 
 Reading is disabled by default and enabled per desktop installation. Disabling it revokes subsequent reads and clears connected readers. The result stream uses its own WebRTC DataChannel. Lists show the newest 100 matching sessions; search covers all discovered sessions. Timeline pages contain up to 40 items, with each body/output capped at 16,384 characters and visibly marked when truncated. Detail reads reject logs larger than 32 MiB and direct you to the original window. Logs may be incomplete and task state can be unknown. Attachment previews and automatic GUI task selection are not included. See the [integration notes](docs/GLASSLINE_INTEGRATION.md).
 
@@ -31,9 +42,9 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Agent discovery uses macOS bundle IDs or Windows executable identities. "Open" describes the application, not task execution. The separate Read tab shows supported local sessions, project paths and states inferred from logs; it does not identify or switch the active task in the GUI.
 - Activate windows on other Spaces or restore a selected minimized window before capture begins.
 - Return to the Agent directory and choose another window by reconnecting with the existing device credentials. Windows within each agent retain their original order.
-- Use tap, double tap, long-press right click, drag, scroll, zoom, pan, and read-only mode.
+- Use tap, double tap, long-press right click, drag, scroll, pinch-to-zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
-- Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS Codex prompt. Image paste is not yet enabled for Windows hosts.
+- Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS or Windows Codex prompt.
 - On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
 - On Windows, identify the target by HWND, process ID, executable path, and process start time. Support regular windows on the current virtual desktop, restoring a selected minimized window, and physical coordinates across high-DPI and multiple displays.
 - Send literal Unicode text on Windows, preserving Chinese and English text without conversion by the host's input method.
@@ -42,13 +53,13 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 
 **Hosts support macOS and Windows.** Linux has no native host adapter and rejects capture and input. This host restriction does not apply to browser controllers. Video uses a window source, but input still relies on system focus and mouse/keyboard APIs; it does not provide operating-system-level input isolation.
 
-### Paste images into Codex from your phone (macOS)
+### Paste images into Codex from your phone (macOS and Windows)
 
-Connect to a macOS host and select its Codex window. Use the image picker or clipboard button below the text composer, or paste an image into the text field. The initial version accepts one PNG/JPEG at a time, up to 10 MiB, approximately 25 megapixels, and 16384 pixels per side. HEIC, GIF, and other files are unsupported. Original image resolution and content are preserved without lossy compression.
+Connect to a macOS or Windows host and select its Codex window. Use the image picker or clipboard button below the text composer, or paste an image into the text field. The initial version accepts one PNG/JPEG at a time, up to 10 MiB, approximately 25 megapixels, and 16384 pixels per side. HEIC, GIF, and other files are unsupported. Original image bytes are transferred unchanged; the host decodes them for its image clipboard without resizing or lossy recompression. Windows identifies Codex by its executable/process identity, not the window title; other applications do not expose these controls.
 
-Tap the Codex prompt in the remote video first, then choose “粘贴到 Codex” (Paste into Codex). The host verifies the control session and window identity, writes the image to its system clipboard, and presses `Cmd+V`. Existing text drafts are preserved; confirm the attachment and send the message yourself. PalmDesk verifies window focus but does not locate the prompt or select a GUI task automatically. Pasting replaces the computer's clipboard with the image.
+Tap the Codex prompt in the remote video first, then choose “粘贴到 Codex” (Paste into Codex). The host verifies the control session and window identity, writes the image to its system clipboard, and presses `Cmd+V` on macOS or `Ctrl+V` on Windows. Existing text drafts are preserved; confirm the attachment and send the message yourself. PalmDesk verifies window focus but does not locate the prompt or select a GUI task automatically. Pasting replaces the computer's clipboard with the image. On Windows, a changed window/process, lost foreground focus, held input, or insufficient permission stops the paste. Release held keys/buttons and return to the selected window before retrying; run Codex and PalmDesk at the same privilege level (normally both without administrator privileges).
 
-Images travel in chunks over a dedicated WebRTC channel on the authenticated connection, without cloud file storage. Switching to reading or watch-only mode, disconnecting, or ending capture cancels pending work. If the image connection closes, choose “重新连接图片” (Reconnect images), then retry manually; your selected image is retained. If the result is unconfirmed, inspect Codex's attachments before retrying to avoid duplicates. Reading the phone clipboard requires HTTPS and browser paste permission; use the image picker when unavailable. Update both clients to a version supporting this feature. Physical iOS Safari and actual Codex attachment display still require validation.
+Images travel in chunks over a dedicated WebRTC channel on the authenticated connection, without cloud file storage. Switching to reading or watch-only mode, disconnecting, or ending capture cancels pending work. If the image connection closes, choose “重新连接图片” (Reconnect images), then retry manually; your selected image is retained. If the result is unconfirmed, inspect Codex's attachments before retrying to avoid duplicates; input already delivered to the OS cannot be undone. Reading the phone clipboard requires HTTPS and browser paste permission; use the image picker when unavailable. Update both clients to a version supporting this feature. Real Windows clipboard pixels, `Ctrl+V`, mixed Chinese/English draft preservation, cancellation and target rejection are covered by disposable native fixtures. Physical-phone testing with actual Codex attachments, including iOS Safari and elevated-target recovery, remains pending; see the [Windows image-paste validation record](docs/smoke-artifacts/windows-image-paste-2026-09-24.md).
 
 ## Getting Started
 
@@ -117,6 +128,8 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 4. After authentication, session reading opens if enabled on the host. To control a window, switch to **窗口** (Window) and select it from the Agent directory. When reading is disabled or unsupported, the directory opens by default. The host activates the selected window and starts capture once it is available.
 
 The default video quality is up to 2160p at 30 fps with an 8 Mbps bitrate ceiling and text detail prioritized. Capture preserves the window's aspect ratio and does not enlarge small windows. Retina windows retain native pixels within 3840×2160, avoiding the text blur caused by a fixed 1080p downscale. Select 720p, 1080p, or 1440p on the phone to reduce traffic; actual bitrate still adapts to screen changes and network conditions.
+
+Pinch with two fingers inside the window view to zoom from fit to 300%, centered on the gesture. Move both fingers to pan; after lifting one finger, the remaining finger can keep panning until lifted. These gestures move only the local video view, leaving the toolbar and text composer in place. For one-finger panning, select **移动画面** (Pan) or **仅观看** (Watch only); other touch modes retain remote control. The zoom selector shows the current scale; choose **适合** (Fit) to reset the view.
 
 To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
 
@@ -210,7 +223,7 @@ Set `SMOKE_PREVIEWS_ONLY=true` to check only previews from other Spaces and cont
 - Complete end-to-end acceptance of real window video streams and system input, including permission recovery.
 - Validate on physical iOS Safari devices and across NAT / TURN connections.
 - Save the selected target for direct access on the next connection.
-- Restore the selected window and reading state after a connection closes. Temporary network recovery already retries ICE negotiation, but does not restore a closed session.
+- Preserve reading state across browser reloads or discarded tabs; automatic recovery currently retains state only in the same live page.
 
 ## Documentation
 

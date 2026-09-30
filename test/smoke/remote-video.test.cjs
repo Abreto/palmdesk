@@ -156,6 +156,27 @@ test('reconnecting never multiplies the bitrate by 1000 again and audio remains 
   assert.equal(audio.writes.length, 0);
 });
 
+test('suspending video disables every encoding without ending tracks or data channels', async (t) => {
+  const rtc = connection(t);
+  const video = sender('video', [{ rid: 'high' }, { rid: 'low' }]);
+  const audio = sender('audio');
+  rtc.peerConnection.senders.push(video, audio);
+  await rtc.setVideoActive(false);
+  assert.ok(
+    video.parameters.encodings.every((entry) => entry.active === false)
+  );
+  assert.equal(rtc.dataChannel.readyState, 'open');
+  assert.equal(audio.writes.length, 0);
+  rtc.peerConnection.dispatchEvent(new Event('signalingstatechange'));
+  await flush();
+  assert.ok(
+    video.parameters.encodings.every((entry) => entry.active === false)
+  );
+  await rtc.setVideoActive(true);
+  assert.ok(video.parameters.encodings.every((entry) => entry.active === true));
+  assert.equal(video.parameters.encodings[0].maxBitrate, 8_000_000);
+});
+
 test('all negotiated video encodings receive live frame rate and content preferences', async (t) => {
   const rtc = connection(t);
   const first = sender('video', [{ rid: 'high' }, { rid: 'low' }]);

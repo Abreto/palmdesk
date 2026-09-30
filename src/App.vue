@@ -1,5 +1,8 @@
 <template>
-  <n-config-provider :theme-overrides="themeOverrides">
+  <n-config-provider
+    :theme="lightTheme"
+    :theme-overrides="themeOverrides"
+  >
     <n-message-provider :max="3">
       <n-modal-provider>
         <n-dialog-provider>
@@ -13,7 +16,7 @@
 </template>
 
 <script lang="ts" setup>
-import { GlobalThemeOverrides, NConfigProvider } from 'naive-ui';
+import { GlobalThemeOverrides, lightTheme, NConfigProvider } from 'naive-ui';
 import { onMounted } from 'vue';
 
 import {
@@ -33,8 +36,31 @@ const cacheStore = usePiniaCacheStore();
 const { handlesetAlwaysOnTop, handleOpenDevTools } = useIpcRendererSend();
 const themeOverrides: GlobalThemeOverrides = {
   common: {
-    primaryColor: '#167c65',
-    primaryColorHover: '#126951',
+    primaryColor: '#167c36',
+    primaryColorHover: '#126f2e',
+    primaryColorPressed: '#0f5b24',
+    primaryColorSuppl: '#167c36',
+    textColorBase: '#17211b',
+    textColor1: '#17211b',
+    textColor2: '#46564b',
+    textColor3: '#68756c',
+    borderColor: '#d7e1d9',
+    borderRadius: 'var(--pd-radius-sm)',
+    borderRadiusSmall: 'var(--pd-radius-sm)',
+    bodyColor: '#f3f6f3',
+    cardColor: '#ffffff',
+    modalColor: '#ffffff',
+    popoverColor: '#ffffff',
+    inputColor: '#f8faf8',
+    inputColorDisabled: '#e8eee9',
+    placeholderColor: '#88958d',
+    fontFamily: 'var(--pd-font)',
+  },
+  Dialog: {
+    borderRadius: 'var(--pd-radius-lg)',
+  },
+  Card: {
+    borderRadius: 'var(--pd-radius)',
   },
 };
 
@@ -81,20 +107,3 @@ async function getClient() {
   }
 }
 </script>
-
-<style lang="scss" scoped></style>
-
-<style lang="scss">
-body {
-  margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    sans-serif;
-  letter-spacing: 0;
-}
-#app {
-  user-select: none;
-}
-</style>

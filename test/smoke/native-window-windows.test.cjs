@@ -1,3 +1,4 @@
+/* eslint-disable no-restricted-syntax -- Native window operations must execute in order, including rejection cases. */
 const assert = require('node:assert/strict');
 const { spawn, spawnSync } = require('node:child_process');
 const { existsSync } = require('node:fs');
@@ -113,7 +114,8 @@ function startJsonProcess(file, args = [], expectsReady = false) {
     child,
     ready,
     request(command, target = {}) {
-      const requestId = ++sequence;
+      sequence += 1;
+      const requestId = sequence;
       const response = waitForResponse(requestId);
       if (!failure) {
         child.stdin.write(
@@ -552,6 +554,32 @@ test(
     );
 
     await t.test(
+      'image paste rejects non-Codex and stale identities without changing focus or text',
+      async () => {
+        const before = await fixture.request('status');
+        for (const command of ['verifyImagePaste', 'pasteImage']) {
+          for (const [change, code] of [
+            [{}, 'invalid'],
+            [{ ownerPid: native.child.pid }, 'gone'],
+            [{ bundleId: `${second.bundleId}changed` }, 'gone'],
+            [{ bundleId: second.bundleId.replace(/#[^#]+$/, '#1') }, 'gone'],
+          ]) {
+            await assert.rejects(
+              native.request(command, { ...identity(second), ...change }),
+              { code }
+            );
+          }
+        }
+        const after = await fixture.request('status');
+        assert.equal(after.foregroundNativeId, before.foregroundNativeId);
+        assert.deepEqual(
+          after.windows.map((window) => window.text),
+          before.windows.map((window) => window.text)
+        );
+      }
+    );
+
+    await t.test(
       'closed fixture HWNDs disappear from the catalog',
       async (closedTest) => {
         await fixture.request('close', { nativeId: second.nativeId });
@@ -570,6 +598,11 @@ test(
             );
           }
         );
+        for (const command of ['verifyImagePaste', 'pasteImage']) {
+          await assert.rejects(native.request(command, identity(second)), {
+            code: 'gone',
+          });
+        }
         await fixture.request('close', { nativeId: first.nativeId });
         await until(
           async () => (await listOwned()).length === 0,

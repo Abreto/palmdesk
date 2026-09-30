@@ -1,6 +1,6 @@
 // Modified for PalmDesk: bounded summary/detail reads, renamed session titles,
 // and sidechain filtering. Original Glassline code is Apache-2.0.
-import { readdir, stat } from "node:fs/promises";
+import { lstat, readdir, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -718,6 +718,7 @@ async function findRootSessionJsonlFiles(claudeConfigDir) {
   let projects;
 
   try {
+    if (!(await lstat(projectsRoot)).isDirectory()) return [];
     projects = await readdir(projectsRoot, { withFileTypes: true });
   } catch {
     return [];
@@ -729,6 +730,7 @@ async function findRootSessionJsonlFiles(claudeConfigDir) {
     async (project) => {
       const projectPath = path.join(projectsRoot, project.name);
       try {
+        if (!(await lstat(projectPath)).isDirectory()) return [];
         const entries = await readdir(projectPath, { withFileTypes: true });
         return entries
           .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonl"))

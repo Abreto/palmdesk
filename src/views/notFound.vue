@@ -21,6 +21,7 @@ import router from '@/router';
   top: 50%;
   left: 50%;
   font-size: 30px;
+  color: var(--pd-text);
   transform: translate(-50%, -50%);
   .click {
     color: $theme-color-gold;

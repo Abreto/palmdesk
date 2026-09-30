@@ -53,6 +53,7 @@ import {
   getRemoteSession,
   registerRemoteSession,
   removeRemoteSession,
+  REMOTE_SESSION_ENDED_EVENT,
 } from '@/utils/network/remote-session';
 import {
   WebSocketClass,
@@ -286,6 +287,9 @@ export const useWebsocket = () => {
       (data: { sessionId: string; peerId: string }) => {
         const session = getRemoteSession(connectedSocketId, data.peerId);
         if (session?.access.id !== data.sessionId) return;
+        window.dispatchEvent(
+          new CustomEvent(REMOTE_SESSION_ENDED_EVENT, { detail: data })
+        );
         networkStore.removeRtc(data.peerId);
         removeRemoteSession(connectedSocketId, data.peerId, data.sessionId);
       }

@@ -1,9 +1,22 @@
 <template>
-  <div class="pwd-wrap">
+  <div
+    class="pwd-wrap"
+    @keydown.esc.stop="!busy && emits('close')"
+  >
     <div class="mask"></div>
-    <div class="content">
+    <div
+      class="content"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="password-dialog-title"
+    >
       <div class="top">
-        <div class="title">连接密码</div>
+        <div
+          id="password-dialog-title"
+          class="title"
+        >
+          连接密码
+        </div>
         <button
           class="close"
           type="button"
@@ -11,10 +24,18 @@
           title="关闭密码输入"
           :disabled="busy"
           @click="emits('close')"
-        ></button>
+        >
+          <CloseOutline />
+        </button>
       </div>
       <div class="uuid">设备代码：{{ uuid }}</div>
-      <div class="err-msg">{{ errMsg }}</div>
+      <div
+        v-if="errMsg"
+        class="err-msg"
+        role="alert"
+      >
+        {{ errMsg }}
+      </div>
       <div class="ipt-wrap">
         <input
           ref="iptRef"
@@ -27,14 +48,18 @@
           :disabled="busy"
           @keydown.enter="handleConfirm"
         />
-        <div
+        <button
           class="ico eye"
-          :class="{ hide: hidePwd }"
+          type="button"
+          :aria-label="hidePwd ? '显示连接密码' : '隐藏连接密码'"
+          :aria-pressed="!hidePwd"
           @click="hidePwd = !hidePwd"
-        ></div>
+        >
+          <EyeOffOutline v-if="hidePwd" /><EyeOutline v-else />
+        </button>
       </div>
       <button
-        class="btn"
+        class="btn pd-button"
         type="button"
         :disabled="busy"
         @click="handleConfirm"
@@ -46,6 +71,7 @@
 </template>
 
 <script lang="ts" setup>
+import { CloseOutline, EyeOffOutline, EyeOutline } from '@vicons/ionicons5';
 import { onMounted, ref } from 'vue';
 
 const hidePwd = ref(true);
@@ -90,116 +116,111 @@ function handleConfirm() {
 
 <style lang="scss" scoped>
 .pwd-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+.mask {
+  position: absolute;
+  inset: 0;
+  background: rgb(27 43 33 / 30%);
+  backdrop-filter: blur(5px);
+}
+.content {
   position: relative;
-  z-index: 20;
-  .mask {
-    background-color: rgba($color: #000000, $alpha: 0.3) !important;
-
-    @extend %maskBg;
+  box-sizing: border-box;
+  width: min(380px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  padding: 28px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius-lg);
+  background: var(--pd-surface);
+  box-shadow: var(--pd-shadow-raised);
+}
+.top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.title {
+  font-size: 20px;
+  font-weight: 600;
+}
+.close,
+.eye {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-surface-soft);
+  color: var(--pd-muted);
+  cursor: pointer;
+  svg {
+    width: 20px;
+    height: 20px;
   }
-  .content {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    box-sizing: border-box;
-    padding: 15px 20px;
-    width: min(320px, calc(100vw - 32px));
-    height: 220px;
-    border-radius: 6px;
-    background-color: white;
-    box-shadow: 0 2px 20px rgb(0 0 0 / 20%);
-    transform: translate(-50%, -50%);
-    .top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      .title {
-        font-weight: 500;
-        font-size: 16px;
-      }
-      .close {
-        padding: 0;
-        border: 0;
-        background: transparent;
-        width: 14px;
-        height: 14px;
-        cursor: pointer;
-
-        @include cross(#666, 2px);
-      }
-    }
-    .uuid {
-      margin-top: 10px;
-      color: #666;
-    }
-    .err-msg {
-      color: red;
-      height: 26px;
-      margin-top: 10px;
-    }
-    .ipt-wrap {
-      position: relative;
-      margin-top: 10px;
-      width: 100%;
-      .ipt {
-        box-sizing: border-box;
-        padding: 0 15px;
-        width: 100%;
-        height: 40px;
-        outline: none;
-        border: 1px solid rgba(153, 153, 153, 0.2);
-        border-radius: 4px;
-        color: #666;
-        font-size: 16px;
-        &::placeholder {
-          color: #c2c2c2;
-          font-size: 14px;
-        }
-        &:focus {
-          border: 1px solid $theme-color-gold;
-        }
-      }
-      .ico {
-        position: absolute;
-        top: 50%;
-        right: 2px;
-        margin-right: 10px;
-        width: 20px;
-        height: 20px;
-        cursor: pointer;
-        transform: translate(0%, -50%);
-
-        &.eye {
-          @include setBackground('@/assets/img/view.png');
-        }
-        &.hide {
-          @include setBackground('@/assets/img/view_off.png');
-        }
-      }
-    }
-    .btn {
-      display: block;
-      padding: 0;
-      border: 0;
-      margin-top: 15px;
-      margin-left: auto;
-      width: 80px;
-      height: 32px;
-      border-radius: 4px;
-      background-color: $theme-color-gold;
-      color: white;
-      text-align: center;
-      font-size: 14px;
-      line-height: 32px;
-      cursor: pointer;
-      &:hover {
-        opacity: 0.7;
-      }
-      &:disabled {
-        opacity: 0.5;
-        cursor: default;
-      }
-    }
+  &:hover:not(:disabled) {
+    background: var(--pd-accent-soft);
+    color: var(--pd-accent);
   }
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+}
+.uuid {
+  margin-top: 14px;
+  color: var(--pd-muted);
+  font-size: 13px;
+}
+.err-msg {
+  margin-top: 16px;
+  padding: 10px 12px;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-danger-soft);
+  color: var(--pd-danger);
+  font-size: 12px;
+}
+.ipt-wrap {
+  position: relative;
+  margin-top: 24px;
+}
+.ipt {
+  box-sizing: border-box;
+  width: 100%;
+  height: 50px;
+  padding: 12px 52px 12px 14px;
+  border: 1px solid var(--pd-border-strong);
+  border-radius: var(--pd-radius-sm);
+  outline: none;
+  background: var(--pd-bg);
+  color: var(--pd-text);
+  font-size: 16px;
+  &::placeholder {
+    color: var(--pd-muted);
+    font-size: 13px;
+  }
+  &:focus {
+    border-color: var(--pd-accent);
+    box-shadow: 0 0 0 3px rgb(22 138 58 / 14%);
+  }
+}
+.eye {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  background: transparent;
+}
+.btn {
+  width: 100%;
+  margin-top: 20px;
 }
 </style>
