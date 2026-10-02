@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
-const { mkdir, mkdtemp, rm, writeFile } = require('node:fs/promises');
+const { mkdir, mkdtemp, realpath, rm, writeFile } = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -38,8 +38,8 @@ test(
     skip: process.platform !== 'win32',
   },
   async () => {
-    const directory = await mkdtemp(
-      path.join(os.tmpdir(), 'palmdesk-app-paths-')
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'palmdesk-app-paths-'))
     );
     const executable = path.join(directory, 'Codex.exe');
     try {
@@ -76,7 +76,10 @@ test(
   'real Windows PowerShell reads local MSIX manifests and skips invalid packages',
   { skip: process.platform !== 'win32' },
   async () => {
-    const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-msix-'));
+    // Windows CI's TEMP may use an 8.3 alias; PowerShell resolves the long path.
+    const directory = await realpath(
+      await mkdtemp(path.join(os.tmpdir(), 'palmdesk-msix-'))
+    );
     const packageDirectory = path.join(directory, 'Claude 测试');
     const executable = path.join(packageDirectory, 'app', 'Claude.exe');
     try {
