@@ -251,3 +251,50 @@ test('launch request rejects unauthenticated or replaced peers and cancels pendi
   assert.equal(started, 1);
   assert.ok(cancelled >= 1);
 });
+
+test('catalog reads share one scan across peers and refresh after expiry', async () => {
+  let now = 1000;
+  let reads = 0;
+  const pending = deferred();
+  const launcher = new AgentLauncher(
+    {},
+    'win32',
+    async () => {
+      reads += 1;
+      return pending.promise;
+    },
+    undefined,
+    () => now
+  );
+  const first = launcher.list();
+  const second = launcher.list();
+  assert.equal(reads, 1);
+  pending.resolve([{ executable: 'C:\\Apps\\Codex.exe' }]);
+  assert.deepEqual(await first, await second);
+  await launcher.list();
+  assert.equal(reads, 1);
+  now += 30001;
+  await launcher.list();
+  assert.equal(reads, 2);
+});
+
+test('cached catalog never authorizes a removed launch target and failed scans can retry', async () => {
+  let reads = 0;
+  let installed = [{ executable: 'C:\\Apps\\Codex.exe' }];
+  const launcher = new AgentLauncher(
+    {},
+    'win32',
+    async () => {
+      reads += 1;
+      if (reads === 1) throw new Error('temporary discovery failure');
+      return installed;
+    },
+    () => assert.fail('must not launch a removed app')
+  );
+  await assert.rejects(launcher.list(), /temporary discovery failure/);
+  assert.equal((await launcher.list()).agents[0].id, 'codex');
+  installed = [];
+  assert.equal((await launcher.list()).agents[0].id, 'codex');
+  await assert.rejects(launcher.launch('codex', 'removed'), /未找到/);
+  assert.equal(reads, 3);
+});

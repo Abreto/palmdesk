@@ -1,4 +1,4 @@
-# Open Agent validation — 2026-10-02
+# Open Agent validation — 2026-10-02, updated 2026-10-03
 
 Scope: issue #37. Built on `b762f09`. Local host: macOS 26.6.2 (Apple Silicon), Node 22.16.0, Chrome 154.0.8037.93. No production Agent sessions were changed by these tests.
 
@@ -35,6 +35,27 @@ node test/smoke/agent-launch-browser.mjs
 ```
 
 The browser script saves synthetic screenshots under `.local/agent-launch-smoke/`. The macOS native script requires a graphical login session and the native build. It only opens its uniquely identified disposable test application.
+
+## Review fixes and regression checks — 2026-10-03
+
+The [review of PR #41](https://github.com/Abreto/palmdesk/pull/41#issuecomment-5957128351) identified three issues, all addressed:
+
+- Installed-app discovery now uses its own authenticated request/result messages and never delays normal window responses. Catalog reads share an in-flight request and a 30-second cache; explicit launches still resolve the installation afresh. Windows reads registered packages' local manifests without a deployment cmdlet call per package.
+- The installed launcher counts/selects host-identified native Agent windows only. Manually linked terminals still open through normal directory navigation and no longer prevent launching the desktop app.
+- AppX enumeration failure preserves desktop targets found through App Paths.
+
+Validation after these changes:
+
+| Check | Result and boundary |
+| --- | --- |
+| `pnpm test:smoke` | 333 passed, 5 skipped on macOS: 3 existing skips plus 2 new Windows-only PowerShell tests. |
+| `pnpm typecheck`, changed-file ESLint, `pnpm build:prod` | Passed; existing browser-data and large-chunk build warnings remain. |
+| Host handler regressions | The production handler returns windows while installed discovery is pending; discovery failure leaves window results intact, and a replaced peer receives no stale result. |
+| Catalog regressions | Concurrent requests share discovery, expiration refreshes it, failures can retry, and an app removed after caching cannot launch. |
+| Browser smoke | All original scenarios passed, plus delayed installed discovery, Terminal → Claude manual links, preserved manual-link navigation, and native-only installed-window counts/selection. No browser errors. |
+| Windows PowerShell regressions | Added to the cross-platform CI smoke suite; skipped locally. Run the production script in Windows PowerShell with mocked discovery providers and real temporary files: App Paths survives throwing AppX enumeration; local MSIX manifests support non-ASCII paths, skip invalid packages/missing executables, and reject paths outside the package. No registry changes or app launches. |
+
+These fixes do not change the native macOS helper. Its earlier OS launch/reopen validation remains applicable. The Windows interpreter tests exercise discovery with controlled fixtures, not installed-app launch acceptance.
 
 ## Synthetic UI screenshots
 

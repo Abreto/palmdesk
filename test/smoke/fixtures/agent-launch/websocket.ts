@@ -1,4 +1,6 @@
+/* eslint-disable no-underscore-dangle -- Shared browser fixture control. */
 import { markRaw, ref } from 'vue';
+
 import { useNetworkStore } from '../../../../src/store/network';
 import {
   WsConnectStatusEnum,
@@ -12,6 +14,8 @@ const state = {
     { id: 'codex', name: 'Codex' },
     { id: 'claude', name: 'Claude' },
   ],
+  installedDelay: 20,
+  installedReplies: 0,
   supported: true,
   legacy: false,
   running: [] as object[],
@@ -83,15 +87,8 @@ export function useWebsocket() {
                 supported: true,
               });
             } else if (request.msgType === M.remoteWindowsRequest) {
-              if (!state.legacy && request.data.installedDiscovery)
-                reply(request, M.remoteWindowsResult, {
-                  installed: {
-                    supported: state.supported,
-                    agents: state.installed,
-                    message: '此平台不支持打开 Agent',
-                  },
-                });
-              if (state.launched && ++state.polls >= state.afterPolls) {
+              if (state.launched) state.polls += 1;
+              if (state.launched && state.polls >= state.afterPolls) {
                 state.running = [{ id: state.launched }];
                 state.windows = Array.from(
                   { length: state.afterLaunch },
@@ -108,6 +105,16 @@ export function useWebsocket() {
                 done: true,
                 error: state.listError || undefined,
               });
+            } else if (request.msgType === M.remoteInstalledAgentsRequest) {
+              if (!state.legacy)
+                setTimeout(() => {
+                  state.installedReplies += 1;
+                  reply(request, M.remoteInstalledAgentsResult, {
+                    supported: state.supported,
+                    agents: state.installed,
+                    message: '此平台不支持打开 Agent',
+                  });
+                }, state.installedDelay);
             } else if (request.msgType === M.remoteAgentLaunch) {
               setTimeout(() => {
                 if (!state.launchError) {

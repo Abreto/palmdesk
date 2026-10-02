@@ -34,10 +34,18 @@ foreach ($root in @('HKCU:\Software\Microsoft\Windows\CurrentVersion\App Paths',
     }
   }
 }
-foreach ($package in @(Get-AppxPackage -ErrorAction Stop)) {
+$packages = @()
+try { $packages = @(Get-AppxPackage -ErrorAction Stop) } catch {
+  # AppX discovery is optional; preserve desktop targets already found above.
+}
+foreach ($package in $packages) {
   if ($package.IsFramework -or !$package.InstallLocation) { continue }
   try {
-    $manifest = Get-AppxPackageManifest -Package $package.PackageFullName -ErrorAction Stop
+    # Read the registered package's local manifest without a deployment cmdlet
+    # round trip for every installed application.
+    $manifest = New-Object System.Xml.XmlDocument
+    $manifest.XmlResolver = $null
+    $manifest.Load((Join-Path $package.InstallLocation 'AppxManifest.xml'))
     foreach ($application in @($manifest.Package.Applications.Application)) {
       $relative = [string]$application.Executable
       if (!$relative -or !($names -contains [IO.Path]::GetFileName($relative))) { continue }
@@ -103,6 +111,8 @@ async function startWindowsTarget(
 
 export class AgentLauncher {
   private operation?: { id: string; cancelled: boolean };
+  private catalog?: { targets: InstalledTarget[]; expiresAt: number };
+  private catalogRequest?: Promise<InstalledTarget[]>;
 
   constructor(
     private native: Pick<NativeWindowBridge, 'request'>,
@@ -127,7 +137,8 @@ export class AgentLauncher {
       );
       return JSON.parse(stdout.replace(/^\uFEFF/, '').trim());
     },
-    private startWindows = startWindowsTarget
+    private startWindows = startWindowsTarget,
+    private now = Date.now
   ) {}
 
   private async targets(): Promise<InstalledTarget[]> {
@@ -149,9 +160,24 @@ export class AgentLauncher {
 
   async list() {
     const supported = this.platform === 'darwin' || this.platform === 'win32';
+    if (!this.catalog || this.catalog.expiresAt <= this.now()) {
+      // Share slow discovery across peers. Only the picker uses this cache;
+      // an explicit launch always resolves the installed target again.
+      if (!this.catalogRequest) {
+        this.catalogRequest = this.targets()
+          .then((targets) => {
+            this.catalog = { targets, expiresAt: this.now() + 30000 };
+            return targets;
+          })
+          .finally(() => {
+            this.catalogRequest = undefined;
+          });
+      }
+      await this.catalogRequest;
+    }
     return {
       supported,
-      agents: (await this.targets()).map(({ id }) => {
+      agents: this.catalog!.targets.map(({ id }) => {
         const agent = getAgent(id)!;
         return { id: agent.id, name: agent.name };
       }),

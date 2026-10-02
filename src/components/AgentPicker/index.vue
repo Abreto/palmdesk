@@ -45,8 +45,14 @@
         tabindex="-1"
       >
         <h3>打开电脑上的 Agent</h3>
-        <p v-if="!launchSupported">{{ launchMessage }}</p>
-        <p v-else-if="!installedAgents?.length">
+        <p
+          v-if="installedLoading"
+          role="status"
+        >
+          正在查找已安装的 Agent…
+        </p>
+        <p v-if="!installedLoading && !launchSupported">{{ launchMessage }}</p>
+        <p v-else-if="!installedLoading && !installedAgents?.length">
           未发现可启动的已安装
           Agent。请在电脑上安装或打开受支持的应用后刷新；部分 Windows
           安装方式尚不支持直接启动。
@@ -467,6 +473,7 @@ const props = defineProps<{
   error: string;
   discoveryError: string;
   installedAgents?: IRemoteAgent[];
+  installedLoading?: boolean;
   launchSupported?: boolean;
   launchMessage?: string;
   openingAgent?: AgentId;
@@ -522,16 +529,25 @@ function startAgent(id: AgentId) {
 }
 function chooseInstalledAgent(agent: IRemoteAgent) {
   const entry = directory.value.agents.find((item) => item.id === agent.id);
+  const windows = installedWindows(agent.id);
   showLauncher.value = false;
   tab.value = 'agents';
   query.value = '';
-  if (entry?.windows.length) openAgent(entry);
+  if (entry && windows.length) openAgent({ ...entry, windows });
   else startAgent(agent.id);
+}
+function installedWindows(id: AgentId) {
+  return (
+    directory.value.agents
+      .find((agent) => agent.id === id)
+      ?.windows.filter((source) => source.agentId === id) || []
+  );
 }
 function installedState(id: AgentId) {
   if (props.openingAgent === id) return '打开中…';
   const entry = directory.value.agents.find((agent) => agent.id === id);
-  if (entry?.windows.length) return `${entry.windows.length} 个窗口`;
+  const windows = installedWindows(id);
+  if (windows.length) return `${windows.length} 个窗口`;
   return entry?.discovered ? '已打开但暂无窗口' : '未运行';
 }
 const preferenceKey = () => `palmdesk-agent-preferences:${props.deviceId}`;

@@ -95,6 +95,8 @@ export enum WsMsgTypeEnum {
   remoteWindowsRequest = 'remoteWindowsRequest',
   remoteAgentLaunch = 'remoteAgentLaunch',
   remoteAgentLaunchResult = 'remoteAgentLaunchResult',
+  remoteInstalledAgentsRequest = 'remoteInstalledAgentsRequest',
+  remoteInstalledAgentsResult = 'remoteInstalledAgentsResult',
   remoteWindowsResult = 'remoteWindowsResult',
   remoteWindowSelect = 'remoteWindowSelect',
   remoteWindowSelected = 'remoteWindowSelected',

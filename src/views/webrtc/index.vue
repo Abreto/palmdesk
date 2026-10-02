@@ -146,6 +146,7 @@
       :error="windowError"
       :discovery-error="discoveryError"
       :installed-agents="installedAgents"
+      :installed-loading="installedLoading"
       :launch-supported="launchSupported"
       :launch-message="launchMessage"
       :opening-agent="openingAgent"
@@ -289,6 +290,9 @@ const agents = ref<IRemoteAgent[]>([]);
 const agentBindings = ref<AgentBindings>({});
 const discoveryError = ref('');
 const installedAgents = ref<IRemoteAgent[]>([]);
+const installedLoading = ref(false);
+let installedRequest = '';
+let installedTimer: ReturnType<typeof setTimeout>;
 const launchSupported = ref(false);
 const launchMessage = ref('请更新电脑端 PalmDesk 以支持打开 Agent');
 const openingAgent = ref<AgentId>();
@@ -382,6 +386,28 @@ watch(
   }
 );
 
+function cancelInstalledRequest() {
+  clearTimeout(installedTimer);
+  installedRequest = '';
+  installedLoading.value = false;
+}
+
+function requestInstalledAgents() {
+  if (installedRequest) return;
+  installedRequest = getRandomString(16);
+  installedLoading.value = true;
+  peer.value?.dataChannelSend({
+    msgType: WsMsgTypeEnum.remoteInstalledAgentsRequest,
+    requestId: installedRequest,
+    data: {},
+  });
+  installedTimer = setTimeout(() => {
+    cancelInstalledRequest();
+    launchMessage.value =
+      '读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk';
+  }, 15000);
+}
+
 function requestWindows() {
   if (
     !visible.value ||
@@ -401,15 +427,16 @@ function requestWindows() {
   peer.value?.dataChannelSend({
     msgType: WsMsgTypeEnum.remoteWindowsRequest,
     requestId: listRequest,
-    data: { agentDiscovery: true, installedDiscovery: !openingAgent.value },
+    data: { agentDiscovery: true, previews: !openingAgent.value },
   });
+  if (!openingAgent.value) requestInstalledAgents();
   requestTimer = setTimeout(() => {
     listRequest = '';
     windowsLoading.value = false;
     windowError.value = '读取窗口列表超时，请刷新重试';
     if (openingAgent.value)
       finishAgentLaunch('读取窗口超时，请刷新查看 Agent 或重试');
-  }, 30000);
+  }, 15000);
 }
 
 function finishAgentLaunch(message = '') {
@@ -541,6 +568,21 @@ function receiveWindowMessage(event: MessageEvent) {
   if (!message?.data || typeof message.data !== 'object') return;
   const { data } = message;
   if (
+    message.msgType === WsMsgTypeEnum.remoteInstalledAgentsResult &&
+    installedRequest &&
+    message.requestId === installedRequest
+  ) {
+    cancelInstalledRequest();
+    launchSupported.value = data.supported === true;
+    installedAgents.value = AGENT_DEFINITIONS.filter(
+      (agent) =>
+        Array.isArray(data.agents) &&
+        data.agents.some((item) => item?.id === agent.id)
+    ).map(({ id, name }) => ({ id, name }));
+    launchMessage.value = typeof data.message === 'string' ? data.message : '';
+    return;
+  }
+  if (
     message.msgType === WsMsgTypeEnum.remoteAgentLaunchResult &&
     launchRequest &&
     message.requestId === launchRequest
@@ -594,18 +636,6 @@ function receiveWindowMessage(event: MessageEvent) {
     message.requestId === listRequest
   ) {
     const source = data.source;
-    if (data.installed && typeof data.installed === 'object') {
-      launchSupported.value = data.installed.supported === true;
-      installedAgents.value = AGENT_DEFINITIONS.filter(
-        (agent) =>
-          Array.isArray(data.installed.agents) &&
-          data.installed.agents.some((item) => item?.id === agent.id)
-      ).map(({ id, name }) => ({ id, name }));
-      launchMessage.value =
-        typeof data.installed.message === 'string'
-          ? data.installed.message
-          : '';
-    }
     const agent = getAgent(data.agent?.id);
     if (agent && !agents.value.some((item) => item.id === agent.id))
       agents.value.push({ id: agent.id, name: agent.name });
@@ -727,6 +757,7 @@ watch(
 );
 
 function endConnection(message: string) {
+  cancelInstalledRequest();
   if (openingAgent.value)
     finishAgentLaunch('连接已中断，请重新连接后刷新查看 Agent');
   recovery.stop();
@@ -792,6 +823,7 @@ function requestConnection() {
 function connect(preserve = false) {
   if (!hasCredentials.value) return;
   finishAgentLaunch();
+  cancelInstalledRequest();
   installedAgents.value = [];
   launchSupported.value = false;
   launchMessage.value = '请更新电脑端 PalmDesk 以支持打开 Agent';
@@ -955,6 +987,7 @@ function visibilityChanged() {
   const returning = !visible.value && !document.hidden;
   visible.value = !document.hidden;
   if (!visible.value) {
+    cancelInstalledRequest();
     if (openingAgent.value)
       finishAgentLaunch(
         '已暂停等待 Agent，请刷新查看窗口；打开请求不会自动重发'
@@ -992,6 +1025,7 @@ function remoteSessionEnded(event: Event) {
 }
 
 function pageHidden() {
+  cancelInstalledRequest();
   if (openingAgent.value)
     finishAgentLaunch('已暂停等待 Agent，请刷新查看窗口；打开请求不会自动重发');
   visible.value = false;
@@ -1018,6 +1052,7 @@ watch(connectStatus, (status) => {
   if (status === WsConnectStatusEnum.connect && !leaving) requestConnection();
 });
 watch(connected, (value) => {
+  if (!value) cancelInstalledRequest();
   if (!value && openingAgent.value)
     finishAgentLaunch('连接已中断，请重新连接后刷新查看 Agent');
   if (value) {
@@ -1084,6 +1119,7 @@ onMounted(() => {
   }, 2000);
 });
 onUnmounted(() => {
+  cancelInstalledRequest();
   finishAgentLaunch();
   document.removeEventListener('visibilitychange', visibilityChanged);
   window.removeEventListener(REMOTE_SESSION_ENDED_EVENT, remoteSessionEnded);

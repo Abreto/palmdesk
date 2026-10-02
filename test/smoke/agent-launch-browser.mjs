@@ -1,8 +1,11 @@
+/* eslint-disable no-underscore-dangle -- Shared browser fixture control. */
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
 import { mkdir } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+
 const require = createRequire(import.meta.url);
 const { chromium } = require('playwright');
+
 const browser = await chromium.launch({
   executablePath:
     process.env.SMOKE_BROWSER_EXECUTABLE ||
@@ -129,6 +132,97 @@ try {
     'PASS an existing Agent does not prevent opening another installed Agent'
   );
 
+  const terminalWindow = {
+    id: 'terminal',
+    contextId: 'terminal',
+    name: 'Claude Code in Terminal',
+    appName: 'Terminal',
+    thumbnail: '',
+    appIcon: '',
+    isOnScreen: true,
+  };
+  const nativeWindow = {
+    ...terminalWindow,
+    id: 'native-claude',
+    contextId: 'native-claude',
+    agentId: 'claude',
+    name: 'Claude Desktop',
+    appName: 'Claude',
+  };
+  async function linkTerminal() {
+    await page.getByRole('tab', { name: /其他应用/ }).click();
+    await page
+      .getByRole('button', { name: '将 Terminal 关联到 Agent', exact: true })
+      .click();
+    await page
+      .getByLabel('选择关联的 Agent', { exact: true })
+      .selectOption('claude');
+  }
+  await reset({ windows: [terminalWindow] });
+  await linkTerminal();
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  const installedClaude = page
+    .locator('.installed-agent')
+    .filter({ hasText: 'Claude' });
+  await installedClaude.getByText('未运行', { exact: true }).waitFor();
+  await installedClaude.click();
+  await page.waitForFunction(() =>
+    window.__agentSmoke.sent.some(
+      (item) => item.msgType === 'remoteWindowSelect'
+    )
+  );
+  assert.equal((await messages('remoteAgentLaunch'))[0].data.id, 'claude');
+  assert.equal((await messages('remoteWindowSelect'))[0].data.id, 'claude-0');
+  console.log(
+    'PASS manually linked terminal does not block launching the desktop Agent'
+  );
+
+  await reset({ windows: [terminalWindow] });
+  await linkTerminal();
+  await page.getByRole('button', { name: '打开 Claude', exact: true }).click();
+  assert.equal((await messages('remoteAgentLaunch')).length, 0);
+  assert.equal((await messages('remoteWindowSelect'))[0].data.id, 'terminal');
+  console.log(
+    'PASS directory navigation to manually linked terminals is preserved'
+  );
+
+  await reset({
+    windows: [terminalWindow, nativeWindow],
+    running: [{ id: 'claude' }],
+  });
+  await linkTerminal();
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await installedClaude.getByText('1 个窗口', { exact: true }).waitFor();
+  await installedClaude.click();
+  assert.equal((await messages('remoteAgentLaunch')).length, 0);
+  assert.equal(
+    (await messages('remoteWindowSelect'))[0].data.id,
+    'native-claude'
+  );
+  console.log(
+    'PASS installed launcher counts and selects only native Agent windows'
+  );
+
+  await reset({ windows: [nativeWindow], installedDelay: 5000 });
+  assert.equal(
+    await page.evaluate(() => window.__agentSmoke.installedReplies),
+    0
+  );
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await page.getByText('正在查找已安装的 Agent…', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '打开 Claude', exact: true }).click();
+  assert.equal(
+    (await messages('remoteWindowSelect'))[0].data.id,
+    'native-claude'
+  );
+  assert.equal(
+    await page.evaluate(() => window.__agentSmoke.installedReplies),
+    0
+  );
+  console.log(
+    'PASS slow installed discovery never blocks selecting an existing window'
+  );
+
   await reset({ launchError: 'Agent 已移除，请刷新后重试' });
   await chooseCodex();
   await page.getByText('Agent 已移除，请刷新后重试', { exact: true }).waitFor();
@@ -161,7 +255,9 @@ try {
     .last()
     .click();
   await page
-    .getByText('请更新电脑端 PalmDesk 以支持打开 Agent', { exact: true })
+    .getByText('读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk', {
+      exact: true,
+    })
     .waitFor();
   console.log(
     'PASS unsupported and older hosts have no ineffective launch action'

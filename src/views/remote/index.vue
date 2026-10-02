@@ -1025,6 +1025,7 @@ watch(
         if (
           msgType === WsMsgTypeEnum.remoteWindowsRequest ||
           msgType === WsMsgTypeEnum.remoteAgentLaunch ||
+          msgType === WsMsgTypeEnum.remoteInstalledAgentsRequest ||
           msgType === WsMsgTypeEnum.remoteWindowSelect
         ) {
           await handleWindowRequest(item, jsondata);
@@ -1571,6 +1572,21 @@ async function handleWindowRequest(
       peer.dataChannelSend({ msgType, requestId: request.requestId, data });
   };
   if (!current()) return;
+  if (request.msgType === WsMsgTypeEnum.remoteInstalledAgentsRequest) {
+    try {
+      const result = await invokeCapture(IPC_EVENT.getInstalledAgents);
+      if (result?.code !== 0)
+        throw new Error('读取已安装 Agent 失败，请刷新重试');
+      reply(WsMsgTypeEnum.remoteInstalledAgentsResult, result.data);
+    } catch {
+      reply(WsMsgTypeEnum.remoteInstalledAgentsResult, {
+        supported: false,
+        agents: [],
+        message: '读取已安装 Agent 失败，请刷新重试',
+      });
+    }
+    return;
+  }
   if (request.msgType === WsMsgTypeEnum.remoteAgentLaunch) {
     if (windowSelection || captureSessionId.value) {
       reply(WsMsgTypeEnum.remoteAgentLaunchResult, {
@@ -1617,23 +1633,6 @@ async function handleWindowRequest(
     if (listingPeers.has(peer.receiver)) return;
     listingPeers.add(peer.receiver);
     try {
-      if (request.data?.installedDiscovery === true) {
-        try {
-          const result = await invokeCapture(IPC_EVENT.getInstalledAgents);
-          if (!current()) return;
-          if (result?.code !== 0)
-            throw new Error('读取已安装 Agent 失败，请刷新重试');
-          reply(WsMsgTypeEnum.remoteWindowsResult, { installed: result.data });
-        } catch {
-          reply(WsMsgTypeEnum.remoteWindowsResult, {
-            installed: {
-              supported: false,
-              agents: [],
-              message: '读取已安装 Agent 失败，请刷新重试',
-            },
-          });
-        }
-      }
       if (request.data?.agentDiscovery === true) {
         try {
           const discovery = await invokeCapture(IPC_EVENT.getAgentApplications);
@@ -1651,7 +1650,7 @@ async function handleWindowRequest(
         }
       }
       const result = await invokeCapture(IPC_EVENT.getCaptureSources, {
-        previews: request.data?.installedDiscovery !== false,
+        previews: request.data?.previews !== false,
       });
       if (!current()) return;
       if (result?.code !== 0) throw new Error(result?.msg || '读取窗口失败');
