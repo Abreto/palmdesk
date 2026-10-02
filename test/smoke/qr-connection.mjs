@@ -21,6 +21,7 @@ export async function exerciseQrConnection({
     host.waitForNavigation(),
     host.getByRole('button', { name: '保存并重新连接' }).click(),
   ]);
+  await host.getByRole('button', { name: '显示二维码', exact: true }).click();
   await host.locator('.connection-qr canvas').waitFor();
   await host.screenshot({ path: path.join(artifacts, 'host-qr.png') });
   const readQr = () =>
@@ -103,6 +104,8 @@ export async function exerciseQrConnection({
   );
   await host.locator('.info-right .edit').click();
   await host.getByText('Rotation fixture failure', { exact: true }).waitFor();
+  await host.getByRole('button', { name: '显示二维码', exact: true }).click();
+  await host.locator('.connection-qr canvas').waitFor();
   assert.equal(await readQr(), originalLink);
   await host.unroute('**/desk_user/update_by_uuid');
   const rotation = host.waitForResponse((response) =>
@@ -110,6 +113,7 @@ export async function exerciseQrConnection({
   );
   await host.locator('.info-right .edit').click();
   await rotation;
+  await host.getByRole('button', { name: '显示二维码', exact: true }).click();
   await host.locator('.connection-qr canvas').waitFor();
   const currentLink = await readQr();
   assert.notEqual(currentLink, originalLink);

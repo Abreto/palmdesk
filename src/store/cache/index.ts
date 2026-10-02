@@ -10,7 +10,6 @@ export type PiniaCacheRootState = {
     remoteDeskUserPassword: string;
   }[];
   isAlwaysOnTop: boolean;
-  hidePwd: boolean;
   deskUserUuid: string;
   deskUserPassword: string;
   remoteDeskUserUuid: string;
@@ -27,7 +26,6 @@ export const usePiniaCacheStore = defineStore(`${LS_KEY_PREFIX}pinia-cache`, {
       volume: 70,
       linkDeviceList: [],
       isAlwaysOnTop: false,
-      hidePwd: false,
       deskUserUuid: '',
       deskUserPassword: '',
       remoteDeskUserUuid: '',
