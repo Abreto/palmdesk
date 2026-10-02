@@ -68,9 +68,7 @@
             <div class="txt">临时密码</div>
             <div class="code-info">
               <div class="code">
-                {{
-                  cacheStore.hidePwd ? '********' : cacheStore.deskUserPassword
-                }}
+                {{ hidePwd ? '********' : cacheStore.deskUserPassword }}
               </div>
               <button
                 class="ico copy"
@@ -84,14 +82,12 @@
               <button
                 class="ico eye"
                 type="button"
-                :title="cacheStore.hidePwd ? '显示临时密码' : '隐藏临时密码'"
-                :aria-label="
-                  cacheStore.hidePwd ? '显示临时密码' : '隐藏临时密码'
-                "
-                :aria-pressed="!cacheStore.hidePwd"
-                @click="cacheStore.hidePwd = !cacheStore.hidePwd"
+                :title="hidePwd ? '显示临时密码' : '隐藏临时密码'"
+                :aria-label="hidePwd ? '显示临时密码' : '隐藏临时密码'"
+                :aria-pressed="!hidePwd"
+                @click="hidePwd = !hidePwd"
               >
-                <EyeOffOutline v-if="cacheStore.hidePwd" /><EyeOutline v-else />
+                <EyeOffOutline v-if="hidePwd" /><EyeOutline v-else />
               </button>
               <button
                 class="ico edit"
@@ -691,6 +687,16 @@ const route = useRoute();
 const appStore = useAppStore();
 const networkStore = useNetworkStore();
 const cacheStore = usePiniaCacheStore();
+// Visibility belongs to this page, never to the persisted device settings.
+const hidePwd = ref(true);
+
+watch(
+  () => [cacheStore.deskUserUuid, cacheStore.deskUserPassword],
+  () => {
+    hidePwd.value = true;
+  },
+  { flush: 'sync' }
+);
 
 const { updateWebRtcRemoteDeskConfig, webRtcRemoteDesk } =
   useWebRtcRemoteDesk();

@@ -181,6 +181,16 @@ NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/business-flow.mjs
 
 默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
 
+凭据显示烟测使用生产网页、真实 Pinia 持久化和二维码解码器，自行启动本地 HTTP / Socket.IO 服务；设备 API 和桌面 IPC 使用测试替身，无需部署后端或控制真实窗口：
+
+```bash
+npm install --prefix .local/smoke --no-package-lock --no-save playwright socket.io
+pnpm build:prod
+NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/credential-visibility.mjs
+```
+
+覆盖首次启动无明文闪现、旧版显示密码设置、刷新后重新隐藏、密码与二维码独立键盘操作、隐藏截图不可解码／显示截图可解码、复制链接、密码更新、重连和窄屏布局。截图写入 `.local/credential-visibility/`，仅使用测试凭据；不替代实体手机相机验收。
+
 手机后台恢复烟测自行启动本机 HTTP / Socket.IO 服务，使用真实 Vue 页面、会话认证模块和 WebRTC；设备存储、窗口捕获、输入及会话记录使用合成数据，不需要部署后端或控制真实窗口：
 
 ```bash

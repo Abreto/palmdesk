@@ -131,7 +131,7 @@ The default video quality is up to 2160p at 30 fps with an 8 Mbps bitrate ceilin
 
 Pinch with two fingers inside the window view to zoom from fit to 300%, centered on the gesture. Move both fingers to pan; after lifting one finger, the remaining finger can keep panning until lifted. These gestures move only the local video view, leaving the toolbar and text composer in place. For one-finger panning, select **移动画面** (Pan) or **仅观看** (Watch only); other touch modes retain remote control. The zoom selector shows the current scale; choose **适合** (Fit) to reset the view.
 
-To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
+To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area, then choose “显示二维码” (Show QR code). The temporary password and QR code start concealed on every launch and have independent Show/Hide controls. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes and conceals the new credentials. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
 
 ## Window Selection and Session Behavior
 
