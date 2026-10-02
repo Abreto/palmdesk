@@ -93,6 +93,8 @@ export enum WsMsgTypeEnum {
   billdDeskSessionError = 'billdDeskSessionError',
   billdDeskBehavior = 'billdDeskBehavior',
   remoteWindowsRequest = 'remoteWindowsRequest',
+  remoteAgentLaunch = 'remoteAgentLaunch',
+  remoteAgentLaunchResult = 'remoteAgentLaunchResult',
   remoteWindowsResult = 'remoteWindowsResult',
   remoteWindowSelect = 'remoteWindowSelect',
   remoteWindowSelected = 'remoteWindowSelected',

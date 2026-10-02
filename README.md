@@ -38,6 +38,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Connect using a device code and password, or scan the desktop's QR code with a camera or an image. Connection links authenticate automatically and open reading when enabled, or the Agent directory otherwise.
 - Browse application windows across macOS Spaces, search by application name or window title, view thumbnails, and refresh the list. Capture starts only after you select a window.
 - Use the Window tab's Agent directory to discover open Codex, Claude, ChatGPT, Kimi, and ZCode applications. A single window opens directly; multiple windows expand for selection. Running applications without an available window remain listed.
+- Choose **打开 Agent** (Open Agent) to launch an installed, supported application on the connected computer. After launch, one available window opens directly; multiple windows remain a choice. Running apps without windows can be reopened with an explicit retry.
 - Pin agents and retain recently used agents per device. Other applications remain accessible, and terminal windows can be manually associated with an agent. Manual associations survive refresh within the current connection and must be recreated after reconnecting.
 - Agent discovery uses macOS bundle IDs or Windows executable identities. "Open" describes the application, not task execution. The separate Read tab shows supported local sessions, project paths and states inferred from logs; it does not identify or switch the active task in the GUI.
 - Activate windows on other Spaces or restore a selected minimized window before capture begins.
@@ -122,16 +123,24 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 
 ### Connect and Select a Window
 
-1. Open the application window you want to view or control on the computer. It can be on any macOS Space, or on the current Windows virtual desktop.
+1. Install a supported Agent on the computer, or open another application window you want to control. Agent windows can be on any macOS Space, or on the current Windows virtual desktop.
 2. Open the PalmDesk web client on your phone. The desktop and web clients must both use this version and connect to the same backend.
 3. Enter the device code and password displayed by the desktop client, or use its QR code.
-4. After authentication, session reading opens if enabled on the host. To control a window, switch to **窗口** (Window) and select it from the Agent directory. When reading is disabled or unsupported, the directory opens by default. The host activates the selected window and starts capture once it is available.
+4. After authentication, session reading opens if enabled on the host. To control a window, switch to **窗口** (Window) and select it from the Agent directory. If the Agent is not open, choose **打开 Agent**, then select an installed application. When reading is disabled or unsupported, the directory opens by default. The host activates the selected window and starts capture once it is available.
 
 The default video quality is up to 2160p at 30 fps with an 8 Mbps bitrate ceiling and text detail prioritized. Capture preserves the window's aspect ratio and does not enlarge small windows. Retina windows retain native pixels within 3840×2160, avoiding the text blur caused by a fixed 1080p downscale. Select 720p, 1080p, or 1440p on the phone to reduce traffic; actual bitrate still adapts to screen changes and network conditions.
 
 Pinch with two fingers inside the window view to zoom from fit to 300%, centered on the gesture. Move both fingers to pan; after lifting one finger, the remaining finger can keep panning until lifted. These gestures move only the local video view, leaving the toolbar and text composer in place. For one-finger panning, select **移动画面** (Pan) or **仅观看** (Watch only); other touch modes retain remote control. The zoom selector shows the current scale; choose **适合** (Fit) to reset the view.
 
 To enable QR connections, configure the phone-accessible web client homepage in the desktop's QR connection area, then choose “显示二维码” (Show QR code). The temporary password and QR code start concealed on every launch and have independent Show/Hide controls. Scan with the web client's scanner, the system camera, or WeChat. The code includes the device code and temporary password; changing the password invalidates old codes and conceals the new credentials. See [QR connection configuration](docs/SERVICE_CONFIGURATION.md#扫码连接) for URL requirements, HTTPS, and WeChat compatibility.
+
+### Open an Agent from your phone
+
+The Agent directory offers **打开 Agent** (Open Agent) both when empty and when other Agents are open. It lists installed Codex, Claude, ChatGPT, Kimi and ZCode applications supported by the host. Selecting an app with existing windows uses the normal window picker; otherwise PalmDesk explicitly launches or reopens it, refreshes the directory, and waits briefly for a window. A single matching window enters the normal capture flow; multiple windows require selection. Apps can refuse to create a window: errors and timeouts retain refresh/retry and other-application access.
+
+macOS resolves installed `.app` bundles through Launch Services and sends the normal application open/reopen request. Windows discovers known executable names from the current user's installed MSIX packages and Windows App Paths registrations, launching packaged apps through their registered application ID. Unregistered portable/custom installations and CLI agents are not launch targets; open those on the computer first. Windows window selection remains limited to the current virtual desktop. Unsupported hosts and older PalmDesk versions explain why launching is unavailable. Update both host and controller.
+
+Launch requests use the authenticated connection and a known Agent ID; paths and launch arguments are resolved only on the host. No apps are installed, prompts submitted, or tasks orchestrated. Disconnecting prevents pending launch work where it has not reached the operating system; an app already opened stays open. Reconnecting, switching to Read, or backgrounding the controller never replays the launch. Capture and input still require the existing permissions and native window identity checks. See the [launch validation record](docs/smoke-artifacts/agent-launch-2026-10-02.md) for tested behavior and remaining real-device checks.
 
 ## Window Selection and Session Behavior
 

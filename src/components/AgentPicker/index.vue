@@ -14,12 +14,66 @@
           type="button"
           title="刷新 Agent 和窗口"
           aria-label="刷新 Agent 和窗口"
-          :disabled="loading || disabled"
+          :disabled="busy"
           @click="$emit('refresh')"
         >
           <RefreshOutline :class="{ spinning: loading }" />
         </button>
       </header>
+      <button
+        v-if="
+          directory.agents.length ||
+          tab === 'other' ||
+          query.trim() ||
+          showLauncher
+        "
+        type="button"
+        class="launch-command"
+        :disabled="busy"
+        :aria-expanded="showLauncher"
+        aria-controls="installed-agents"
+        @click="toggleLauncher()"
+      >
+        <AddOutline />打开 Agent
+      </button>
+      <section
+        v-if="showLauncher"
+        id="installed-agents"
+        ref="launcherPanel"
+        class="installed-agents"
+        aria-label="已安装的 Agent"
+        tabindex="-1"
+      >
+        <h3>打开电脑上的 Agent</h3>
+        <p v-if="!launchSupported">{{ launchMessage }}</p>
+        <p v-else-if="!installedAgents?.length">
+          未发现可启动的已安装
+          Agent。请在电脑上安装或打开受支持的应用后刷新；部分 Windows
+          安装方式尚不支持直接启动。
+        </p>
+        <button
+          v-for="agent in launchSupported ? installedAgents : []"
+          :key="agent.id"
+          type="button"
+          class="installed-agent"
+          :disabled="busy"
+          @click="chooseInstalledAgent(agent)"
+        >
+          <span>{{ agent.name }}</span>
+          <span>{{ installedState(agent.id) }}</span>
+          <ChevronForwardOutline />
+        </button>
+        <button
+          type="button"
+          class="text-command"
+          @click="
+            showLauncher = false;
+            tab = 'other';
+          "
+        >
+          查看其他应用
+        </button>
+      </section>
       <div
         class="picker-tabs"
         role="tablist"
@@ -64,12 +118,34 @@
       >
         {{ error || discoveryError }}
       </p>
+      <div
+        v-if="launchError"
+        class="picker-error"
+        role="alert"
+      >
+        <p>{{ launchError }}</p>
+        <button
+          v-if="retryAgent && canLaunch(retryAgent)"
+          type="button"
+          class="text-command"
+          :disabled="busy"
+          @click="startAgent(retryAgent)"
+        >
+          重试打开 {{ getAgent(retryAgent)?.name }}
+        </button>
+      </div>
       <p
-        v-if="loading || disabled"
+        v-if="busy"
         class="picker-status"
         role="status"
       >
-        {{ disabled ? '打开中…' : '刷新中…' }}
+        {{
+          openingAgent
+            ? `正在打开 ${getAgent(openingAgent)?.name}…`
+            : disabled
+              ? '打开中…'
+              : '刷新中…'
+        }}
       </p>
 
       <div
@@ -92,7 +168,9 @@
               :aria-expanded="
                 agent.windows.length > 1 ? expanded === agent.id : undefined
               "
-              :disabled="loading || disabled || !agent.windows.length"
+              :disabled="
+                busy || (!agent.windows.length && !canLaunch(agent.id))
+              "
               @click="openAgent(agent)"
             >
               <span class="agent-icon">
@@ -124,7 +202,22 @@
                 }}</span>
                 <span class="agent-state"
                   ><span :class="{ manual: !agent.discovered }"></span
-                  >{{ agent.discovered ? '已打开' : '手动关联' }}</span
+                  >{{
+                    agent.discovered
+                      ? agent.windows.length
+                        ? '可进入窗口'
+                        : '已打开但暂无窗口'
+                      : '手动关联'
+                  }}</span
+                >
+                <span
+                  v-if="!agent.windows.length"
+                  class="agent-context"
+                  >{{
+                    canLaunch(agent.id)
+                      ? '点按尝试打开窗口'
+                      : '请在电脑上打开窗口后刷新'
+                  }}</span
                 >
               </span>
               <ChevronDownOutline
@@ -171,7 +264,7 @@
               <button
                 class="window-item"
                 type="button"
-                :disabled="loading || disabled"
+                :disabled="busy"
                 :aria-label="`选择 ${source.name}`"
                 @click="openWindow(source, agent.id)"
               >
@@ -198,7 +291,7 @@
                 type="button"
                 title="取消关联"
                 aria-label="取消关联"
-                :disabled="loading || disabled"
+                :disabled="busy"
                 @click="$emit('bind', source, undefined)"
               >
                 <UnlinkOutline />
@@ -209,7 +302,7 @@
             v-else-if="agent.windows.length === 1 && !agent.windows[0].agentId"
             type="button"
             class="unlink-command"
-            :disabled="loading || disabled"
+            :disabled="busy"
             @click="$emit('bind', agent.windows[0], undefined)"
           >
             <UnlinkOutline />取消关联
@@ -224,6 +317,15 @@
           <p>
             {{ query.trim() ? '没有匹配的 Agent' : '未发现已打开的 Agent' }}
           </p>
+          <button
+            v-if="!query.trim() && !showLauncher"
+            type="button"
+            class="launch-command"
+            :disabled="busy"
+            @click="toggleLauncher(true)"
+          >
+            <AddOutline />打开 Agent
+          </button>
           <button
             v-if="!query.trim()"
             type="button"
@@ -249,7 +351,7 @@
           <button
             class="window-item"
             type="button"
-            :disabled="loading || disabled"
+            :disabled="busy"
             :aria-label="`选择 ${source.name}`"
             @click="openWindow(source)"
           >
@@ -275,7 +377,7 @@
             type="button"
             :title="`将 ${source.appName} 关联到 Agent`"
             :aria-label="`将 ${source.appName} 关联到 Agent`"
-            :disabled="loading || disabled"
+            :disabled="busy"
             :aria-expanded="linking === source.id"
             @click="linking = linking === source.id ? '' : source.id"
           >
@@ -288,7 +390,7 @@
             <label
               >关联到<select
                 aria-label="选择关联的 Agent"
-                :disabled="loading || disabled"
+                :disabled="busy"
                 @change="bindWindow(source, $event)"
               >
                 <option value="">选择 Agent</option>
@@ -327,6 +429,7 @@
 
 <script setup lang="ts">
 import {
+  AddOutline,
   AppsOutline,
   BrowsersOutline,
   ChevronDownOutline,
@@ -340,7 +443,7 @@ import {
   StarOutline,
   UnlinkOutline,
 } from '@vicons/ionicons5';
-import { computed, ref, watch } from 'vue';
+import { computed, nextTick, ref, watch } from 'vue';
 
 import type { IRemoteAgent, IRemoteWindow } from '@/pure-interface';
 import {
@@ -363,18 +466,74 @@ const props = defineProps<{
   disabled: boolean;
   error: string;
   discoveryError: string;
+  installedAgents?: IRemoteAgent[];
+  launchSupported?: boolean;
+  launchMessage?: string;
+  openingAgent?: AgentId;
+  launchedAgent?: AgentId;
+  launchError?: string;
 }>();
 const emit = defineEmits<{
   refresh: [];
   select: [source: IRemoteWindow];
   bind: [source: IRemoteWindow, agentId: AgentId | undefined];
+  launch: [id: AgentId];
 }>();
+const showLauncher = ref(false);
+const launcherPanel = ref<HTMLElement>();
+async function toggleLauncher(show = !showLauncher.value) {
+  showLauncher.value = show;
+  if (show) {
+    await nextTick();
+    launcherPanel.value?.focus({ preventScroll: true });
+    launcherPanel.value?.scrollIntoView({ block: 'start' });
+  }
+}
+const retryAgent = ref<AgentId>();
+const busy = computed(
+  () => props.loading || props.disabled || !!props.openingAgent
+);
+const canLaunch = (id: AgentId) =>
+  props.launchSupported &&
+  props.installedAgents?.some((agent) => agent.id === id);
 const tab = ref<'agents' | 'other'>('agents');
 const query = ref('');
 const expanded = ref<AgentId>();
 const linking = ref('');
 const pinned = ref<AgentId[]>([]);
 const recent = ref<Partial<Record<AgentId, number>>>({});
+watch(
+  () => props.launchedAgent,
+  (id) => {
+    if (!id) return;
+    tab.value = 'agents';
+    query.value = '';
+    expanded.value = id;
+    showLauncher.value = false;
+  }
+);
+function startAgent(id: AgentId) {
+  if (busy.value || !canLaunch(id)) return;
+  retryAgent.value = id;
+  showLauncher.value = false;
+  query.value = '';
+  tab.value = 'agents';
+  emit('launch', id);
+}
+function chooseInstalledAgent(agent: IRemoteAgent) {
+  const entry = directory.value.agents.find((item) => item.id === agent.id);
+  showLauncher.value = false;
+  tab.value = 'agents';
+  query.value = '';
+  if (entry?.windows.length) openAgent(entry);
+  else startAgent(agent.id);
+}
+function installedState(id: AgentId) {
+  if (props.openingAgent === id) return '打开中…';
+  const entry = directory.value.agents.find((agent) => agent.id === id);
+  if (entry?.windows.length) return `${entry.windows.length} 个窗口`;
+  return entry?.discovered ? '已打开但暂无窗口' : '未运行';
+}
 const preferenceKey = () => `palmdesk-agent-preferences:${props.deviceId}`;
 watch(
   () => props.deviceId,
@@ -452,7 +611,8 @@ function togglePin(id: AgentId) {
   savePreferences();
 }
 function openAgent(agent: AgentEntry) {
-  if (agent.windows.length === 1) openWindow(agent.windows[0], agent.id);
+  if (!agent.windows.length) startAgent(agent.id);
+  else if (agent.windows.length === 1) openWindow(agent.windows[0], agent.id);
   else expanded.value = expanded.value === agent.id ? undefined : agent.id;
 }
 function openWindow(source: IRemoteWindow, agentId?: AgentId) {
@@ -485,6 +645,65 @@ function bindWindow(source: IRemoteWindow, event: Event) {
 .picker-content {
   max-width: 780px;
   margin: 0 auto;
+}
+.launch-command {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  margin-bottom: 18px;
+  border: 0;
+  border-radius: var(--pd-radius-sm);
+  background: var(--pd-accent);
+  color: var(--pd-surface);
+  font-weight: 600;
+  svg {
+    width: 20px;
+    height: 20px;
+  }
+  &:disabled {
+    opacity: 0.5;
+  }
+}
+.installed-agents {
+  padding: 16px;
+  margin-bottom: 18px;
+  border: 1px solid var(--pd-border);
+  border-radius: var(--pd-radius);
+  background: var(--pd-surface);
+  h3 {
+    margin: 0 0 12px;
+    font-size: 16px;
+  }
+  p {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--pd-muted);
+  }
+}
+.installed-agent {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  border: 0;
+  border-bottom: 1px solid var(--pd-border);
+  background: transparent;
+  text-align: left;
+  span:first-child {
+    flex: 1;
+  }
+  span:nth-child(2) {
+    font-size: 12px;
+    color: var(--pd-muted);
+  }
+  svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 .picker-heading {
   display: flex;
