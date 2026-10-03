@@ -1,14 +1,16 @@
 Experimental PalmDesk desktop installers for testing.
 
-## What's new in v0.0.6
+## What's new in v0.0.7
 
-- Read local Codex, Claude Code and Claude Desktop Code sessions on Windows, alongside the existing macOS support. Enable Session reading on the host to browse searchable sessions, Markdown replies, history and tool output from your phone. Reading is off by default and stays read-only; cloud, SSH, WSL and Desktop Chat/Cowork sessions are not included.
-- Paste a single PNG/JPEG from your phone into a Windows Codex prompt, with the same 10 MiB limit as macOS. Click the intended prompt first, then explicitly paste. PalmDesk verifies the target window, focus and clipboard image before sending Ctrl+V; text drafts remain intact and messages are not submitted automatically. Pasting replaces the host clipboard. Cancelled or uncertain operations are not retried automatically.
-- Introduce the original Palm Window identity: a desktop window resting in an open palm, with refreshed macOS and Windows application icons, browser icons, and desktop/mobile navigation marks.
+- Conceal connection credentials by default: hide the temporary password and blur the connection QR code until explicitly revealed, reducing accidental exposure in screenshots and screen recordings. Revealed codes and copied connection links still grant access and must be kept private.
+- Open installed Codex, Claude, ChatGPT, Kimi and ZCode desktop apps from the Agent directory on macOS and Windows. PalmDesk uses the authenticated connection to request an explicit launch, then refreshes the window list: one matching window opens through the existing selection flow, while multiple windows remain your choice. Apps are not installed, prompts are not submitted, and launch requests are not replayed after reconnecting. Supported installation types and platform limits are documented in the usage guide.
+- Start both connection entry points with Balanced quality: up to 2160p, 20 fps and a 3000 kbit/s (3 Mbps) bitrate ceiling. High detail retains the previous 2160p / 30 fps / 8 Mbps settings; Low data offers 1080p / 10 fps / 1 Mbps. Explicit choices and manual overrides are saved locally. Bitrate values are ceilings, not measured usage or hard data budgets; quality changes preserve background and reading-mode video suspension.
 
-Update the desktop app and refresh the phone web client together for the new Windows features. Windows session discovery and image paste have automated and native-fixture coverage; end-to-end testing with a physical phone and the actual agent apps remains incomplete. iOS Safari, Android Chrome, elevated Windows targets and network handoffs still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.6/README.md) for details and limits.
+Update the desktop app and refresh the phone web client together for the new features. Self-hosted installations need the matching web frontend; the backend source and deployment adapter are unchanged from v0.0.6, so this release does not require a backend update or database migration.
 
-[Changes since v0.0.5](https://github.com/Abreto/palmdesk/compare/v0.0.5...v0.0.6)
+Source and synthetic-browser regressions cover the new controls, preferences, authorization and recovery behavior. macOS launch/reopen has native-fixture coverage; actual Windows app launching and complete physical-phone workflows remain unvalidated. The new quality profiles have not been measured on physical phones, native Retina/Windows capture or constrained networks. iOS Safari, Android Chrome, Windows Codex image attachments, permission recovery and cross-network TURN behavior still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.7/README.md), [Agent launch validation](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/smoke-artifacts/agent-launch-2026-10-02.md) and [quality validation](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/VIDEO_QUALITY.md) for the exact boundaries.
+
+[Changes since v0.0.6](https://github.com/Abreto/palmdesk/compare/v0.0.6...v0.0.7)
 
 ## Installation
 
@@ -30,21 +32,23 @@ Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
 These builds pass source checks and packaging verification in CI. Real screen capture, input, permission recovery and phone/network behavior still require testing on physical devices.
 
 `SHA256SUMS.txt` contains SHA256 hashes of the two installers.
-This prerelease does not resolve the known dependency and license review items in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.6/docs/OPEN_SOURCE_READINESS.md).
+This prerelease does not resolve the known dependency and license review items in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/OPEN_SOURCE_READINESS.md).
 
 ## 中文说明
 
 供测试使用的 PalmDesk 桌面安装包。
 
-### v0.0.6 更新内容
+### v0.0.7 更新内容
 
-- 将本地 Codex、Claude Code 和 Claude Desktop Code 会话阅读扩展到 Windows，保留已有 macOS 支持。在电脑端开启「会话阅读」后，可从手机搜索会话、阅读 Markdown 回复、历史记录和工具输出。阅读默认关闭且保持只读；不包含云端、SSH、WSL 和 Desktop Chat/Cowork 会话。
-- 支持从手机向 Windows Codex 的 prompt 粘贴单张 PNG/JPEG，最大 10 MiB，与 macOS 一致。先点击目标输入框，再明确执行粘贴；PalmDesk 校验目标窗口、焦点和剪贴板图片后发送 Ctrl+V，保留文字草稿，不自动提交消息。粘贴会替换电脑剪贴板，取消或结果不确定时不会自动重试。
-- 引入原创 Palm Window 品牌形象：掌心托起桌面窗口，更新 macOS、Windows 应用图标、浏览器图标以及桌面端和手机端导航标识。
+- 默认隐藏连接凭据：临时密码保持隐藏，连接二维码保持模糊，需主动显示，减少截图和录屏时意外泄露。已显示的二维码和复制的连接链接仍可用于访问设备，请勿公开分享。
+- 支持从 Agent 目录打开 macOS 和 Windows 上已安装的 Codex、Claude、ChatGPT、Kimi 和 ZCode 桌面应用。通过已认证连接明确发起启动后刷新窗口列表；一个匹配窗口进入现有选窗流程，多个窗口由用户选择。不安装应用、不提交提示词，重连后不重放启动请求。支持的安装类型及平台限制见使用指南。
+- 两个连接入口默认使用「均衡」画质：最高 2160p、20 fps、3000 kbit/s（3 Mbps）码率上限。「高细节」保留原有 2160p / 30 fps / 8 Mbps 设置；「省流量」提供 1080p / 10 fps / 1 Mbps。主动选择及手动调整保存在本地。码率是上限，不代表实测流量或严格流量预算；调整画质仍保留后台和阅读模式下的视频暂停行为。
 
-请更新桌面 App 并刷新手机网页，以使用新的 Windows 功能。Windows 会话发现和图片粘贴已有自动化及原生测试窗口验证，但真实手机连接实际 Agent 应用的完整验收尚未完成。iOS Safari、Android Chrome、Windows 提权目标以及网络切换仍需实机验收。详细说明及限制见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.6/README.zh-CN.md)。
+请更新桌面 App 并刷新手机网页，以使用新功能。自部署需更新到对应的网页前端；后端源码与部署适配器相较 v0.0.6 未变，本次无需更新后端或迁移数据库。
 
-[查看自 v0.0.5 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.5...v0.0.6)
+源码和模拟浏览器回归覆盖新增控件、偏好保存、鉴权及恢复行为。macOS 启动／重新打开已有原生测试应用验证；真实 Windows 应用启动及手机完整流程尚未验收。新画质预设尚无真实手机、原生 Retina／Windows 捕获或受限网络的测量结果。iOS Safari、Android Chrome、Windows Codex 图片附件、权限恢复及跨网络 TURN 仍需实机验收。具体边界见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.7/README.zh-CN.md)、[打开 Agent 验证记录](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/smoke-artifacts/agent-launch-2026-10-02.md)及[画质验证说明](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/VIDEO_QUALITY.md)。
+
+[查看自 v0.0.6 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.6...v0.0.7)
 
 ### 安装说明
 
@@ -65,4 +69,4 @@ This prerelease does not resolve the known dependency and license review items i
 这些构建已通过 CI 中的源码检查和打包验证。真实的屏幕捕获、输入、权限恢复以及手机和网络行为仍需在实体设备上测试。
 
 `SHA256SUMS.txt` 包含两个安装包的 SHA256 校验和。
-本测试版未解决[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.6/docs/OPEN_SOURCE_READINESS.md)中已知的依赖和许可证审查事项。
+本测试版未解决[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/OPEN_SOURCE_READINESS.md)中已知的依赖和许可证审查事项。
