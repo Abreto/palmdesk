@@ -21,6 +21,7 @@ import {
 import { IPC_EVENT } from '../src/event';
 import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
+import { AgentLauncher } from './agent-launcher';
 import { assertUniqueApplicationIdentity } from './app-identity';
 import { CaptureSession, InputUnavailableError } from './capture-session';
 import {
@@ -756,9 +757,9 @@ function main() {
       }
     });
   };
-  captureHandler(IPC_EVENT.getCaptureSources, async () => {
+  captureHandler(IPC_EVENT.getCaptureSources, async (data) => {
     const result = await captureSession.refresh();
-    if (!result.sessionId)
+    if (!result.sessionId && data.previews !== false)
       result.sources = await nativeWindows.addThumbnails(result.sources);
     return result;
   });
@@ -767,6 +768,15 @@ function main() {
       await nativeWindows.request<NativeApplication[]>('applications')
     ),
   }));
+  const agentLauncher = new AgentLauncher(nativeWindows);
+  captureHandler(IPC_EVENT.getInstalledAgents, () => agentLauncher.list());
+  captureHandler(IPC_EVENT.launchAgent, (data) =>
+    agentLauncher.launch(data.id, data.operationId)
+  );
+  captureHandler(IPC_EVENT.cancelAgentLaunch, (data) => {
+    agentLauncher.cancel(data.operationId);
+    return Promise.resolve({});
+  });
   const sessionReader = new DesktopSessionReader(app.getPath('userData'));
   captureHandler(IPC_EVENT.sessionReaderSettings, () =>
     sessionReader.settings()

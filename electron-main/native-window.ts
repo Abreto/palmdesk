@@ -172,6 +172,7 @@ export class NativeWindowBridge {
     target?: Partial<NativeWindow> & {
       windows?: WindowIdentity[];
       text?: string;
+      bundles?: string[];
     },
     current?: () => boolean
   ): Promise<T> {
@@ -182,7 +183,7 @@ export class NativeWindowBridge {
       if (generation !== this.generation)
         throw new Error('原生窗口服务不可用，请重新启动客户端');
       if (current && !current())
-        throw new NativeWindowError('图片粘贴已取消', 'cancelled');
+        throw new NativeWindowError('操作已取消', 'cancelled');
       return this.dispatch<T>(command, target);
     });
     this.serial = result.catch(() => {});
@@ -194,6 +195,7 @@ export class NativeWindowBridge {
     target?: Partial<NativeWindow> & {
       windows?: WindowIdentity[];
       text?: string;
+      bundles?: string[];
     }
   ): Promise<T> {
     if (this.platform !== 'darwin' && this.platform !== 'win32') {

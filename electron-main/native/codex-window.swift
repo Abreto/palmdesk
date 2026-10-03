@@ -44,7 +44,7 @@ struct WindowThumbnail: Encodable {
 }
 
 enum WindowError: String, Error {
-    case unavailable, permission, ambiguous, focus, invalid
+    case unavailable, permission, ambiguous, focus, invalid, applicationUnavailable, launchFailed
     case space, spaceUnsupported, spaceUnknown, spaceDisplay, spaceControls
 
     var message: String {
@@ -59,6 +59,8 @@ enum WindowError: String, Error {
         case .spaceDisplay: return "Cannot locate the display for the selected window"
         case .spaceControls: return "Mission Control desktop controls are unavailable"
         case .invalid: return "Invalid native window request"
+        case .applicationUnavailable: return "Agent 已移除或尚未安装，请刷新后重试"
+        case .launchFailed: return "无法打开 Agent，请在电脑上检查应用后重试"
         }
     }
 }
@@ -385,6 +387,34 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
     throw WindowError.focus
 }
 
+// Launch Services resolves installed applications without scanning arbitrary
+// client paths. Opening an existing application sends its normal reopen event.
+func installedApplication(_ identifier: String) -> URL? {
+    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: identifier),
+          let bundle = Bundle(url: url), bundle.bundleIdentifier == identifier,
+          let executable = bundle.executableURL,
+          FileManager.default.isExecutableFile(atPath: executable.path) else { return nil }
+    return url
+}
+
+func launchApplication(_ identifier: String) throws {
+    guard let url = installedApplication(identifier) else { throw WindowError.applicationUnavailable }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    configuration.createsNewApplicationInstance = false
+    var finished = false
+    var succeeded = false
+    NSWorkspace.shared.openApplication(at: url, configuration: configuration) { application, error in
+        succeeded = application != nil && error == nil
+        finished = true
+    }
+    let deadline = Date().addingTimeInterval(8)
+    while !finished && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.025))
+    }
+    guard finished && succeeded else { throw WindowError.launchFailed }
+}
+
 // One process handles JSON lines so pointer events do not launch a process each time.
 while let line = readLine() {
     var requestId: Any = NSNull()
@@ -398,6 +428,13 @@ while let line = readLine() {
         switch command {
         case "appIdentity":
             data = try applicationIdentity()
+        case "installedAgents":
+            guard let bundles = request["bundles"] as? [String], bundles.count <= 16 else { throw WindowError.invalid }
+            data = bundles.filter { installedApplication($0) != nil }
+        case "launchAgent":
+            guard let bundle = request["bundleId"] as? String else { throw WindowError.invalid }
+            try launchApplication(bundle)
+            data = ["opened": true]
         case "list":
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(listedWindows()))
         case "applications":

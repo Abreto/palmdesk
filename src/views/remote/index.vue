@@ -662,6 +662,7 @@ import {
   setAudioTrackContentHints,
   setVideoTrackContentHints,
 } from '@/utils';
+import { runAgentLaunch } from '@/utils/agent-launch-request';
 import { CaptureLifecycle } from '@/utils/capture-lifecycle';
 import {
   type ConnectionInvite,
@@ -1023,6 +1024,8 @@ watch(
         }
         if (
           msgType === WsMsgTypeEnum.remoteWindowsRequest ||
+          msgType === WsMsgTypeEnum.remoteAgentLaunch ||
+          msgType === WsMsgTypeEnum.remoteInstalledAgentsRequest ||
           msgType === WsMsgTypeEnum.remoteWindowSelect
         ) {
           await handleWindowRequest(item, jsondata);
@@ -1556,15 +1559,76 @@ async function handleWindowRequest(
 ) {
   if (typeof request.requestId !== 'string' || request.requestId.length > 64)
     return;
+  const channel = peer.cbDataChannel;
   const current = () =>
-    !stoppedPeers.has(peer.cbDataChannel!) &&
+    !disposed &&
+    !stoppedPeers.has(channel!) &&
     appStore.remoteDesk.has(peer.receiver) &&
-    networkStore.rtcMap.get(peer.receiver)?.cbDataChannel ===
-      peer.cbDataChannel;
+    !appStore.remoteDesk.get(peer.receiver)?.isClose &&
+    channel?.readyState === 'open' &&
+    networkStore.rtcMap.get(peer.receiver)?.cbDataChannel === channel;
   const reply = (msgType: WsMsgTypeEnum, data: unknown) => {
     if (current())
       peer.dataChannelSend({ msgType, requestId: request.requestId, data });
   };
+  if (!current()) return;
+  if (request.msgType === WsMsgTypeEnum.remoteInstalledAgentsRequest) {
+    try {
+      const result = await invokeCapture(IPC_EVENT.getInstalledAgents);
+      if (result?.code !== 0)
+        throw new Error('读取已安装 Agent 失败，请刷新重试');
+      reply(WsMsgTypeEnum.remoteInstalledAgentsResult, result.data);
+    } catch {
+      reply(WsMsgTypeEnum.remoteInstalledAgentsResult, {
+        supported: false,
+        agents: [],
+        message: '读取已安装 Agent 失败，请刷新重试',
+      });
+    }
+    return;
+  }
+  if (request.msgType === WsMsgTypeEnum.remoteAgentLaunch) {
+    if (windowSelection || captureSessionId.value) {
+      reply(WsMsgTypeEnum.remoteAgentLaunchResult, {
+        error: '已有应用正在打开或控制，请稍后重试',
+      });
+      return;
+    }
+    const selection = Symbol();
+    const operationId = crypto.randomUUID();
+    windowSelection = selection;
+    const cancel = () => {
+      void invokeCapture(IPC_EVENT.cancelAgentLaunch, { operationId }).catch(
+        () => {}
+      );
+    };
+    channel!.addEventListener('close', cancel, { once: true });
+    try {
+      await runAgentLaunch(
+        request.data.id,
+        operationId,
+        current,
+        async (id, operationId) => {
+          const result = await invokeCapture(IPC_EVENT.launchAgent, {
+            id,
+            operationId,
+          });
+          if (result?.code !== 0)
+            throw new Error(result?.msg || '打开 Agent 失败，请重试');
+        },
+        cancel
+      );
+      reply(WsMsgTypeEnum.remoteAgentLaunchResult, { id: request.data.id });
+    } catch (error) {
+      reply(WsMsgTypeEnum.remoteAgentLaunchResult, {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      channel?.removeEventListener('close', cancel);
+      if (windowSelection === selection) windowSelection = undefined;
+    }
+    return;
+  }
   if (request.msgType === WsMsgTypeEnum.remoteWindowsRequest) {
     if (listingPeers.has(peer.receiver)) return;
     listingPeers.add(peer.receiver);
@@ -1585,7 +1649,9 @@ async function handleWindowRequest(
           });
         }
       }
-      const result = await invokeCapture(IPC_EVENT.getCaptureSources);
+      const result = await invokeCapture(IPC_EVENT.getCaptureSources, {
+        previews: request.data?.previews !== false,
+      });
       if (!current()) return;
       if (result?.code !== 0) throw new Error(result?.msg || '读取窗口失败');
       captureSources.value = result.data.sources;
