@@ -29,6 +29,7 @@ const state = {
   launched: '',
   sent: [] as any[],
   channel: undefined as EventTarget | undefined,
+  setConnectionState: undefined as ((value: string) => void) | undefined,
 };
 (window as any).__agentSmoke = state;
 const source = (id: string, index: number) => ({
@@ -57,6 +58,10 @@ export function useWebsocket() {
         Object.assign(new EventTarget(), { readyState: 'open' })
       );
       state.channel = channel;
+      const connectionState = ref('connected');
+      state.setConnectionState = (value) => {
+        connectionState.value = value;
+      };
       const reply = (request: any, msgType: M, data: any) =>
         channel.dispatchEvent(
           new MessageEvent('message', {
@@ -72,7 +77,11 @@ export function useWebsocket() {
         rtt: 0,
         dataChannel: channel,
         cbDataChannel: channel,
-        peerConnection: { connectionState: 'connected' },
+        peerConnection: {
+          get connectionState() {
+            return connectionState.value;
+          },
+        },
         videoEl: markRaw(document.createElement('video')),
         close() {
           channel.readyState = 'closed';
@@ -112,7 +121,7 @@ export function useWebsocket() {
                   reply(request, M.remoteInstalledAgentsResult, {
                     supported: state.supported,
                     agents: state.installed,
-                    message: '此平台不支持打开 Agent',
+                    message: state.supported ? '' : '此平台不支持打开 Agent',
                   });
                 }, state.installedDelay);
             } else if (request.msgType === M.remoteAgentLaunch) {

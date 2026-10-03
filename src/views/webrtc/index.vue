@@ -292,6 +292,7 @@ const discoveryError = ref('');
 const installedAgents = ref<IRemoteAgent[]>([]);
 const installedLoading = ref(false);
 let installedRequest = '';
+let installedNeedsRetry = false;
 let installedTimer: ReturnType<typeof setTimeout>;
 const launchSupported = ref(false);
 const launchMessage = ref('请更新电脑端 PalmDesk 以支持打开 Agent');
@@ -386,23 +387,35 @@ watch(
   }
 );
 
-function cancelInstalledRequest() {
+function cancelInstalledRequest(interrupted = true) {
+  if (interrupted && installedRequest) {
+    installedNeedsRetry = true;
+    launchMessage.value = '读取已安装 Agent 已中断，请刷新重试';
+  }
   clearTimeout(installedTimer);
   installedRequest = '';
   installedLoading.value = false;
 }
 
 function requestInstalledAgents() {
-  if (installedRequest) return;
+  if (
+    installedRequest ||
+    !visible.value ||
+    !connected.value ||
+    openingAgent.value
+  )
+    return;
+  installedNeedsRetry = false;
   installedRequest = getRandomString(16);
   installedLoading.value = true;
+  launchMessage.value = '';
   peer.value?.dataChannelSend({
     msgType: WsMsgTypeEnum.remoteInstalledAgentsRequest,
     requestId: installedRequest,
     data: {},
   });
   installedTimer = setTimeout(() => {
-    cancelInstalledRequest();
+    cancelInstalledRequest(false);
     launchMessage.value =
       '读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk';
   }, 15000);
@@ -572,7 +585,7 @@ function receiveWindowMessage(event: MessageEvent) {
     installedRequest &&
     message.requestId === installedRequest
   ) {
-    cancelInstalledRequest();
+    cancelInstalledRequest(false);
     launchSupported.value = data.supported === true;
     installedAgents.value = AGENT_DEFINITIONS.filter(
       (agent) =>
@@ -741,18 +754,20 @@ watch(controlling, (value) => {
   if (value) clearTimeout(requestTimer);
 });
 watch(
-  [connected, () => peer.value?.cbDataChannel, view],
-  ([ready, channel, mode]) => {
+  [connected, () => peer.value?.cbDataChannel, view, visible],
+  ([ready, channel, mode, isVisible]) => {
     if (
-      mode === 'window' &&
-      ready &&
-      channel &&
-      !listRequest &&
-      !selectedWindow.value &&
-      !windowStarting.value &&
-      !windows.value.length
+      mode !== 'window' ||
+      !isVisible ||
+      !ready ||
+      !channel ||
+      selectedWindow.value ||
+      windowStarting.value
     )
-      requestWindows();
+      return;
+    if (!listRequest && !windows.value.length) requestWindows();
+    // A cached window list must not suppress recovery of an interrupted scan.
+    if (installedNeedsRetry) requestInstalledAgents();
   }
 );
 
@@ -824,6 +839,7 @@ function connect(preserve = false) {
   if (!hasCredentials.value) return;
   finishAgentLaunch();
   cancelInstalledRequest();
+  installedNeedsRetry = false;
   installedAgents.value = [];
   launchSupported.value = false;
   launchMessage.value = '请更新电脑端 PalmDesk 以支持打开 Agent';

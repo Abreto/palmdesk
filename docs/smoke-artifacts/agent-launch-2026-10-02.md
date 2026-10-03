@@ -1,4 +1,4 @@
-# Open Agent validation — 2026-10-02, updated 2026-10-03
+# Open Agent validation — 2026-10-02, updated 2026-10-04
 
 Scope: issue #37. Built on `b762f09`. Local host: macOS 26.6.2 (Apple Silicon), Node 22.16.0, Chrome 154.0.8037.93. No production Agent sessions were changed by these tests.
 
@@ -56,6 +56,18 @@ Validation after these changes:
 | Windows PowerShell regressions | Added to the cross-platform CI smoke suite; skipped locally. Run the production script in Windows PowerShell with mocked discovery providers and real temporary files: App Paths survives throwing AppX enumeration; local MSIX manifests support non-ASCII paths, skip invalid packages/missing executables, and reject paths outside the package. No registry changes or app launches. |
 
 These fixes do not change the native macOS helper. Its earlier OS launch/reopen validation remains applicable. The Windows interpreter tests exercise discovery with controlled fixtures, not installed-app launch acceptance.
+
+## Controller recovery and picker checks — 2026-10-04
+
+The [follow-up review](https://github.com/Abreto/palmdesk/pull/41#issuecomment-5970857363) found three P3 issues, all addressed:
+
+- An installed-app scan interrupted by backgrounding or a brief disconnect is retried when the connected Window view returns, even if windows are already cached. Cancelled replies are ignored. Interruption feedback no longer implies an outdated host. Only discovery is retried; launch requests are never replayed.
+- Choosing an installed Agent with multiple native windows always expands its choices, including when that directory group was already expanded.
+- Catalog timeout feedback is visible after an earlier successful load. Cached launch choices remain usable, and a successful explicit refresh clears the message. A timeout does not create an automatic retry loop.
+
+The browser suite passed all previous scenarios and four new regressions: returning from Read after backgrounding during discovery; disconnecting and reconnecting with a populated window list while a cancelled reply arrives; choosing an already-expanded Agent with two native windows; and catalog timeout after success followed by explicit refresh. The recovery cases verify that only the catalog is re-requested and no launch is sent. No browser errors occurred.
+
+`pnpm test:smoke` passed with 333 tests and 5 platform skips on macOS. Typecheck, ESLint for changed files, and the production web build passed; existing browser-data and large-chunk warnings remain. The two real Windows PowerShell discovery regressions previously [passed on `f1552ff`](https://github.com/Abreto/palmdesk/actions/runs/37038644077/job/110943000283). These controller changes do not alter native launch or discovery code. Background/connection transitions use a simulated host in Chrome; physical-phone and actual Windows app-launch acceptance remain pending.
 
 ## Synthetic UI screenshots
 

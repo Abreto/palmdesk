@@ -51,8 +51,12 @@
         >
           正在查找已安装的 Agent…
         </p>
-        <p v-if="!installedLoading && !launchSupported">{{ launchMessage }}</p>
-        <p v-else-if="!installedLoading && !installedAgents?.length">
+        <p v-if="!installedLoading && launchMessage">{{ launchMessage }}</p>
+        <p
+          v-else-if="
+            !installedLoading && launchSupported && !installedAgents?.length
+          "
+        >
           未发现可启动的已安装
           Agent。请在电脑上安装或打开受支持的应用后刷新；部分 Windows
           安装方式尚不支持直接启动。
@@ -528,12 +532,12 @@ function startAgent(id: AgentId) {
   emit('launch', id);
 }
 function chooseInstalledAgent(agent: IRemoteAgent) {
-  const entry = directory.value.agents.find((item) => item.id === agent.id);
   const windows = installedWindows(agent.id);
   showLauncher.value = false;
   tab.value = 'agents';
   query.value = '';
-  if (entry && windows.length) openAgent({ ...entry, windows });
+  if (windows.length === 1) openWindow(windows[0], agent.id);
+  else if (windows.length > 1) expanded.value = agent.id;
   else startAgent(agent.id);
 }
 function installedWindows(id: AgentId) {

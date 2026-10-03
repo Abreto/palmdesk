@@ -40,6 +40,15 @@ async function chooseCodex() {
     .click();
   await page.locator('.installed-agent').filter({ hasText: 'Codex' }).click();
 }
+async function setHidden(hidden) {
+  await page.evaluate((value) => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
 const messages = (type) =>
   page.evaluate(
     (type) => window.__agentSmoke.sent.filter((item) => item.msgType === type),
@@ -203,6 +212,30 @@ try {
     'PASS installed launcher counts and selects only native Agent windows'
   );
 
+  await reset({
+    windows: [
+      nativeWindow,
+      {
+        ...nativeWindow,
+        id: 'native-claude-2',
+        contextId: 'native-claude-2',
+        name: 'Claude Desktop 2',
+      },
+    ],
+  });
+  await page.getByRole('button', { name: '打开 Claude', exact: true }).click();
+  await page.getByRole('button', { name: '选择 Claude Desktop 2' }).waitFor();
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await installedClaude.click();
+  await page.getByRole('button', { name: '选择 Claude Desktop 2' }).waitFor();
+  assert.equal((await messages('remoteWindowSelect')).length, 0);
+  await page.getByRole('button', { name: '选择 Claude Desktop 2' }).click();
+  assert.equal(
+    (await messages('remoteWindowSelect'))[0].data.id,
+    'native-claude-2'
+  );
+  console.log('PASS installed launcher keeps existing multiple choices open');
+
   await reset({ windows: [nativeWindow], installedDelay: 5000 });
   assert.equal(
     await page.evaluate(() => window.__agentSmoke.installedReplies),
@@ -221,6 +254,72 @@ try {
   );
   console.log(
     'PASS slow installed discovery never blocks selecting an existing window'
+  );
+
+  await reset({ windows: [nativeWindow], installedDelay: 1500 });
+  assert.equal(
+    await page.evaluate(() => window.__agentSmoke.installedReplies),
+    0
+  );
+  await page.getByRole('button', { name: '阅读', exact: true }).click();
+  await setHidden(true);
+  await page.waitForFunction(() => window.__agentSmoke.installedReplies === 1);
+  await setHidden(false);
+  assert.equal((await messages('remoteInstalledAgentsRequest')).length, 1);
+  await page.getByRole('button', { name: '窗口', exact: true }).click();
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await installedClaude.waitFor();
+  assert.equal((await messages('remoteInstalledAgentsRequest')).length, 2);
+  assert.equal((await messages('remoteWindowsRequest')).length, 1);
+  assert.equal((await messages('remoteAgentLaunch')).length, 0);
+  console.log(
+    'PASS returning from Read/background retries discovery with cached windows'
+  );
+
+  await reset({ windows: [nativeWindow], installedDelay: 1500 });
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await page.evaluate(() =>
+    window.__agentSmoke.setConnectionState('disconnected')
+  );
+  await page.locator('.agent-picker').waitFor({ state: 'detached' });
+  await page.waitForFunction(() => window.__agentSmoke.installedReplies === 1);
+  assert.equal(await page.locator('.installed-agent').count(), 0);
+  await page.evaluate(() =>
+    window.__agentSmoke.setConnectionState('connected')
+  );
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await installedClaude.waitFor();
+  assert.equal((await messages('remoteInstalledAgentsRequest')).length, 2);
+  assert.equal((await messages('remoteWindowsRequest')).length, 1);
+  assert.equal((await messages('remoteAgentLaunch')).length, 0);
+  console.log(
+    'PASS brief disconnect retries discovery and ignores its cancelled reply'
+  );
+
+  await reset({ windows: [nativeWindow] });
+  await page.getByRole('button', { name: '打开 Agent', exact: true }).click();
+  await installedClaude.waitFor();
+  await page.evaluate(() => {
+    window.__agentSmoke.legacy = true;
+  });
+  await page.getByRole('button', { name: '刷新 Agent 和窗口' }).click();
+  const catalogTimeout = page.getByText(
+    '读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk',
+    { exact: true }
+  );
+  await catalogTimeout.waitFor({ timeout: 20000 });
+  assert.equal(await installedClaude.isVisible(), true);
+  assert.equal(await installedClaude.isEnabled(), true);
+  assert.equal((await messages('remoteInstalledAgentsRequest')).length, 2);
+  await page.evaluate(() => {
+    window.__agentSmoke.legacy = false;
+  });
+  await page.getByRole('button', { name: '刷新 Agent 和窗口' }).click();
+  await page.waitForFunction(() => window.__agentSmoke.installedReplies === 2);
+  await catalogTimeout.waitFor({ state: 'hidden' });
+  assert.equal((await messages('remoteInstalledAgentsRequest')).length, 3);
+  console.log(
+    'PASS catalog timeout stays visible with cached choices and clears on retry'
   );
 
   await reset({ launchError: 'Agent 已移除，请刷新后重试' });
