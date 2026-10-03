@@ -131,7 +131,7 @@ app
     await waitFor(() => rtc.dataChannel.readyState === 'open');
     const sender = host.addTrack(track, stream);
     await negotiate();
-    await waitFor(() => video.videoWidth > 0 && sender.getParameters().encodings[0]?.maxBitrate === 8000000);
+    await waitFor(() => video.videoWidth > 0 && sender.getParameters().encodings[0]?.maxBitrate === defaults.maxBitrate * 1000);
     after.sender = sender.getParameters();
     after.decoded = { width: video.videoWidth, height: video.videoHeight };
     after.adapted = track.getSettings();
@@ -139,10 +139,12 @@ app
     await rtc.setMaxFramerate(15);
     await waitFor(() => video.videoHeight <= 720);
     after.lowered = { track: track.getSettings(), width: video.videoWidth, height: video.videoHeight };
-    await quality.applyRemoteVideoConstraints(stream, 2160, 30);
-    await rtc.setMaxFramerate(30);
+    const highDetail = quality.REMOTE_VIDEO_PROFILES.highDetail;
+    await quality.applyRemoteVideoConstraints(stream, highDetail.resolutionRatio, highDetail.maxFramerate);
+    await rtc.setMaxFramerate(highDetail.maxFramerate);
+    await rtc.setMaxBitrate(highDetail.maxBitrate);
     await waitFor(() => video.videoHeight === after.decoded.height && video.videoWidth === after.decoded.width);
-    after.restored = { track: track.getSettings(), width: video.videoWidth, height: video.videoHeight };
+    after.restored = { track: track.getSettings(), width: video.videoWidth, height: video.videoHeight, sender: sender.getParameters() };
     after.stats = [...(await sender.getStats()).values()].filter(s => s.type === 'outbound-rtp').map(s => ({ width: s.frameWidth, height: s.frameHeight, fps: s.framesPerSecond, qualityLimitationReason: s.qualityLimitationReason }));
     track.stop(); rtc.close(); phone.close();
     return { before, after };
@@ -178,14 +180,16 @@ app
     );
     assert.equal(
       after.sender.encodings[0].maxBitrate,
-      8000000,
-      'apply bitrate after data-only negotiation'
+      3000000,
+      'apply Balanced bitrate after data-only negotiation'
     );
-    assert.equal(after.sender.encodings[0].maxFramerate, 30);
+    assert.equal(after.sender.encodings[0].maxFramerate, 20);
     assert.equal(after.sender.degradationPreference, 'maintain-resolution');
     assert.ok(after.lowered.height <= 720);
     assert.equal(after.restored.width, after.decoded.width);
     assert.equal(after.restored.height, after.decoded.height);
+    assert.equal(after.restored.sender.encodings[0].maxBitrate, 8000000);
+    assert.equal(after.restored.sender.encodings[0].maxFramerate, 30);
     console.log(
       'PASS',
       JSON.stringify({

@@ -427,62 +427,10 @@
             />
           </summary>
           <div class="link-config">
-            <div class="link-item">
-              <n-space>
-                <div class="link-label">码率：</div>
-                <n-radio-group v-model:value="currentMaxBitrate">
-                  <n-radio
-                    v-for="item in maxBitrate"
-                    :key="item.value"
-                    :value="item.value"
-                  >
-                    {{ item.label }}
-                  </n-radio>
-                </n-radio-group>
-              </n-space>
-            </div>
-            <div class="link-item">
-              <n-space>
-                <div class="link-label">帧率：</div>
-                <n-radio-group v-model:value="currentMaxFramerate">
-                  <n-radio
-                    v-for="item in maxFramerate"
-                    :key="item.value"
-                    :value="item.value"
-                  >
-                    {{ item.label }}
-                  </n-radio>
-                </n-radio-group>
-              </n-space>
-            </div>
-            <div class="link-item">
-              <n-space>
-                <div class="link-label">分辨率：</div>
-                <n-radio-group v-model:value="currentResolutionRatio">
-                  <n-radio
-                    v-for="item in resolutionRatio"
-                    :key="item.value"
-                    :value="item.value"
-                  >
-                    {{ item.label }}
-                  </n-radio>
-                </n-radio-group>
-              </n-space>
-            </div>
-            <div class="link-item">
-              <n-space>
-                <div class="link-label">视频内容：</div>
-                <n-radio-group v-model:value="currentVideoContentHint">
-                  <n-radio
-                    v-for="item in videoContentHint"
-                    :key="item.value"
-                    :value="item.value"
-                  >
-                    {{ item.label }}
-                  </n-radio>
-                </n-radio-group>
-              </n-space>
-            </div>
+            <RemoteVideoSettings
+              :model-value="videoQuality"
+              @update:model-value="setVideoQuality"
+            />
             <div class="link-item">
               <n-space>
                 <div class="link-label">音频内容：</div>
@@ -626,10 +574,12 @@ import {
   fetchDeskUserUpdateByUuid,
   fetchFindReceiverByUuid,
 } from '@/api/deskUser';
+import RemoteVideoSettings from '@/components/RemoteVideoSettings/index.vue';
 import SessionReaderSettings from '@/components/SessionReaderSettings/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
+import { useRemoteVideoQuality } from '@/hooks/use-remoteVideoQuality';
 import { useRTCParams } from '@/hooks/use-rtcParams';
 import { useTip } from '@/hooks/use-tip';
 import { useWebsocket } from '@/hooks/use-websocket';
@@ -703,13 +653,10 @@ const { updateWebRtcRemoteDeskConfig, webRtcRemoteDesk } =
   useWebRtcRemoteDesk();
 const { initWs, connectStatus, deskUserUuid, deskUserPassword } =
   useWebsocket();
-const {
-  maxBitrate,
-  maxFramerate,
-  resolutionRatio,
-  audioContentHint,
-  videoContentHint,
-} = useRTCParams();
+const { audioContentHint } = useRTCParams();
+const { videoQuality, setVideoQuality } = useRemoteVideoQuality({
+  followSavedPreference: true,
+});
 const { handleRtcBilldDeskBehavior } = useIpcRendererSend();
 
 const currentMaxBitrate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxBitrate);
@@ -1800,11 +1747,7 @@ async function handleConfirm(pwd: string) {
                 remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
                 remoteDeskUserPassword: pwd,
                 receiverId: receiverId.value,
-                maxBitrate: currentMaxBitrate.value,
-                maxFramerate: currentMaxFramerate.value,
-                resolutionRatio: currentResolutionRatio.value,
                 audioContentHint: currentAudioContentHint.value,
-                videoContentHint: currentVideoContentHint.value,
               },
               windowId: WINDOW_ID_ENUM.webrtc,
               minWidth: 300,
@@ -1824,11 +1767,7 @@ async function handleConfirm(pwd: string) {
               remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
               remoteDeskUserPassword: pwd,
               receiverId: receiverId.value,
-              maxBitrate: currentMaxBitrate.value,
-              maxFramerate: currentMaxFramerate.value,
-              resolutionRatio: currentResolutionRatio.value,
               audioContentHint: currentAudioContentHint.value,
-              videoContentHint: currentVideoContentHint.value,
             })
           );
           await router.push({ name: routerName.webrtc });

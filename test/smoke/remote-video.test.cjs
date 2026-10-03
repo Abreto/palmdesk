@@ -3,6 +3,8 @@ const { test } = require('node:test');
 const loadSource = require('./load-source.cjs');
 const {
   REMOTE_VIDEO_DEFAULTS,
+  REMOTE_VIDEO_PROFILES,
+  remoteVideoProfile,
   desktopCaptureConstraints,
   remoteVideoConstraints,
   applyRemoteVideoConstraints,
@@ -91,7 +93,8 @@ test('Retina capture has enough headroom for 4K without forcing small windows to
     'a Retina desktop must not be reduced to 1080p by default'
   );
   assert.equal(defaults.height.min, undefined);
-  assert.equal(defaults.frameRate.max, 30);
+  assert.equal(defaults.frameRate.max, 20);
+  assert.equal(REMOTE_VIDEO_DEFAULTS.maxBitrate, 3000);
 });
 
 test('changing quality replaces both dimension limits and can recover from 720p to 2160p', async () => {
@@ -134,7 +137,7 @@ test('video added after DataChannel connection gets the saved bitrate after nego
   rtc.peerConnection.dispatchEvent(new Event('signalingstatechange'));
   await flush();
   assert.equal(video.parameters.encodings[0].maxBitrate, 8_000_000);
-  assert.equal(video.parameters.encodings[0].maxFramerate, 30);
+  assert.equal(video.parameters.encodings[0].maxFramerate, 20);
   assert.equal(video.parameters.degradationPreference, 'maintain-resolution');
   assert.equal(video.parameters.transactionId, 'preserved');
   assert.equal(video.parameters.encodings[0].active, true);
@@ -174,7 +177,7 @@ test('suspending video disables every encoding without ending tracks or data cha
   );
   await rtc.setVideoActive(true);
   assert.ok(video.parameters.encodings.every((entry) => entry.active === true));
-  assert.equal(video.parameters.encodings[0].maxBitrate, 8_000_000);
+  assert.equal(video.parameters.encodings[0].maxBitrate, 3_000_000);
 });
 
 test('all negotiated video encodings receive live frame rate and content preferences', async (t) => {
@@ -193,7 +196,7 @@ test('all negotiated video encodings receive live frame rate and content prefere
   for (const entry of [first, second]) {
     for (const encoding of entry.parameters.encodings) {
       assert.equal(encoding.maxFramerate, 15);
-      assert.equal(encoding.maxBitrate, 8_000_000);
+      assert.equal(encoding.maxBitrate, 3_000_000);
     }
   }
 });
@@ -229,4 +232,53 @@ test('overlapping quality updates serialize sender transactions and survive enco
   video.setParameters = set;
   assert.equal(await rtc.updateVideoSenderParameters(), 1);
   assert.equal(video.parameters.encodings[0].maxBitrate, 4_000_000);
+});
+
+test('Balanced lowers the ceiling and frame rate while High detail preserves the old policy', async (t) => {
+  assert.deepEqual(REMOTE_VIDEO_PROFILES.highDetail, {
+    resolutionRatio: 2160,
+    maxFramerate: 30,
+    maxBitrate: 8000,
+    videoContentHint: 'text',
+  });
+  const rtc = connection(t);
+  const video = sender();
+  rtc.peerConnection.senders.push(video);
+  let constraints;
+  const stream = {
+    getVideoTracks: () => [
+      {
+        async applyConstraints(value) {
+          constraints = value;
+        },
+      },
+    ],
+  };
+  for (const name of ['balanced', 'lowData', 'highDetail']) {
+    const profile = REMOTE_VIDEO_PROFILES[name];
+    assert.equal(remoteVideoProfile(profile), name);
+    await applyRemoteVideoConstraints(
+      stream,
+      profile.resolutionRatio,
+      profile.maxFramerate
+    );
+    await rtc.setMaxBitrate(profile.maxBitrate);
+    await rtc.setMaxFramerate(profile.maxFramerate);
+    assert.equal(constraints.height.max, profile.resolutionRatio);
+    assert.equal(
+      video.parameters.encodings[0].maxBitrate,
+      profile.maxBitrate * 1000
+    );
+    assert.equal(
+      video.parameters.encodings[0].maxFramerate,
+      profile.maxFramerate
+    );
+    assert.equal(video.parameters.degradationPreference, 'maintain-resolution');
+  }
+  assert.equal(constraints.width.max, 3840);
+  // Changing quality while reading must not resume video.
+  await rtc.setVideoActive(false);
+  await rtc.setMaxBitrate(3000);
+  await rtc.setMaxFramerate(20);
+  assert.equal(video.parameters.encodings[0].active, false);
 });
