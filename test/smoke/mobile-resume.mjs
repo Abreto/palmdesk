@@ -288,7 +288,37 @@ try {
     await host.getByLabel('画质预设', { exact: true }).inputValue(),
     'balanced'
   );
+  // Electron opens controllers in another window sharing this origin's storage.
+  // A controller without credentials exercises its settings without a second
+  // host registration or an additional peer connection.
+  const sibling = await hostContext.newPage();
+  await sibling.goto(`${base}/#/webrtc`);
+  await sibling.getByLabel('连接设置', { exact: true }).click();
+  await sibling.getByLabel('画质预设', { exact: true }).selectOption('lowData');
+  await host.waitForFunction(
+    () =>
+      document.querySelector('select[aria-label="画质预设"]').value ===
+      'lowData'
+  );
+  await host.getByLabel('码率上限', { exact: true }).selectOption('2000');
+  assert.equal(
+    await host.getByLabel('分辨率上限', { exact: true }).inputValue(),
+    '1080'
+  );
+  assert.equal(
+    await host.getByLabel('帧率上限', { exact: true }).inputValue(),
+    '10'
+  );
+  assert.equal(
+    await sibling.getByLabel('码率上限', { exact: true }).inputValue(),
+    '1000',
+    'another window must not silently change the active controller'
+  );
+  await sibling.close();
   await host.getByLabel('画质预设', { exact: true }).selectOption('highDetail');
+  console.log(
+    'PASS same-origin connection forms follow saved preferences without changing another controller'
+  );
 
   const phoneContext = await browser.newContext({
     viewport: { width: 390, height: 844 },

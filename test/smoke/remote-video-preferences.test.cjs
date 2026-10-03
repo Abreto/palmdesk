@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { effectScope } = require('vue');
 const loadSource = require('./load-source.cjs');
 const { REMOTE_VIDEO_DEFAULTS, REMOTE_VIDEO_PROFILES, remoteVideoProfile } =
   loadSource('src/utils/remote-video.ts');
@@ -115,4 +116,75 @@ test('saved settings cannot inject unrelated connection fields', (t) => {
     useRemoteVideoQuality().videoQuality.value,
     REMOTE_VIDEO_DEFAULTS
   );
+});
+
+test('connection forms follow cross-window preferences while active controllers keep their choice', (t) => {
+  const local = storage(t);
+  const originalWindow = global.window;
+  global.window = new EventTarget();
+  t.after(() => {
+    global.window = originalWindow;
+  });
+  const scope = effectScope();
+  t.after(() => scope.stop());
+  const form = scope.run(() =>
+    useRemoteVideoQuality({ followSavedPreference: true })
+  );
+  const controller = useRemoteVideoQuality();
+  const dispatch = (
+    newValue,
+    storageArea = local,
+    key = 'palmdesk-remote-video-quality-v1'
+  ) => {
+    const event = Object.assign(new Event('storage'), {
+      key,
+      newValue,
+      storageArea,
+    });
+    global.window.dispatchEvent(event);
+  };
+  controller.setVideoQuality(REMOTE_VIDEO_PROFILES.lowData);
+  dispatch(local.getItem());
+  assert.deepEqual(form.videoQuality.value, REMOTE_VIDEO_PROFILES.lowData);
+  form.setVideoQuality({ ...form.videoQuality.value, maxBitrate: 2000 });
+  assert.deepEqual(JSON.parse(local.getItem()), {
+    ...REMOTE_VIDEO_PROFILES.lowData,
+    maxBitrate: 2000,
+  });
+  assert.deepEqual(
+    controller.videoQuality.value,
+    REMOTE_VIDEO_PROFILES.lowData
+  );
+  dispatch(JSON.stringify(REMOTE_VIDEO_PROFILES.highDetail), {});
+  assert.equal(
+    form.videoQuality.value.maxBitrate,
+    2000,
+    'ignore sessionStorage events'
+  );
+  dispatch(null, local, 'another-preference');
+  assert.equal(form.videoQuality.value.maxBitrate, 2000);
+  dispatch(null, local, null);
+  assert.deepEqual(
+    form.videoQuality.value,
+    REMOTE_VIDEO_DEFAULTS,
+    'clearing storage restores Balanced'
+  );
+  scope.stop();
+  dispatch(JSON.stringify(REMOTE_VIDEO_PROFILES.highDetail));
+  assert.deepEqual(
+    form.videoQuality.value,
+    REMOTE_VIDEO_DEFAULTS,
+    'disposed forms stop listening'
+  );
+});
+
+test('legacy debug bitrate preferences fall back to Balanced', (t) => {
+  const local = storage(t);
+  for (const maxBitrate of [1, 10]) {
+    local.setItem('', JSON.stringify({ ...REMOTE_VIDEO_DEFAULTS, maxBitrate }));
+    assert.deepEqual(
+      useRemoteVideoQuality().videoQuality.value,
+      REMOTE_VIDEO_DEFAULTS
+    );
+  }
 });

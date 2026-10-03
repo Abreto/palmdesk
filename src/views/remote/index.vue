@@ -654,7 +654,9 @@ const { updateWebRtcRemoteDeskConfig, webRtcRemoteDesk } =
 const { initWs, connectStatus, deskUserUuid, deskUserPassword } =
   useWebsocket();
 const { audioContentHint } = useRTCParams();
-const { videoQuality, setVideoQuality } = useRemoteVideoQuality();
+const { videoQuality, setVideoQuality } = useRemoteVideoQuality({
+  followSavedPreference: true,
+});
 const { handleRtcBilldDeskBehavior } = useIpcRendererSend();
 
 const currentMaxBitrate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxBitrate);
@@ -1745,7 +1747,6 @@ async function handleConfirm(pwd: string) {
                 remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
                 remoteDeskUserPassword: pwd,
                 receiverId: receiverId.value,
-                ...videoQuality.value,
                 audioContentHint: currentAudioContentHint.value,
               },
               windowId: WINDOW_ID_ENUM.webrtc,
@@ -1766,7 +1767,6 @@ async function handleConfirm(pwd: string) {
               remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
               remoteDeskUserPassword: pwd,
               receiverId: receiverId.value,
-              ...videoQuality.value,
               audioContentHint: currentAudioContentHint.value,
             })
           );

@@ -2,7 +2,7 @@
 
 Issue: [#42](https://github.com/Abreto/palmdesk/issues/42).
 
-Both controller entry points share one policy. Explicit settings are saved locally; incoming host settings are not saved as controller preferences.
+Both controller entry points share one policy. Explicit settings are saved locally; incoming host settings are not saved as controller preferences. Connection forms follow saved edits from other windows, while active controllers retain their own choice until explicitly changed. The selectable bitrate ceilings start at 1000 kbit/s; legacy 1 or 10 kbit/s preferences fall back to Balanced.
 
 | Profile                                 | Capture ceiling | Frame ceiling | Bitrate ceiling | Content hint |
 | --------------------------------------- | --------------- | ------------- | --------------- | ------------ |
@@ -16,7 +16,7 @@ Balanced retains the resolution ceiling from the Retina fix (#9) while reducing 
 
 `pnpm test:smoke` covers shared defaults, explicit preference persistence, invalid/unavailable storage, encoder bitrate units, late video negotiation, low-to-high quality changes, and suspension remaining active through quality changes. `pnpm typecheck` and `pnpm build:prod` check integration in both Vue pages.
 
-After building, run `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs` using the [browser smoke dependencies](LOCAL_DEVELOPMENT.md). This exercises both real Vue pages, authenticated signaling, and WebRTC in Chrome with synthetic capture. It checks presets selected before capture, live High detail restoration, all four manual overrides, reconnect/navigation/reload persistence, independence from incoming host settings, and inactive-video suspension. Phone-size layout screenshots are written to `.local/video-quality/`.
+After building, run `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs` using the [browser smoke dependencies](LOCAL_DEVELOPMENT.md). This exercises both real Vue pages, authenticated signaling, and WebRTC in Chrome with synthetic capture. It checks presets selected before capture, live High detail restoration, all four manual overrides, reconnect/navigation/reload persistence, independence from incoming host settings, cross-window preference updates, and inactive-video suspension. Phone-size layout screenshots are written to `.local/video-quality/`.
 
 Validation on 2026-10-04: source smoke tests, type checking, linting of changed source files, production build, and the Chrome browser/WebRTC smoke passed. The 390×844 and 844×390 settings screenshots were inspected. These browser checks use synthetic 960×600 video and do not measure native Retina capture, Windows capture, physical-phone readability, or network performance. The Electron native test was updated for Balanced and High detail but was not run in this validation.
 

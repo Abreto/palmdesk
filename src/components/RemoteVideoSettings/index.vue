@@ -4,6 +4,7 @@
       画质预设
       <select
         aria-label="画质预设"
+        :aria-describedby="descriptionId"
         :value="profile"
         @change="selectProfile"
       >
@@ -18,7 +19,13 @@
         </option>
       </select>
     </label>
-    <p class="quality-description">{{ description }}</p>
+    <p
+      :id="descriptionId"
+      class="quality-description"
+      aria-live="polite"
+    >
+      {{ description }}
+    </p>
     <label>
       分辨率上限
       <select
@@ -81,13 +88,13 @@
       </select>
     </label>
     <p>
-      码率是上限，实际用量随画面和网络变化。选择会保存在此浏览器中，重连时沿用。
+      码率是上限，实际用量随画面和网络变化。选择会保存在当前客户端中，重连时沿用。
     </p>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, useId } from 'vue';
 
 import {
   REMOTE_VIDEO_OPTIONS,
@@ -98,6 +105,7 @@ import {
 } from '@/utils/remote-video';
 
 const props = defineProps<{ modelValue: RemoteVideoQuality }>();
+const descriptionId = useId();
 const emit = defineEmits<{
   'update:modelValue': [value: RemoteVideoQuality];
 }>();

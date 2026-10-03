@@ -36,7 +36,7 @@ export const REMOTE_VIDEO_DEFAULTS = REMOTE_VIDEO_PROFILES.balanced;
 export const REMOTE_VIDEO_OPTIONS = {
   resolutionRatio: [360, 540, 720, 1080, 1440, 2160],
   maxFramerate: [1, 10, 15, 20, 30, 60, 120],
-  maxBitrate: [1, 10, 1000, 2000, 3000, 4000, 8000],
+  maxBitrate: [1000, 2000, 3000, 4000, 8000],
   videoContentHint: ['', 'motion', 'text', 'detail'],
 };
 
