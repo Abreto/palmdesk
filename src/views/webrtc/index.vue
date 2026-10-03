@@ -51,27 +51,10 @@
           <OptionsOutline />
         </summary>
         <div class="options-panel">
-          <label
-            >画质<select
-              v-model.number="quality"
-              @change="updateQuality"
-            >
-              <option :value="720">720p</option>
-              <option :value="1080">1080p</option>
-              <option :value="1440">1440p</option>
-              <option :value="2160">2160p</option>
-            </select></label
-          >
-          <label
-            >帧率<select
-              v-model.number="frameRate"
-              @change="updateQuality"
-            >
-              <option :value="15">15 fps</option>
-              <option :value="30">30 fps</option>
-              <option :value="60">60 fps</option>
-            </select></label
-          >
+          <RemoteVideoSettings
+            :model-value="videoQuality"
+            @update:model-value="updateQuality"
+          />
           <span v-if="peer"
             >延迟 {{ Math.max(0, Math.round(peer.rtt)) }} ms</span
           >
@@ -226,10 +209,12 @@ import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { useRoute } from 'vue-router';
 
 import AgentPicker from '@/components/AgentPicker/index.vue';
+import RemoteVideoSettings from '@/components/RemoteVideoSettings/index.vue';
 import RemoteViewport from '@/components/RemoteViewport/index.vue';
 import SessionReader from '@/components/SessionReader/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
+import { useRemoteVideoQuality } from '@/hooks/use-remoteVideoQuality';
 import { useWebsocket } from '@/hooks/use-websocket';
 import type { IRemoteAgent, IRemoteWindow } from '@/pure-interface';
 import router, { routerName } from '@/router';
@@ -253,7 +238,7 @@ import {
 } from '@/utils/agent-registry';
 import { REMOTE_SESSION_ENDED_EVENT } from '@/utils/network/remote-session';
 import { ControllerRecovery } from '@/utils/remote-presence';
-import { REMOTE_VIDEO_DEFAULTS } from '@/utils/remote-video';
+import type { RemoteVideoQuality } from '@/utils/remote-video';
 import { ReaderClient } from '@/utils/session-reader-channel';
 
 import type { ReaderSession } from '../../../session-core/index.mjs';
@@ -271,8 +256,7 @@ const {
 } = useWebsocket();
 const roomId = ref('');
 const receiverId = ref('');
-const quality = ref<number>(REMOTE_VIDEO_DEFAULTS.resolutionRatio);
-const frameRate = ref<number>(REMOTE_VIDEO_DEFAULTS.maxFramerate);
+const { videoQuality, setVideoQuality } = useRemoteVideoQuality();
 const error = ref('');
 const inputError = ref('');
 const retryingInput = ref(false);
@@ -711,6 +695,9 @@ function receiveWindowMessage(event: MessageEvent) {
             : undefined,
       };
       needsWindowResume.value = false;
+      // Edits made in the directory have no capture owner yet. Reapply them
+      // once the host confirms selection, including after window recovery.
+      sendQuality();
       if (imagePasteSession) peer.value?.openImageChannel();
       if (associationRequest)
         sessionWindows.value[associationRequest] = data.id;
@@ -799,10 +786,7 @@ function connectionData() {
     deskUserPassword: deskUserPassword.value,
     remoteDeskUserUuid: remoteDeskUserUuid.value,
     remoteDeskUserPassword: remoteDeskUserPassword.value,
-    maxBitrate: REMOTE_VIDEO_DEFAULTS.maxBitrate,
-    maxFramerate: frameRate.value,
-    resolutionRatio: quality.value,
-    videoContentHint: REMOTE_VIDEO_DEFAULTS.videoContentHint,
+    ...videoQuality.value,
     audioContentHint: '',
   };
 }
@@ -942,11 +926,20 @@ function retryInput() {
 function releaseInput() {
   sendBehavior({ type: Behavior.releaseAll });
 }
-function updateQuality() {
+function updateQuality(value: RemoteVideoQuality) {
+  setVideoQuality(value);
+  sendQuality();
+}
+function sendQuality() {
   (
     [
-      [WsMsgTypeEnum.changeResolutionRatio, quality.value],
-      [WsMsgTypeEnum.changeMaxFramerate, frameRate.value],
+      [WsMsgTypeEnum.changeResolutionRatio, videoQuality.value.resolutionRatio],
+      [WsMsgTypeEnum.changeMaxFramerate, videoQuality.value.maxFramerate],
+      [WsMsgTypeEnum.changeMaxBitrate, videoQuality.value.maxBitrate],
+      [
+        WsMsgTypeEnum.changeVideoContentHint,
+        videoQuality.value.videoContentHint,
+      ],
     ] as const
   ).forEach(([msgType, val]) => {
     peer.value?.dataChannelSend({
@@ -1333,7 +1326,9 @@ onUnmounted(() => {
   right: 0;
   top: 46px;
   z-index: 5;
-  width: 220px;
+  width: 320px;
+  max-height: calc(100dvh - 100px);
+  overflow-y: auto;
   max-width: calc(100vw - 32px);
   padding: 16px;
   box-sizing: border-box;
@@ -1342,24 +1337,9 @@ onUnmounted(() => {
   background: var(--pd-surface);
   box-shadow: var(--pd-shadow-raised);
 }
-.options-panel label {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  font-size: 14px;
-}
-.options-panel select {
-  min-width: 100px;
-  height: 36px;
-  padding: 0 8px;
-  border: 1px solid var(--pd-border);
-  border-radius: var(--pd-radius-sm);
-  background: var(--pd-bg);
-  color: var(--pd-text);
-  font-size: 14px;
-}
 .options-panel > span {
+  display: block;
+  margin-top: 12px;
   font-size: 12px;
   color: var(--pd-muted);
 }

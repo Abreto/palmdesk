@@ -2,7 +2,7 @@
 // Run after pnpm build:prod. Uses real Vue pages, Socket.IO session auth and
 // WebRTC; only native capture/input, device persistence and transcripts are fake.
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
@@ -84,8 +84,12 @@ const sessions = createDeskSessions({
   },
 });
 const signaling = [];
+const qualityRequests = [];
 io.on('connection', (socket) => {
   sessions.attach(socket);
+  socket.on('billdDeskStartRemote', (request) =>
+    qualityRequests.push(request.data)
+  );
   socket.onAny((event) => {
     if (event.startsWith('nativeWebRtc')) signaling.push(event);
   });
@@ -279,6 +283,13 @@ try {
     device.uuid
   );
 
+  await host.locator('.quality-settings summary').click();
+  assert.equal(
+    await host.getByLabel('画质预设', { exact: true }).inputValue(),
+    'balanced'
+  );
+  await host.getByLabel('画质预设', { exact: true }).selectOption('highDetail');
+
   const phoneContext = await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: true,
@@ -318,8 +329,59 @@ try {
     remoteDeskUserUuid: device.uuid,
     remoteDeskUserPassword: device.password,
   });
+  await phone.goto(base);
+  await phone.locator('.quality-settings summary').click();
+  assert.equal(
+    await phone.getByLabel('画质预设', { exact: true }).inputValue(),
+    'balanced'
+  );
   await phone.goto(`${base}/#/webrtc?${query}`);
   await phone.getByRole('button', { name: /Synthetic reading task/ }).click();
+  assert.equal(qualityRequests.at(-1).maxBitrate, 3000);
+  assert.equal(qualityRequests.at(-1).maxFramerate, 20);
+  assert.equal(qualityRequests.at(-1).resolutionRatio, 2160);
+  const options = phone.getByLabel('连接设置', { exact: true });
+  const profile = phone.getByLabel('画质预设', { exact: true });
+  await options.click();
+  assert.equal(await profile.inputValue(), 'balanced');
+  // No capture owner exists yet: the choice must be applied after selection.
+  await profile.selectOption('lowData');
+  await mkdir('.local/video-quality', { recursive: true });
+  await phone.screenshot({ path: '.local/video-quality/phone-settings.png' });
+  assert.equal(
+    await phone.evaluate(() => document.documentElement.scrollWidth),
+    390
+  );
+  await phone.setViewportSize({ width: 844, height: 390 });
+  const panel = await phone.locator('.options-panel').boundingBox();
+  assert.ok(
+    panel.y + panel.height <= 390,
+    'settings remain within a landscape viewport'
+  );
+  await phone.screenshot({
+    path: '.local/video-quality/phone-settings-landscape.png',
+  });
+  await phone.setViewportSize({ width: 390, height: 844 });
+  await options.click();
+  const qualityApplied = (quality) =>
+    host.waitForFunction((expected) => {
+      const sender = window.resumeFixture.peers
+        .filter((pc) => pc.connectionState === 'connected')
+        .flatMap((pc) => pc.getSenders())
+        .find((sender) => sender.track?.kind === 'video');
+      const params = sender?.getParameters();
+      return (
+        sender &&
+        params.encodings.every(
+          (encoding) =>
+            encoding.maxBitrate === expected.maxBitrate * 1000 &&
+            encoding.maxFramerate === expected.maxFramerate
+        ) &&
+        sender.track.getConstraints().height?.max ===
+          expected.resolutionRatio &&
+        sender.track.contentHint === expected.videoContentHint
+      );
+    }, quality);
   const timeline = phone.locator('.timeline');
   await timeline.locator('.message-card').last().waitFor();
   await timeline.evaluate((element) => {
@@ -355,6 +417,24 @@ try {
   await draft.fill('Keep this unsent draft');
 
   await active(true);
+  await qualityApplied({
+    resolutionRatio: 1080,
+    maxFramerate: 10,
+    maxBitrate: 1000,
+    videoContentHint: 'text',
+  });
+  await options.click();
+  await profile.selectOption('highDetail');
+  await qualityApplied({
+    resolutionRatio: 2160,
+    maxFramerate: 30,
+    maxBitrate: 8000,
+    videoContentHint: 'text',
+  });
+  await options.click();
+  console.log(
+    'PASS both entry points start Balanced; a pre-capture preset and live High detail reach the encoder'
+  );
   await visibility(true);
   await active(false);
   await visibility(false);
@@ -367,6 +447,24 @@ try {
 
   await phone.getByRole('button', { name: '阅读', exact: true }).click();
   await active(false);
+  await options.click();
+  await phone.getByLabel('分辨率上限', { exact: true }).selectOption('1440');
+  await phone.getByLabel('帧率上限', { exact: true }).selectOption('15');
+  await phone.getByLabel('码率上限', { exact: true }).selectOption('2000');
+  await phone.getByLabel('视频内容', { exact: true }).selectOption('motion');
+  assert.equal(await profile.inputValue(), 'custom');
+  const customQuality = {
+    resolutionRatio: 1440,
+    maxFramerate: 15,
+    maxBitrate: 2000,
+    videoContentHint: 'motion',
+  };
+  await qualityApplied(customQuality);
+  await active(false);
+  await options.click();
+  console.log(
+    'PASS all manual overrides reach the encoder without resuming suspended video'
+  );
   assert.equal(
     await timeline.evaluate((element) => element.scrollTop),
     position
@@ -396,6 +494,9 @@ try {
   await phone.getByRole('button', { name: '窗口', exact: true }).click();
   await host.waitForFunction(() => window.resumeFixture.captures === 2);
   await active(true);
+  await qualityApplied(customQuality);
+  for (const [key, value] of Object.entries(customQuality))
+    assert.equal(qualityRequests.at(-1)[key], value);
   assert.equal(await draft.inputValue(), 'Keep this unsent draft');
   console.log(
     'PASS fresh authenticated session restores reading position and revalidates the selected window'
@@ -488,6 +589,31 @@ try {
   );
   console.log(
     'PASS explicit desktop disconnect is not undone by foreground recovery'
+  );
+  await host.locator('.quality-settings summary').click();
+  assert.equal(
+    await host.getByLabel('画质预设', { exact: true }).inputValue(),
+    'highDetail',
+    'incoming settings must not overwrite the host preference'
+  );
+  await phone.goto(base);
+  await phone.locator('.quality-settings summary').click();
+  assert.equal(
+    await phone.getByLabel('画质预设', { exact: true }).inputValue(),
+    'custom'
+  );
+  assert.equal(
+    await phone.getByLabel('码率上限', { exact: true }).inputValue(),
+    '2000'
+  );
+  await phone.reload();
+  await phone.locator('.quality-settings summary').click();
+  assert.equal(
+    await phone.getByLabel('视频内容', { exact: true }).inputValue(),
+    'motion'
+  );
+  console.log(
+    'PASS custom quality survives reconnect, navigation, and reload without replacing the host preference'
   );
   assert.deepEqual(errors, []);
 } catch (error) {
