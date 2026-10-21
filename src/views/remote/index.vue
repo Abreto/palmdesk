@@ -499,15 +499,6 @@
           {{ mySocketId }}
         </span>
       </div>
-
-      <div>
-        <span>调试地址：</span>
-        <input
-          v-model="debugUrl"
-          type="text"
-        />
-        <button @click="changeDebugUrl">确定</button>
-      </div>
     </div>
 
     <UrlModal
@@ -843,8 +834,6 @@ const originalPassword = ref('');
 const loopBilldDeskUpdateUserTimer = ref();
 const suspend = ref('');
 const resume = ref('');
-const debugUrl = ref('');
-const position = ref({ x: 0, y: 0 });
 const mySocketId = computed(() => {
   return networkStore.wsMap.get(roomId.value)?.socketIo?.id || '';
 });
@@ -1181,19 +1170,14 @@ async function handleInitIpcRendererSend() {
   }
 }
 
-function responsePowerMonitorSuspend(_event, data: IIpcRendererData) {
-  console.log('response_powerMonitorSuspend', data);
+function responsePowerMonitorSuspend() {
   suspend.value = `${new Date().toLocaleString()}-powerMonitorSuspend`;
 }
-function responsePowerMonitorResume(_event, data: IIpcRendererData) {
-  console.log('response_powerMonitorResume', data);
+function responsePowerMonitorResume() {
   resume.value = `${new Date().toLocaleString()}-powerMonitorResume`;
   handleCloseAll();
 }
-function responseGetWindowPosition(_event, data: IIpcRendererData) {
-  position.value = data.data.position;
-}
-function responseWorkAreaSize(_event, data: IIpcRendererData) {
+function responseWorkAreaSize(data: IIpcRendererData) {
   appStore.workAreaSize = {
     width: data.data.width,
     height: data.data.height,
@@ -1276,11 +1260,6 @@ function handleInitIpcRendererOn() {
   ipcRendererOn(
     IPC_EVENT.response_powerMonitorResume,
     responsePowerMonitorResume
-  );
-
-  ipcRendererOn(
-    IPC_EVENT.response_getWindowPosition,
-    responseGetWindowPosition
   );
 
   ipcRendererOn(IPC_EVENT.response_workAreaSize, responseWorkAreaSize);
@@ -1686,10 +1665,6 @@ async function handleWindowRequest(
   }
 }
 
-function changeDebugUrl() {
-  window.location.href = debugUrl.value;
-}
-
 async function handleResetDeskuuid() {
   if (updatingPassword.value || !deviceReady.value) return;
   deviceReady.value = false;
@@ -1734,28 +1709,24 @@ async function handleConfirm(pwd: string) {
           remoteDeskUserPassword: pwd,
         });
         if (ipcRenderer) {
-          ipcRendererSend({
-            windowId: 0,
+          // Credentials reach the controller window over IPC, not its URL.
+          const opened = await ipcRendererInvoke({
+            windowId: WINDOW_ID_ENUM.remote,
             channel: IPC_EVENT.createWindow,
             requestId: getRandomString(8),
             data: {
-              route: routerName.webrtc,
-              query: {
-                roomId: cacheStore.remoteDeskUserUuid,
+              kind: routerName.webrtc,
+              session: {
                 deskUserUuid: cacheStore.deskUserUuid,
                 deskUserPassword: cacheStore.deskUserPassword,
                 remoteDeskUserUuid: cacheStore.remoteDeskUserUuid,
                 remoteDeskUserPassword: pwd,
-                receiverId: receiverId.value,
-                audioContentHint: currentAudioContentHint.value,
               },
-              windowId: WINDOW_ID_ENUM.webrtc,
-              minWidth: 300,
-              minHeight: 300,
-              useWorkAreaSize: true,
-              frame: true,
             },
           });
+          if (disposed) return;
+          if (opened?.code !== 0)
+            connectionError.value = opened?.msg || '无法打开远程窗口';
         } else {
           networkStore.removeAllWsAndRtc();
           sessionStorage.setItem(

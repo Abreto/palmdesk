@@ -33,6 +33,7 @@ export const IPC_EVENT = {
   workAreaSize: 'workAreaSize',
   getPrimaryDisplaySize: 'getPrimaryDisplaySize',
   createWindow: 'createWindow',
+  takeWindowSession: 'takeWindowSession',
   powerMonitorSuspend: 'powerMonitorSuspend',
   powerMonitorResume: 'powerMonitorResume',
   shellOpenExternal: 'shellOpenExternal',

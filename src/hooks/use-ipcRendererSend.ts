@@ -15,15 +15,6 @@ export const useIpcRendererSend = () => {
     });
   }
 
-  function handleMoveScreenRightBottom({ windowId }) {
-    ipcRendererSend({
-      windowId,
-      channel: IPC_EVENT.handleMoveScreenRightBottom,
-      requestId: getRandomString(8),
-      data: {},
-    });
-  }
-
   function handleOpenDevTools({ windowId }) {
     ipcRendererSend({
       windowId,
@@ -61,7 +52,6 @@ export const useIpcRendererSend = () => {
 
   return {
     handlesetAlwaysOnTop,
-    handleMoveScreenRightBottom,
     handleOpenDevTools,
     handleOpenExternal,
     handleRtcBilldDeskBehavior,
