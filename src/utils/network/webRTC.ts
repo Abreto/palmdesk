@@ -599,7 +599,8 @@ export class WebRTCClass {
     data?: T;
   }) => {
     if (this.dataChannel?.readyState !== 'open') {
-      console.error('dataChannel未连接成功，不发送消息！', msgType, data);
+      // Payloads can carry text typed on the phone; log the type only.
+      console.error('dataChannel未连接成功，不发送消息！', msgType);
       return;
     }
     console.log('dataChannel发送消息', msgType);

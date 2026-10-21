@@ -118,28 +118,13 @@
         刷新
       </div>
       <div
+        v-if="isDev"
         class="item"
         @click="handleOpenDevTools({ windowId: WINDOW_ID_ENUM.remote })"
       >
         控制台
       </div>
     </div>
-    <UpdateModal
-      v-if="
-        appStore.updateModalInfo &&
-        appStore.updateModalInfo?.checkUpdate === 1 &&
-        appStore.updateModalInfo?.isUpdate === 1
-      "
-      @close="appStore.updateModalInfo.isUpdate = 2"
-    ></UpdateModal>
-    <DisableModal
-      v-if="
-        appStore.updateModalInfo &&
-        appStore.updateModalInfo?.disableList.find(
-          (v) => v.version === appStore.version
-        )
-      "
-    ></DisableModal>
   </div>
 </template>
 
@@ -158,7 +143,6 @@ import palmdeskMark from '@/assets/img/palmdesk-mark.svg';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
-import { IIpcRendererData } from '@/interface';
 import { routerName } from '@/router';
 import { useAppStore } from '@/store/app';
 import {
@@ -172,6 +156,8 @@ const appStore = useAppStore();
 const route = useRoute();
 
 const { handleOpenDevTools } = useIpcRendererSend();
+// DevTools are available only in development builds.
+const isDev = import.meta.env.DEV;
 
 // 窗口当前的位置 + 鼠标当前的相对位置 - 鼠标以前的相对位置
 const isMoving = ref<boolean>(false);
@@ -200,47 +186,23 @@ async function init() {
   }
 }
 
-ipcRendererOn(
-  IPC_EVENT.response_open_about,
-  (_event, data: IIpcRendererData) => {
-    console.log('response_open_about', data);
-    ipcRendererSend({
-      windowId: 0,
-      channel: IPC_EVENT.createWindow,
-      requestId: getRandomString(8),
-      data: {
-        windowId: WINDOW_ID_ENUM.about,
-        width: 550,
-        height: 380,
-        route: routerName.about,
-        query: {},
-        useWorkAreaSize: false,
-        frame: true,
-      },
-    });
-  }
-);
+// The main process owns window sizes, routes and IDs; ask only for a kind.
+function openWindow(kind: string) {
+  void ipcRendererInvoke({
+    windowId: WINDOW_ID_ENUM.remote,
+    channel: IPC_EVENT.createWindow,
+    requestId: getRandomString(8),
+    data: { kind },
+  });
+}
 
-ipcRendererOn(
-  IPC_EVENT.response_open_version,
-  (_event, data: IIpcRendererData) => {
-    console.log('response_open_version', data);
-    ipcRendererSend({
-      windowId: 0,
-      channel: IPC_EVENT.createWindow,
-      requestId: getRandomString(8),
-      data: {
-        windowId: WINDOW_ID_ENUM.version,
-        width: 300,
-        height: 300,
-        route: routerName.version,
-        query: {},
-        useWorkAreaSize: false,
-        frame: true,
-      },
-    });
-  }
-);
+ipcRendererOn(IPC_EVENT.response_open_about, () => {
+  openWindow(routerName.about);
+});
+
+ipcRendererOn(IPC_EVENT.response_open_version, () => {
+  openWindow(routerName.version);
+});
 
 function handleOpenDebug() {
   if (clickNum.value < 5) {
