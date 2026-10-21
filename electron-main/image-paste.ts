@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { identifyAgent } from '../src/utils/agent-registry';
 import { validateImage } from '../src/utils/image-payload';
 
@@ -23,11 +25,18 @@ type ClipboardDriver = {
   read: () => Electron.NativeImage;
 };
 
+// Hash each bitmap in turn so a large image is never held twice for comparison.
+function pixels(image: Electron.NativeImage) {
+  return createHash('sha256').update(image.toBitmap()).digest('hex');
+}
+
 export async function pasteClipboardImage(
   payload: ImagePayload,
   current: () => boolean,
   driver: ClipboardDriver & {
     verify?: () => Promise<unknown>;
+    /** Runs after the clipboard is ready, immediately before the shortcut. */
+    confirm?: () => Promise<unknown>;
     press: () => Promise<unknown>;
     release: () => Promise<unknown>;
   }
@@ -40,6 +49,7 @@ export async function pasteClipboardImage(
   if (!current()) throw new Error('图片粘贴已取消');
   await driver.verify?.();
   if (!current()) throw new Error('图片粘贴已取消');
+  const expected = pixels(image);
   // Leave the image in the clipboard, as a normal copy/paste would. Restoring
   // immediately can race Codex's asynchronous reading of the pasteboard.
   try {
@@ -52,7 +62,7 @@ export async function pasteClipboardImage(
       copied.isEmpty() ||
       copiedSize.width !== size.width ||
       copiedSize.height !== size.height ||
-      !copied.toBitmap().equals(image.toBitmap())
+      pixels(copied) !== expected
     )
       throw new Error('Clipboard image did not match');
   } catch {
@@ -60,12 +70,49 @@ export async function pasteClipboardImage(
       '无法写入或确认电脑剪贴板中的图片，请关闭占用剪贴板的应用后手动重试'
     );
   }
+  if (!current()) throw new Error('图片粘贴已取消');
+  await driver.confirm?.();
   try {
     if (!current()) throw new Error('图片粘贴已取消');
     await driver.press();
   } finally {
     await driver.release();
   }
+}
+
+export function pasteMacClipboardImage(
+  payload: ImagePayload,
+  source: ICaptureSource,
+  current: () => boolean,
+  driver: ClipboardDriver &
+    Pick<NativeWindowBridge, 'request'> & {
+      press: () => Promise<unknown>;
+      release: () => Promise<unknown>;
+    }
+) {
+  const target = {
+    nativeId: source.nativeId,
+    ownerPid: source.ownerPid,
+    bundleId: source.bundleId,
+  };
+  // Check focus without activating: a window that lost focus after the
+  // session's focus check stops this paste instead of receiving Cmd+V.
+  const verify = async () => {
+    try {
+      await driver.request('verifyFocus', target, current);
+    } catch (error) {
+      if (error instanceof NativeWindowError && error.code === 'cancelled')
+        throw new Error('图片粘贴已取消');
+      throw new InputUnavailableError(
+        'Codex 窗口不在前台或被对话框阻挡，请在电脑上切回目标窗口后重试控制'
+      );
+    }
+  };
+  return pasteClipboardImage(payload, current, {
+    ...driver,
+    verify,
+    confirm: verify,
+  });
 }
 
 export async function pasteWindowsClipboardImage(

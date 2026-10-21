@@ -46,7 +46,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Use tap, double tap, long-press right click, drag, scroll, pinch-to-zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
 - Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS or Windows Codex prompt.
-- On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
+- On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input. Long text is typed in short chunks with a focus check between them: if the window loses focus, typing stops and reports how many characters were entered, and ending control stops it too.
 - On Windows, identify the target by HWND, process ID, executable path, and process start time. Support regular windows on the current virtual desktop, restoring a selected minimized window, and physical coordinates across high-DPI and multiple displays.
 - Send literal Unicode text on Windows, preserving Chinese and English text without conversion by the host's input method.
 - Stop input and release held keys when the window disappears, capture ends, or the connection closes.

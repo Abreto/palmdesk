@@ -320,20 +320,46 @@ func activateOffscreenWindow(_ target: TargetWindow) throws {
     throw WindowError.spaceControls
 }
 
+// NSWorkspace learns about activations through the run loop, which this
+// helper runs only while it waits, so frontmostApplication can be stale
+// between requests. The accessibility server always answers for now.
+func frontmostProcess() -> pid_t? {
+    let system = AXUIElementCreateSystemWide()
+    AXUIElementSetMessagingTimeout(system, 0.5)
+    guard let focused = attribute(system, kAXFocusedApplicationAttribute as CFString),
+          CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+    var pid: pid_t = 0
+    return AXUIElementGetPid(focused as! AXUIElement, &pid) == .success ? pid : nil
+}
+
+// The target when it is the focused window of the frontmost application.
+func focusedWindow(_ id: UInt32, _ pid: Int32, _ bundle: String, _ application: AXUIElement) -> TargetWindow? {
+    guard frontmostProcess() == pid,
+          let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
+          CFGetTypeID(focused) == AXUIElementGetTypeID(),
+          windowNumber(focused as! AXUIElement) == id,
+          let target = windows(id).first(where: {
+              $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle
+          }), target.isOnScreen else { return nil }
+    return target
+}
+
+// Confirms focus without activating anything, for checks in the middle of
+// typing or pasting: losing focus must stop input, not steal focus back.
+func verifyFocus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow {
+    guard AXIsProcessTrusted() else { throw WindowError.permission }
+    let application = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(application, 0.5)
+    guard let target = focusedWindow(id, pid, bundle, application) else { throw WindowError.focus }
+    return target
+}
+
 func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow {
     guard AXIsProcessTrusted() else { throw WindowError.permission }
     let application = AXUIElementCreateApplication(pid)
     AXUIElementSetMessagingTimeout(application, 0.5)
     // Verify live focus and bounds without enumerating every desktop window for each input.
-    if NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
-       let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
-       CFGetTypeID(focused) == AXUIElementGetTypeID(),
-       windowNumber(focused as! AXUIElement) == id,
-       let target = windows(id).first(where: {
-           $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle
-       }), target.isOnScreen {
-        return target
-    }
+    if let target = focusedWindow(id, pid, bundle, application) { return target }
     var appWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
     guard var target = appWindows.first(where: { $0.nativeId == id }),
           let running = NSRunningApplication(processIdentifier: pid) else { throw WindowError.unavailable }
@@ -353,7 +379,7 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
           appWindows.filter({ matches(candidates[0], $0) }).count == 1 else { throw WindowError.ambiguous }
     let window = candidates[0]
     func focusedTarget() -> TargetWindow? {
-        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid,
+        guard frontmostProcess() == pid,
               let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
               CFGetTypeID(focused) == AXUIElementGetTypeID(),
               CFEqual(focused, window) else { return nil }
@@ -449,11 +475,12 @@ while let line = readLine() {
             guard let requested = request["windows"] as? [[String: Any]] else { throw WindowError.invalid }
             let identities = try JSONDecoder().decode([WindowIdentity].self, from: JSONSerialization.data(withJSONObject: requested))
             data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(thumbnails(identities)))
-        case "focus":
+        case "focus", "verifyFocus":
             guard let id = request["nativeId"] as? UInt32,
                   let pid = request["ownerPid"] as? Int32,
                   let bundle = request["bundleId"] as? String else { throw WindowError.invalid }
-            data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(focus(id, pid, bundle)))
+            let target = try command == "focus" ? focus(id, pid, bundle) : verifyFocus(id, pid, bundle)
+            data = try JSONSerialization.jsonObject(with: JSONEncoder().encode(target))
         case "permissions":
             data = ["accessibility": AXIsProcessTrusted(), "screen": CGPreflightScreenCaptureAccess()]
         case "reveal":
