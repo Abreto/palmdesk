@@ -19,15 +19,24 @@ function run(command, env, failCommand) {
     env,
   };
   vm.runInNewContext(source, {
+    Buffer,
     process,
     console: { log() {}, error: (value) => errors.push(value) },
     require: (name) => {
       if (name === '../build/macos-signing.json') return certificate;
       if (name === 'node:child_process')
         return {
-          spawnSync: (binary, args) => {
-            calls.push({ binary, args: Array.from(args) });
-            return { status: args[0] === failCommand ? 1 : 0, stdout: '' };
+          spawnSync: (binary, args, options) => {
+            calls.push({
+              binary,
+              args: Array.from(args),
+              input: options.input,
+            });
+            return {
+              status: args[0] === failCommand ? 1 : 0,
+              stdout: '',
+              stderr: '',
+            };
           },
         };
       return require(name);
@@ -79,3 +88,33 @@ for (const failure of [undefined, 'delete-keychain']) {
     );
   });
 }
+
+test('the certificate password reaches security only through stdin', (t) => {
+  const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'signing-import-'));
+  t.after(() => fs.rmSync(temporary, { recursive: true, force: true }));
+  const password = 'p"a\\ss $word';
+  const result = run('prepare', {
+    GITHUB_ACTIONS: 'true',
+    RUNNER_ENVIRONMENT: 'github-hosted',
+    RUNNER_TEMP: temporary,
+    GITHUB_ENV: path.join(temporary, 'github-env'),
+    PALMDESK_SIGNING_P12: Buffer.from('synthetic p12').toString('base64'),
+    PALMDESK_SIGNING_PASSWORD: password,
+  });
+  // The synthetic keychain holds no certificate, so setup stops and cleans up.
+  assert.equal(result.exitCode, 1);
+  assert.match(result.errors[0], /does not match/);
+  result.calls.forEach((call) =>
+    assert.ok(!call.args.some((arg) => arg.includes('word')), call.args[0])
+  );
+  const imports = result.calls.filter((call) => call.args[0] === '-i');
+  assert.equal(imports.length, 1);
+  const directory = fs
+    .readFileSync(path.join(temporary, 'github-env'), 'utf8')
+    .match(/^PALMDESK_SIGNING_DIR=(.+)$/m)[1];
+  assert.equal(
+    imports[0].input,
+    `import "${path.join(directory, 'certificate.p12')}" -k "${path.join(directory, 'signing.keychain-db')}" -P "p\\"a\\\\ss $word" -x -T /usr/bin/codesign\n`
+  );
+  assert.equal(fs.existsSync(directory), false);
+});

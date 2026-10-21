@@ -1,15 +1,19 @@
 // Opt-in real signing check: node --test test/smoke/macos-signing-upgrade.cjs
 // Requires the fixed certificate and an unlocked CSC_KEYCHAIN (CI prepares both).
+// Uses only Node.js built-ins so the release signing job can run it.
 const assert = require('node:assert/strict');
 const { execFileSync, spawnSync } = require('node:child_process');
 const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
-const sign = require('../../scripts/sign-macos.cjs');
 const certificate = require('../../build/macos-signing.json');
+const {
+  helperIdentifiers,
+  signApp,
+} = require('../../scripts/macos-codesign.cjs');
 
-test('different app and native helper builds satisfy the previous signed identity', async (t) => {
+test('different app and native helper builds satisfy the previous signed identity', (t) => {
   assert.equal(process.platform, 'darwin');
   assert.ok(process.env.CSC_KEYCHAIN, 'Prepare the signing keychain first.');
   const directory = mkdtempSync(
@@ -17,11 +21,6 @@ test('different app and native helper builds satisfy the previous signed identit
   );
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const id = 'io.github.abreto.palmdesk.signing-test';
-  const entitlements = path.join(directory, 'entitlements.plist');
-  writeFileSync(
-    entitlements,
-    '<?xml version="1.0"?><plist version="1.0"><dict/></plist>'
-  );
   const source = path.join(directory, 'probe.c');
   writeFileSync(source, 'int main(void) { return REVISION; }\n');
   const builds = [];
@@ -51,16 +50,12 @@ test('different app and native helper builds satisfy the previous signed identit
         ],
         { stdio: 'pipe' }
       );
-    await sign(
-      {
-        app,
-        platform: 'darwin',
-        identity: certificate.sha1,
-        keychain: process.env.CSC_KEYCHAIN,
-        optionsForFile: () => ({ entitlements }),
-      },
-      { appInfo: { id }, platformSpecificBuildOptions: {} }
-    );
+    signApp({
+      app,
+      identity: certificate.sha1,
+      keychain: process.env.CSC_KEYCHAIN,
+      identifiers: helperIdentifiers(id),
+    });
     builds.push([app, path.join(macOS, 'codex-window')]);
   }
   function signature(target) {
