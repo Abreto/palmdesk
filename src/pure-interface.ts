@@ -77,3 +77,23 @@ export interface RemoteInput {
   text?: string;
   keys?: number[];
 }
+
+export interface IReleaseInfo {
+  version: string;
+  url: string;
+  /** The release notes contain a line starting with `Security:`. */
+  security: boolean;
+}
+
+export interface IReleaseStatus {
+  /** Automatic checks; a check requested by the user always runs. */
+  enabled: boolean;
+  current: string;
+  checking: boolean;
+  checkedAt?: number;
+  latest?: IReleaseInfo;
+  available: boolean;
+  error?: string;
+  /** The last check was requested by the user. */
+  manual?: boolean;
+}

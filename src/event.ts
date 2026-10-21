@@ -34,6 +34,9 @@ export const IPC_EVENT = {
   getPrimaryDisplaySize: 'getPrimaryDisplaySize',
   createWindow: 'createWindow',
   takeWindowSession: 'takeWindowSession',
+  releaseStatus: 'releaseStatus',
+  releaseCheck: 'releaseCheck',
+  releaseConfigure: 'releaseConfigure',
   powerMonitorSuspend: 'powerMonitorSuspend',
   powerMonitorResume: 'powerMonitorResume',
   shellOpenExternal: 'shellOpenExternal',
@@ -93,7 +96,7 @@ export const IPC_EVENT = {
   response_powerMonitorResume: 'response_powerMonitorResume',
   response_globalShortcut: 'response_globalShortcut',
   response_open_about: 'response_open_about',
-  response_open_version: 'response_open_version',
+  response_releaseStatus: 'response_releaseStatus',
 };
 
 export const GLOBAL_SHORTCUT = {

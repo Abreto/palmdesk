@@ -12,6 +12,7 @@ import {
   ipcMain,
   Menu,
   nativeImage,
+  net,
   powerMonitor,
   screen,
   session,
@@ -37,6 +38,7 @@ import {
   enableWindowsCapture,
   discoverAgents,
 } from './native-window';
+import { ReleaseChecker, RELEASES_API } from './release-check';
 import {
   externalLinkUrl,
   isAppDocumentUrl,
@@ -90,7 +92,7 @@ app.setPath('sessionData', userData);
 const windowNormalParams = { width: 960, height: 720 };
 let winBounds: Electron.Rectangle | null;
 let mainWindow: BrowserWindow | undefined;
-type ChildWindowKind = 'about' | 'version' | 'webrtc';
+type ChildWindowKind = 'about' | 'webrtc';
 const childWindows = new Map<BrowserWindow, ChildWindowKind>();
 // Credentials for each controller window; its page takes them once after loading.
 const controllerSessions = new WeakMap<
@@ -286,7 +288,6 @@ const CHILD_WINDOWS: Record<
   }
 > = {
   about: { width: 550, height: 380, singleton: true },
-  version: { width: 300, height: 300, singleton: true },
   webrtc: { minWidth: 300, minHeight: 300, useWorkAreaSize: true },
 };
 
@@ -349,7 +350,7 @@ function appWindows() {
 function sendToWindow(
   win: BrowserWindow | undefined,
   channel: string,
-  data: Record<string, unknown> = {}
+  data: object = {}
 ) {
   if (win && !win.isDestroyed())
     win.webContents.send(channel, { channel, requestId: '', data, code: 0 });
@@ -461,6 +462,26 @@ function main() {
   mainWindow = win;
   void loadApp(win);
 
+  // Notify about new releases; never download or install anything.
+  const releaseChecker = new ReleaseChecker({
+    directory: app.getPath('userData'),
+    current: app.getVersion(),
+    fetchReleases: async () => {
+      const response = await net.fetch(RELEASES_API, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `PalmDesk/${app.getVersion()}`,
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error(`GitHub 返回 ${response.status}`);
+      return response.json();
+    },
+    onChange: (status) =>
+      sendToWindow(mainWindow, IPC_EVENT.response_releaseStatus, status),
+  });
+  releaseChecker.start();
+
   win.webContents.on('render-process-gone', () => {
     void captureSession.end();
   });
@@ -478,6 +499,7 @@ function main() {
     void captureSession.end();
     closeChildWindows();
     mainWindow = undefined;
+    releaseChecker.stop();
   });
 
   // 创建菜单
@@ -495,7 +517,7 @@ function main() {
         {
           label: '检查更新',
           click: () => {
-            sendToWindow(mainWindow, IPC_EVENT.response_open_version);
+            void releaseChecker.check(true);
           },
         },
 
@@ -545,6 +567,12 @@ function main() {
   winBounds = win.getBounds();
 
   handle(IPC_EVENT.getPlatform, 'any', () => ({ platform }));
+
+  handle(IPC_EVENT.releaseStatus, 'main', () => releaseChecker.settings());
+  handle(IPC_EVENT.releaseCheck, 'main', () => releaseChecker.check(true));
+  handle(IPC_EVENT.releaseConfigure, 'main', (data) =>
+    releaseChecker.configure(data.enabled)
+  );
 
   handle(IPC_EVENT.shellOpenExternal, 'any', async (data) => {
     // Never hand renderer-chosen schemes, files or hosts to the OS.
@@ -725,8 +753,7 @@ function main() {
 
   // The renderer names a window kind; size, route and identity stay here.
   handle(IPC_EVENT.createWindow, 'main', (data) => {
-    if (data.kind === 'about' || data.kind === 'version')
-      return createChildWindow(data.kind);
+    if (data.kind === 'about') return createChildWindow('about');
     if (data.kind === 'webrtc')
       return createChildWindow('webrtc', parseControllerSession(data.session));
     throw new Error('不支持打开此窗口');
