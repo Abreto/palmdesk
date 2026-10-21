@@ -166,8 +166,9 @@ test('a stuck request times out, close rejects waiting work, and a crash recover
   if (args[0] !== 'hang') parentPort.postMessage({ id, result: { ok: args[0] } });
 });`
   );
+  // The limit also covers starting a worker, which is slow on Windows runners.
   const reader = createWorkerSessionReader({}, file, {
-    request: 100,
+    request: 2000,
     idle: 60_000,
   });
   await assert.rejects(reader.read('hang'), /超时/);
