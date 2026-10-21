@@ -92,7 +92,7 @@ test('only Mach-O files are code: resources, short files and Java classes are sk
 test('nested code is signed inside out at its real path, finishing with the app', (t) => {
   const app = fixture(t);
   const targets = signingTargets(app).map(
-    (target) => path.relative(app, target) || '.'
+    (target) => path.relative(app, target).split(path.sep).join('/') || '.'
   );
   assert.deepEqual([...targets].sort(), [
     '.',
@@ -106,9 +106,7 @@ test('nested code is signed inside out at its real path, finishing with the app'
     'Contents/Resources/app.asar.unpacked/node_modules/libnut/libnut.node',
   ]);
   assert.equal(targets.at(-1), '.');
-  const depth = targets
-    .slice(0, -1)
-    .map((target) => target.split(path.sep).length);
+  const depth = targets.slice(0, -1).map((target) => target.split('/').length);
   assert.deepEqual(
     depth,
     [...depth].sort((a, b) => b - a)

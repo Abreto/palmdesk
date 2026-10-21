@@ -112,9 +112,11 @@ test('the certificate password reaches security only through stdin', (t) => {
   const directory = fs
     .readFileSync(path.join(temporary, 'github-env'), 'utf8')
     .match(/^PALMDESK_SIGNING_DIR=(.+)$/m)[1];
+  const quoted = (file) =>
+    `"${path.join(directory, file).replace(/[\\"]/g, '\\$&')}"`;
   assert.equal(
     imports[0].input,
-    `import "${path.join(directory, 'certificate.p12')}" -k "${path.join(directory, 'signing.keychain-db')}" -P "p\\"a\\\\ss $word" -x -T /usr/bin/codesign\n`
+    `import ${quoted('certificate.p12')} -k ${quoted('signing.keychain-db')} -P "p\\"a\\\\ss $word" -x -T /usr/bin/codesign\n`
   );
   assert.equal(fs.existsSync(directory), false);
 });

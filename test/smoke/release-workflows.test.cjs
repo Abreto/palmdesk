@@ -8,7 +8,13 @@ const workflows = Object.fromEntries(
   fs
     .readdirSync(directory)
     .filter((name) => /\.ya?ml$/.test(name))
-    .map((name) => [name, fs.readFileSync(path.join(directory, name), 'utf8')])
+    // Windows checkouts may use CRLF line endings.
+    .map((name) => [
+      name,
+      fs
+        .readFileSync(path.join(directory, name), 'utf8')
+        .replace(/\r\n/g, '\n'),
+    ])
 );
 
 // Splits a workflow into its top-level jobs by indentation.

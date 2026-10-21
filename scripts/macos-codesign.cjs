@@ -64,7 +64,8 @@ function signApp({
 }) {
   const targets = signingTargets(app);
   targets.forEach((target) => {
-    const identifier = identifiers[path.relative(app, target)];
+    const relative = path.relative(app, target).split(path.sep).join('/');
+    const identifier = identifiers[relative];
     run(
       'codesign',
       [

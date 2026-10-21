@@ -122,59 +122,66 @@ test('an archive is never extracted over files from an earlier attempt', (t) => 
   assert.equal(calls.length, 0);
 });
 
-test('the DMG keeps the build layout, adds Applications and marks the volume icon', (t) => {
-  const calls = [];
-  const { createDmg } = load(calls);
-  const { root, directory } = stage(t);
-  const output = path.join(root, 'out/PalmDesk-0.1.0-mac-arm64.dmg');
-  createDmg(directory, output, manifest);
-  assert.equal(fs.existsSync(path.join(directory, 'dmg.json')), false);
-  assert.equal(
-    fs.readlinkSync(path.join(directory, 'Applications')),
-    '/Applications'
-  );
-  const [create, attach, icon, detach, convert] = calls;
-  assert.deepEqual(create[1].slice(0, 9), [
-    'create',
-    '-volname',
-    'PalmDesk 0.1.0-arm64',
-    '-srcfolder',
-    directory,
-    '-fs',
-    'APFS',
-    '-format',
-    'UDRW',
-  ]);
-  const writable = create[1].at(-1);
-  assert.deepEqual(attach[1].slice(0, 5), [
-    'attach',
-    writable,
-    '-nobrowse',
-    '-noautoopen',
-    '-readwrite',
-  ]);
-  const mountpoint = attach[1].at(-1);
-  assert.deepEqual(icon, [
-    'xattr',
-    [
-      '-wx',
-      'com.apple.FinderInfo',
-      `${'00'.repeat(8)}0400${'00'.repeat(22)}`,
-      mountpoint,
-    ],
-  ]);
-  assert.deepEqual(detach, ['hdiutil', ['detach', mountpoint]]);
-  assert.deepEqual(convert[1], [
-    'convert',
-    writable,
-    '-format',
-    'UDZO',
-    '-imagekey',
-    'zlib-level=9',
-    '-ov',
-    '-o',
-    output,
-  ]);
-  assert.equal(fs.existsSync(mountpoint), false);
-  assert.equal(fs.existsSync(path.dirname(writable)), false);
-});
+// The DMG links /Applications, a macOS path.
+test(
+  'the DMG keeps the build layout, adds Applications and marks the volume icon',
+  {
+    skip: process.platform === 'win32',
+  },
+  (t) => {
+    const calls = [];
+    const { createDmg } = load(calls);
+    const { root, directory } = stage(t);
+    const output = path.join(root, 'out/PalmDesk-0.1.0-mac-arm64.dmg');
+    createDmg(directory, output, manifest);
+    assert.equal(fs.existsSync(path.join(directory, 'dmg.json')), false);
+    assert.equal(
+      fs.readlinkSync(path.join(directory, 'Applications')),
+      '/Applications'
+    );
+    const [create, attach, icon, detach, convert] = calls;
+    assert.deepEqual(create[1].slice(0, 9), [
+      'create',
+      '-volname',
+      'PalmDesk 0.1.0-arm64',
+      '-srcfolder',
+      directory,
+      '-fs',
+      'APFS',
+      '-format',
+      'UDRW',
+    ]);
+    const writable = create[1].at(-1);
+    assert.deepEqual(attach[1].slice(0, 5), [
+      'attach',
+      writable,
+      '-nobrowse',
+      '-noautoopen',
+      '-readwrite',
+    ]);
+    const mountpoint = attach[1].at(-1);
+    assert.deepEqual(icon, [
+      'xattr',
+      [
+        '-wx',
+        'com.apple.FinderInfo',
+        `${'00'.repeat(8)}0400${'00'.repeat(22)}`,
+        mountpoint,
+      ],
+    ]);
+    assert.deepEqual(detach, ['hdiutil', ['detach', mountpoint]]);
+    assert.deepEqual(convert[1], [
+      'convert',
+      writable,
+      '-format',
+      'UDZO',
+      '-imagekey',
+      'zlib-level=9',
+      '-ov',
+      '-o',
+      output,
+    ]);
+    assert.equal(fs.existsSync(mountpoint), false);
+    assert.equal(fs.existsSync(path.dirname(writable)), false);
+  }
+);
