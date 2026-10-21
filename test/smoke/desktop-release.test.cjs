@@ -61,7 +61,12 @@ function assets(t) {
   );
   for (const name of names)
     writeFileSync(path.join(root, name), `fixture ${name}`);
-  return { root, names };
+  const sbom = `PalmDesk-${manifest.version}-sbom.cdx.json`;
+  writeFileSync(
+    path.join(root, sbom),
+    JSON.stringify({ bomFormat: 'CycloneDX' })
+  );
+  return { root, names: [...names, sbom] };
 }
 
 test('release accepts an exact package version and a new tag', (t) => {
@@ -110,10 +115,12 @@ test('release assets match the builder names and include verifiable SHA256 hashe
   assert.deepEqual(await prepareReleaseAssets(root, manifest), names);
   const checksums = readFileSync(path.join(root, 'SHA256SUMS.txt'), 'utf8');
   for (const name of names) {
-    const digest = createHash('sha256').update(`fixture ${name}`).digest('hex');
+    const digest = createHash('sha256')
+      .update(readFileSync(path.join(root, name)))
+      .digest('hex');
     assert.ok(checksums.includes(`${digest}  ${name}\n`));
   }
-  assert.equal(checksums.trim().split('\n').length, 2);
+  assert.equal(checksums.trim().split('\n').length, 3);
 });
 
 for (const kind of [
@@ -123,6 +130,8 @@ for (const kind of [
   'Intel Mac installer',
   'empty',
   'directory',
+  'missing SBOM',
+  'invalid SBOM',
 ]) {
   test(`release refuses ${kind} assets before writing checksums`, async (t) => {
     const { root, names } = assets(t);
@@ -147,6 +156,9 @@ for (const kind of [
       rmSync(filename);
       mkdirSync(filename);
     }
+    if (kind === 'missing SBOM') rmSync(path.join(root, names[2]));
+    if (kind === 'invalid SBOM')
+      writeFileSync(path.join(root, names[2]), '{"bomFormat":"SPDX"}');
     await assert.rejects(prepareReleaseAssets(root, manifest));
     assert.equal(existsSync(path.join(root, 'SHA256SUMS.txt')), false);
   });
