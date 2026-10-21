@@ -71,7 +71,7 @@ Linux 暂无原生主机适配器，会拒绝捕获和输入。浏览器控制�
 
 从 [GitHub Releases](https://github.com/Abreto/palmdesk/releases) 下载 Apple Silicon Mac DMG 或 Windows x64 安装包。使用安装包无需安装 Node.js、pnpm 或开发工具。Mac 打开 DMG 后将 PalmDesk 拖入 Applications，Windows 运行安装向导；随后在手机网页扫码或输入设备凭据连接。
 
-暂不提供 Intel Mac 安装包。Mac 预览版在 macOS 15 构建，更早系统尚未验收；Windows 需要 Windows 10 1903 及以上 / Windows 11 x64，并具有可用的 Windows Graphics Capture。从 v0.0.3 起，macOS 使用固定自签名证书，尚无 Developer ID 签名和公证；Windows 安装包未签名。安装和发布说明见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
+暂不提供 Intel Mac 安装包。Mac 预览版需要 macOS 13 Ventura 及以上，在 macOS 15 构建，macOS 13 和 14 尚未验收；Windows 需要 Windows 10 1903 及以上 / Windows 11 x64，并具有可用的 Windows Graphics Capture。从 v0.0.3 起，macOS 使用固定自签名证书，尚无 Developer ID 签名和公证；Windows 安装包未签名。安装和发布说明见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
 
 ## 本地启动
 

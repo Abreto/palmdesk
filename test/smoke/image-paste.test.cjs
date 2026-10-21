@@ -190,11 +190,11 @@ function windowsDriver() {
       assert.deepEqual(bytes, image.bytes);
       return native;
     },
-    write: (value) => {
+    write: async (value) => {
       events.push('write');
       clipboardImage = value;
     },
-    read: () => {
+    read: async () => {
       events.push('read');
       return clipboardImage;
     },
@@ -235,8 +235,10 @@ test('a silent Windows clipboard write failure cannot paste old text or an old i
     },
   ]) {
     const { events, driver } = windowsDriver();
-    driver.write = () => events.push('write');
-    driver.read = () => contents;
+    driver.write = async () => {
+      events.push('write');
+    };
+    driver.read = async () => contents;
     await assert.rejects(
       pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
       /剪贴板.*手动重试/
@@ -245,10 +247,23 @@ test('a silent Windows clipboard write failure cannot paste old text or an old i
   }
 });
 
+test('a rejected clipboard write stops input before the paste shortcut', async () => {
+  const { events, driver } = windowsDriver();
+  driver.write = async () => {
+    events.push('write');
+    throw new Error('OpenClipboard failed');
+  };
+  await assert.rejects(
+    pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
+    /剪贴板.*手动重试/
+  );
+  assert.deepEqual(events, ['verifyImagePaste', 'write']);
+});
+
 test('a clipboard read failure stops input and permits a later explicit paste', async () => {
   const { events, driver } = windowsDriver();
   const read = driver.read;
-  driver.read = () => {
+  driver.read = async () => {
     throw new Error('clipboard is locked');
   };
   await assert.rejects(
@@ -407,11 +422,11 @@ test('clipboard write precedes the paste shortcut, and modifiers release even on
   };
   const driver = {
     decode: () => native,
-    write: (value) => {
+    write: async (value) => {
       assert.equal(value, native);
       events.push('write');
     },
-    read: () => native,
+    read: async () => native,
     press: async () => {
       events.push('paste');
       throw new Error('keyboard failed');
