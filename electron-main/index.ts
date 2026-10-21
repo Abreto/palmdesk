@@ -23,9 +23,13 @@ import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
 import { AgentLauncher } from './agent-launcher';
 import { assertUniqueApplicationIdentity } from './app-identity';
-import { CaptureSession, InputUnavailableError } from './capture-session';
 import {
-  pasteClipboardImage,
+  CaptureSession,
+  InputUnavailableError,
+  typeInChunks,
+} from './capture-session';
+import {
+  pasteMacClipboardImage,
   pasteWindowsClipboardImage,
   supportsImagePaste,
 } from './image-paste';
@@ -141,15 +145,26 @@ const captureSession = new CaptureSession(
       if (direction === 'left') return nutjs.mouse.scrollLeft(amount);
       return nutjs.mouse.scrollRight(amount);
     },
-    text: (value, source) =>
-      platform === 'win32'
-        ? nativeWindows.request('text', {
-            nativeId: source.nativeId,
-            ownerPid: source.ownerPid,
-            bundleId: source.bundleId,
-            text: value,
-          })
-        : nutjs.keyboard.type(value),
+    text: (value, source, current) => {
+      const target = {
+        nativeId: source.nativeId,
+        ownerPid: source.ownerPid,
+        bundleId: source.bundleId,
+      };
+      // Windows inserts the whole text in one SendInput batch after its own
+      // foreground check; macOS types chunks and re-checks focus in between.
+      if (platform === 'win32')
+        return nativeWindows.request(
+          'text',
+          { ...target, text: value },
+          current
+        );
+      return typeInChunks(value, current, {
+        type: (chunk) => nutjs.keyboard.type(chunk),
+        verifyFocus: () =>
+          nativeWindows.request('verifyFocus', target, current),
+      });
+    },
     keysDown: (keys) => nutjs.keyboard.pressKey(...keys),
     keysUp: (keys) => nutjs.keyboard.releaseKey(...keys),
     validKey: (key) =>
@@ -167,8 +182,10 @@ const captureSession = new CaptureSession(
           request: (command, target, current) =>
             nativeWindows.request(command, target, current),
         });
-      return pasteClipboardImage(image, current, {
+      return pasteMacClipboardImage(image, source, current, {
         ...clipboardDriver,
+        request: (command, target, current) =>
+          nativeWindows.request(command, target, current),
         press: () => nutjs.keyboard.pressKey(nutjs.Key.LeftCmd, nutjs.Key.V),
         release: () =>
           nutjs.keyboard.releaseKey(nutjs.Key.V, nutjs.Key.LeftCmd),
@@ -207,12 +224,20 @@ const captureSession = new CaptureSession(
   }
 );
 
+// Typing and image paste stop at their next check once the session ends;
+// still, never let a stuck input request keep the app from quitting.
+const QUIT_INPUT_TIMEOUT_MS = 3000;
 let quitting = false;
 app.on('before-quit', (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
-  void captureSession.end().finally(() => {
+  void Promise.race([
+    captureSession.end(),
+    new Promise((resolve) => {
+      setTimeout(resolve, QUIT_INPUT_TIMEOUT_MS);
+    }),
+  ]).finally(() => {
     nativeWindows.close();
     app.quit();
   });
@@ -1013,6 +1038,8 @@ app.on('ready', async () => {
   nutjs = require('@nut-tree-fork/nut-js');
   // Remote pointer events already arrive at the user's gesture cadence.
   nutjs.mouse.config.autoDelayMs = 0;
+  // nut-js otherwise waits 300 ms before every typed character and key press.
+  nutjs.keyboard.config.autoDelayMs = 0;
   powerMonitor.on('suspend', () => {
     windowMap.forEach((item) => {
       const windowId = item.id;
