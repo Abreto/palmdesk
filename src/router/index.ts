@@ -1,18 +1,8 @@
-import { isIPad, isMobile } from 'billd-utils';
 import { createRouter, createWebHashHistory } from 'vue-router';
 
 import Layout from '@/layout/index.vue';
 
 import type { RouteRecordRaw } from 'vue-router';
-
-export const commonRouterName = {
-  qrcodeLogin: 'qrcodeLogin',
-  notFound: 'notFound',
-};
-
-export const mobileRouterName = {
-  h5privatizationDeployment: 'h5privatizationDeployment',
-};
 
 export const routerName = {
   remote: 'remote',
@@ -22,16 +12,10 @@ export const routerName = {
   webrtc: 'webrtc',
   deviceManage: 'deviceManage',
   setting: 'setting',
-  privatizationDeployment: 'privatizationDeployment',
-
-  pull: 'pull',
-  push: 'push',
-  ...mobileRouterName,
-  ...commonRouterName,
+  notFound: 'notFound',
 };
 
-// 默认路由
-export const defaultRoutes: RouteRecordRaw[] = [
+const routes: RouteRecordRaw[] = [
   {
     name: routerName.home,
     path: '/',
@@ -56,11 +40,6 @@ export const defaultRoutes: RouteRecordRaw[] = [
     ],
   },
   {
-    name: routerName.privatizationDeployment,
-    path: '/privatizationDeployment',
-    redirect: { name: routerName.setting },
-  },
-  {
     name: routerName.webrtc,
     path: '/webrtc',
     component: () => import('@/views/webrtc/index.vue'),
@@ -76,55 +55,13 @@ export const defaultRoutes: RouteRecordRaw[] = [
     component: () => import('@/views/version/index.vue'),
   },
   {
-    name: mobileRouterName.h5privatizationDeployment,
-    path: '/h5/privatizationDeployment',
-    redirect: { name: routerName.setting },
+    path: '/:pathMatch(.*)*',
+    name: routerName.notFound,
+    component: () => import('@/views/notFound.vue'),
   },
 ];
 
-const router = createRouter({
-  routes: [
-    ...defaultRoutes,
-    {
-      path: '/:pathMatch(.*)*',
-      name: routerName.notFound,
-      component: () => import('@/views/notFound.vue'),
-    },
-  ],
+export default createRouter({
+  routes,
   history: createWebHashHistory(),
 });
-
-router.beforeEach((to, _from, next) => {
-  if (Object.keys(commonRouterName).includes(to.name as string)) {
-    // 跳转通用路由
-    return next();
-  } else if (isMobile() && !isIPad()) {
-    console.log('当前是移动端', to.name);
-    if (!Object.keys(mobileRouterName).includes(to.name as string)) {
-      console.log('当前移动端，但是跳转了非移动端路由');
-      if (to.name === routerName.privatizationDeployment) {
-        return next({
-          name: mobileRouterName.h5privatizationDeployment,
-        });
-      } else {
-        return next();
-      }
-    } else {
-      return next();
-    }
-  } else {
-    if (Object.keys(mobileRouterName).includes(to.name as string)) {
-      console.log('当前非移动端，但是跳转了移动端路由', to.name);
-      if (to.name === mobileRouterName.h5privatizationDeployment) {
-        return next({
-          name: routerName.privatizationDeployment,
-        });
-      } else {
-        return next();
-      }
-    }
-    return next();
-  }
-});
-
-export default router;

@@ -1,8 +1,6 @@
 import axios, { Axios, AxiosRequestConfig } from 'axios';
 
 import { AXIOS_BASEURL } from '@/constant';
-import { useUserStore } from '@/store/user';
-import { getToken } from '@/utils/localStorage/user';
 
 import { getAxiosBaseUrl } from './localStorage/app';
 
@@ -26,21 +24,6 @@ class MyAxios {
   constructor(config: AxiosRequestConfig) {
     // @ts-ignore
     this.instance = axios.create(config);
-
-    // 请求拦截器
-    this.instance.interceptors.request.use(
-      (cfg) => {
-        const token = getToken();
-        if (token) {
-          cfg.headers.Authorization = `Bearer ${token}`;
-        }
-        return cfg;
-      },
-      (error) => {
-        console.log(error);
-        return Promise.reject(error);
-      }
-    );
 
     // 响应拦截器
     this.instance.interceptors.response.use(
@@ -72,8 +55,6 @@ class MyAxios {
           if (statusCode === 401) {
             console.error(errorResponseData.message);
             window.$message.error(errorResponseData.message);
-            const userStore = useUserStore();
-            userStore.logout();
             return Promise.reject(errorResponseData);
           }
           if (statusCode === 403) {

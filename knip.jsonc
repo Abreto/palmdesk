@@ -1,0 +1,38 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  // src/main.ts is found through index.html.
+  "entry": [
+    "electron-main/index.ts",
+    "electron-main/preload.ts",
+    "electron-builder.cjs",
+    "scripts/*.{mjs,cjs}",
+    "session-core/index.mjs",
+    "session-core/test/*.mjs",
+    "test/smoke/*.{cjs,mjs}",
+  ],
+  "project": [
+    "src/**/*.{ts,vue}",
+    "electron-main/**/*.ts",
+    "session-core/**/*.mjs",
+    "scripts/**/*.{mjs,cjs}",
+    "test/**/*.{cjs,mjs,ts}",
+  ],
+  // The backend container runs on the pinned upstream server's dependencies.
+  "ignore": ["containers/**"],
+  "ignoreDependencies": [
+    // Imported from SCSS through css.preprocessorOptions in vite.config.ts.
+    "billd-scss",
+    // Named as a plugin in postcss.config.js.
+    "postcss-preset-env",
+    // Installed on demand for the manual browser smoke tests (#55).
+    "playwright",
+    "socket.io",
+  ],
+  // Browser smoke tests import these from the Vite dev server at run time.
+  "ignoreUnresolved": [
+    "/src/store/network/index.ts",
+    "/__qr/qr-scanner.min.js",
+  ],
+  // Windows-only command used by a manual native smoke test.
+  "ignoreBinaries": ["taskkill.exe"],
+}
