@@ -192,7 +192,9 @@ export async function getCodexSessionFileTimelinePage(
   }
 
   try {
-    const session = await parseCodexSessionFile(filePath, { indexEntry });
+    const parse = () => parseCodexSessionFile(filePath, { indexEntry });
+    // Timeline items come from the file alone; indexEntry only adds titles.
+    const session = await (options.parseCache ? options.parseCache(filePath, parse) : parse());
     return pageTimelineItems(session.timeline, { limit, cursor });
   } catch (error) {
     if (error instanceof SessionFileTooLargeError) throw error;
