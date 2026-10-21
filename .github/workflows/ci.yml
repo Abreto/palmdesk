@@ -37,6 +37,9 @@ jobs:
         run: pnpm build:native
       - name: Run source smoke tests
         run: pnpm test:smoke
+      - name: Check for unused files and dependencies
+        if: runner.os == 'Linux'
+        run: pnpm lint:unused
       # Interactive native smoke needs an unlocked desktop and runs manually;
       # see docs/LOCAL_DEVELOPMENT.md for the opt-in command.
       - run: pnpm typecheck

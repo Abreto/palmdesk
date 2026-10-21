@@ -46,12 +46,6 @@ module.exports = {
       NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },
-  linux: {
-    artifactName:
-      '${productName}-linux-${platform}-${version}-${arch}-installer.${ext}',
-    // amd是x64
-    target: [{ target: 'AppImage', arch: ['x64', 'arm64'] }],
-  },
   win: {
     extraResources: [
       {

@@ -260,4 +260,4 @@ Report bugs and suggestions through [PalmDesk Issues](https://github.com/Abreto/
 
 PalmDesk uses the [MIT license](LICENSE.txt), retaining upstream shuisheng's copyright notice and adding attribution to Abreto. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution and dependency notices.
 
-The preserved [upstream open-source README](README_OpenSource.md) describes upstream products, services, and Pro features; those are not PalmDesk's feature set. PalmDesk is an independent project and is not affiliated with OpenAI, Anthropic, or the BilldDesk maintainers.
+The [upstream repository](https://github.com/galaxy-s10/billd-desk) describes upstream products, services, and Pro features; those are not PalmDesk's feature set. PalmDesk is an independent project and is not affiliated with OpenAI, Anthropic, or the BilldDesk maintainers.
