@@ -626,6 +626,10 @@ import {
   applyRemoteVideoConstraints,
   desktopCaptureConstraints,
 } from '@/utils/remote-video';
+import {
+  changeTemporaryPassword,
+  type SessionEndReason,
+} from '@/utils/session-end';
 import { ReaderHost } from '@/utils/session-reader-channel';
 import { WindowCatalog } from '@/utils/window-catalog';
 import { WindowResumeStore } from '@/utils/window-resume';
@@ -1316,19 +1320,32 @@ async function handleUpdatePassword() {
   updatingPassword.value = true;
   try {
     const password = getRandomString(8);
-    const result = await fetchDeskUserUpdateByUuid({
-      uuid: cacheStore.deskUserUuid!,
-      password: originalPassword.value,
-      new_password: password,
+    const disconnected = await changeTemporaryPassword({
+      connected: () => [...networkStore.rtcMap.keys()],
+      update: async () => {
+        const result = await fetchDeskUserUpdateByUuid({
+          uuid: cacheStore.deskUserUuid!,
+          password: originalPassword.value,
+          new_password: password,
+        });
+        if (result.code !== 200) {
+          window.$message.error(result.message || '更新临时密码失败');
+          return false;
+        }
+        cacheStore.deskUserPassword = password;
+        deskUserPassword.value = password;
+        originalPassword.value = password;
+        return true;
+      },
+      disconnect: handleDel,
     });
-    if (result.code === 200) {
-      cacheStore.deskUserPassword = password;
-      deskUserPassword.value = password;
-      originalPassword.value = password;
-      window.$message.success('更新临时密码成功！');
-    } else {
-      window.$message.error(result.message || '更新临时密码失败');
-    }
+    if (disconnected === undefined) return;
+    stopCaptureStream();
+    window.$message.success(
+      disconnected
+        ? `临时密码已更新，已断开 ${disconnected} 个控制端`
+        : '更新临时密码成功！'
+    );
   } catch {
     window.$message.error('更新临时密码失败，请重试');
   } finally {
@@ -1902,7 +1919,7 @@ function handleCloseAll() {
   appStore.remoteDesk.clear();
 }
 
-function handleDel(sender) {
+function handleDel(sender: string, reason: SessionEndReason = 'explicit') {
   const peer = networkStore.rtcMap.get(sender);
   if (!peer) return;
   if (peer.cbDataChannel) stoppedPeers.add(peer.cbDataChannel);
@@ -1923,7 +1940,7 @@ function handleDel(sender) {
   peer.dataChannelSend({
     msgType: WsMsgTypeEnum.remoteSessionStopped,
     requestId: getRandomString(8),
-    data: {},
+    data: { reason },
   });
   if (captureOwner === sender) stopCaptureStream();
   // Allow the terminal notice to arrive before closing SCTP. Do not close a

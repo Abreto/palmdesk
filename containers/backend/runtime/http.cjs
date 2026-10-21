@@ -76,4 +76,19 @@ function deskPackets(socket, next) {
   next();
 }
 
-module.exports = { cors, errors, engineCors, deskPackets };
+// Wraps the upstream device router: once a password change succeeds, end
+// every session of that device so connected controllers must sign in again.
+// Routes match the way koa-router does: case-insensitive, optional trailing slash.
+function passwordChanges(sessions) {
+  return async (ctx, next) => {
+    await next();
+    const route = `${ctx.method} ${ctx.path.toLowerCase().replace(/\/$/, '')}`;
+    const { uuid, new_password: password } = ctx.request.body || {};
+    if (route === 'PUT /desk_user/update_by_uuid' && ctx.status === 200 && ctx.body?.code === 200 &&
+        typeof uuid === 'string' && typeof password === 'string') {
+      await sessions.endDevice(uuid, 'password-changed');
+    }
+  };
+}
+
+module.exports = { cors, errors, engineCors, deskPackets, passwordChanges };
