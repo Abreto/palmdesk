@@ -1,6 +1,8 @@
-# Codex Remote 修复与验证结果
+# Codex Remote 修复与验证结果（存档）
 
-日期：2026-09-07，Asia/Shanghai。工作区：`/Users/abreto/workspace/codex-remote`。基线为 `dcfe26a`，保留此前未提交修改；本轮没有提交或重置 Git。
+> 存档：这是项目仍名为 Codex Remote 时的验证记录，不代表当前实现、命令或支持范围。之后的验证见 [smoke-artifacts](../smoke-artifacts/)。
+
+日期：2026-09-07，Asia/Shanghai。基线为 `dcfe26a`，保留此前未提交修改；本轮没有提交或重置 Git。
 
 ## 结论
 
@@ -26,30 +28,30 @@
 | ICE 早到、DataChannel 丢包和连接清理不完整                       | 排队早到 ICE，使用有序可靠通道；关闭双向通道、tracks 和统计定时器                                           |
 | 主进程开发热重启与单实例锁存在竞争                               | Vite 等旧 Electron 进程退出后再启动新进程                                                                   |
 
-具体配置和启动说明见 [README](../README.md)、[本地开发](LOCAL_DEVELOPMENT.md) 和 [服务配置](SERVICE_CONFIGURATION.md)。
+具体配置和启动说明见 [README](../../README.md)、[本地开发](../LOCAL_DEVELOPMENT.md) 和 [服务配置](../SERVICE_CONFIGURATION.md)。
 
 ## 验证记录
 
-| 检查                     | 结果与证据                                                                                                                  |
-| ------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| 主进程和输入测试         | 40/40，含 29 项窗口身份/会话/输入测试与 11 项触摸/流生命周期测试；[TAP](smoke-artifacts/repair-unit-tests.tap)              |
-| 官方设备 API / Socket.IO | PASS；设备注册、正确/错误密码、接收方查询、远控鉴权、offer/answer/ICE 转发                                                  |
-| 浏览器完整业务链路       | 14 项 PASS；[结构化结果](smoke-artifacts/business-flow.json)                                                                |
-| 视频解码                 | 实际业务 WebRTC 收到 960 × 600 视频，并通过 canvas 像素采样检查；媒体源为合成 canvas                                        |
-| 中文与按键               | 中文多行文字、Enter、触摸点击/拖拽/释放/滚动、长按右键到达真实业务 IPC 调用点；系统驱动为测试替身                           |
-| 手机本地平移与只读       | 放大后的滑动改变本地 viewport，不发送主机输入；只读模式阻断输入并释放按住状态                                               |
-| 清理与重连               | 断开停止原 tracks，重连产生新 track ID；源消失关闭业务连接；设备历史可回到连接表单                                          |
-| 手机设置                 | 错误 URL 被拒绝，保存后页面重新加载且使用保存值                                                                             |
-| 响应式布局               | 390 × 844、844 × 390、1440 × 900 均无页面横向/纵向溢出，截图已检查                                                          |
-| 开发版 Electron          | 冷启动、后端连接、权限读取、无效会话输入拒绝、第二渲染器 IPC 拒绝；[结果](smoke-artifacts/desktop-shell.json)               |
-| 打包版 Electron          | 从应用目录直接启动，使用构建后的 `file:` 页面；同样通过冷启动、后端和 IPC 检查；[结果](smoke-artifacts/packaged-shell.json) |
-| Swift / 应用标识         | helper 编译成功，打包后为 arm64 Mach-O；两个应用的 bundle ID 已读取确认；开发副本 `codesign --verify --deep --strict` 通过  |
-| 静态检查                 | Vue TypeScript、修改范围 ESLint/Prettier、Electron 输出语法检查和 `git diff --check` 通过                                   |
-| 构建                     | Vite 前端、Electron 主进程/preload、纯 Web 生产构建及 macOS arm64 应用目录构建通过                                          |
+| 检查                     | 结果与证据                                                                                                                     |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| 主进程和输入测试         | 40/40，含 29 项窗口身份/会话/输入测试与 11 项触摸/流生命周期测试；[TAP](../smoke-artifacts/repair-unit-tests.tap)              |
+| 官方设备 API / Socket.IO | PASS；设备注册、正确/错误密码、接收方查询、远控鉴权、offer/answer/ICE 转发                                                     |
+| 浏览器完整业务链路       | 14 项 PASS；[结构化结果](../smoke-artifacts/business-flow.json)                                                                |
+| 视频解码                 | 实际业务 WebRTC 收到 960 × 600 视频，并通过 canvas 像素采样检查；媒体源为合成 canvas                                           |
+| 中文与按键               | 中文多行文字、Enter、触摸点击/拖拽/释放/滚动、长按右键到达真实业务 IPC 调用点；系统驱动为测试替身                              |
+| 手机本地平移与只读       | 放大后的滑动改变本地 viewport，不发送主机输入；只读模式阻断输入并释放按住状态                                                  |
+| 清理与重连               | 断开停止原 tracks，重连产生新 track ID；源消失关闭业务连接；设备历史可回到连接表单                                             |
+| 手机设置                 | 错误 URL 被拒绝，保存后页面重新加载且使用保存值                                                                                |
+| 响应式布局               | 390 × 844、844 × 390、1440 × 900 均无页面横向/纵向溢出，截图已检查                                                             |
+| 开发版 Electron          | 冷启动、后端连接、权限读取、无效会话输入拒绝、第二渲染器 IPC 拒绝；[结果](../smoke-artifacts/desktop-shell.json)               |
+| 打包版 Electron          | 从应用目录直接启动，使用构建后的 `file:` 页面；同样通过冷启动、后端和 IPC 检查；[结果](../smoke-artifacts/packaged-shell.json) |
+| Swift / 应用标识         | helper 编译成功，打包后为 arm64 Mach-O；两个应用的 bundle ID 已读取确认；开发副本 `codesign --verify --deep --strict` 通过     |
+| 静态检查                 | Vue TypeScript、修改范围 ESLint/Prettier、Electron 输出语法检查和 `git diff --check` 通过                                      |
+| 构建                     | Vite 前端、Electron 主进程/preload、纯 Web 生产构建及 macOS arm64 应用目录构建通过                                             |
 
-截图：[手机连接](smoke-artifacts/mobile-connect.png)、[手机控制](smoke-artifacts/mobile-controller.png)、[横屏](smoke-artifacts/mobile-landscape.png)、[桌面控制](smoke-artifacts/desktop-controller.png)、[手机设置](smoke-artifacts/mobile-settings.png)、[Electron 主窗口](smoke-artifacts/desktop-shell.png)。控制画面的 fixture 标记说明其为合成视频，不能当作 Codex 实拍。Electron 截图已隐藏连接密码。
+截图：[手机连接](../smoke-artifacts/mobile-connect.png)、[手机控制](../smoke-artifacts/mobile-controller.png)、[横屏](../smoke-artifacts/mobile-landscape.png)、[桌面控制](../smoke-artifacts/desktop-controller.png)、[手机设置](../smoke-artifacts/mobile-settings.png)、[Electron 主窗口](../smoke-artifacts/desktop-shell.png)。控制画面的 fixture 标记说明其为合成视频，不能当作 Codex 实拍。Electron 截图已隐藏连接密码。
 
-主进程热重启也已验证：文件变更后旧进程退出，新进程完成主窗口初始化，网页与后端继续正常响应；[重启证据](smoke-artifacts/development-restart.json)。
+主进程热重启也已验证：文件变更后旧进程退出，新进程完成主窗口初始化，网页与后端继续正常响应；[重启证据](../smoke-artifacts/development-restart.json)。
 
 测试环境为 macOS 26.6.2 / Apple Silicon、Electron 33.2.1、Node.js 22.16.0、本机 Chrome 和官方 BilldDesk 后端快照 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`。
 
@@ -84,7 +86,7 @@ node --check electron-dist/preload.mjs
 npm run build:prod
 ```
 
-浏览器与桌面外壳测试的 Playwright 环境设置见 [本地开发](LOCAL_DEVELOPMENT.md)。本次本地打包命令：
+浏览器与桌面外壳测试的 Playwright 环境设置见 [本地开发](../LOCAL_DEVELOPMENT.md)。本次本地打包命令：
 
 ```bash
 CSC_IDENTITY_AUTO_DISCOVERY=false ./node_modules/.bin/electron-builder \

@@ -169,7 +169,7 @@ GitHub Actions 配置包含 Linux、macOS、Windows 单元测试、类型检查�
 
 ## 验证边界与计划
 
-独立的浏览器集成烟测覆盖真实 Vue 页面、运行中的后端、Socket.IO、WebRTC 视频解码和输入 DataChannel，其中原生视频源与系统输入使用测试替身。它需要按 [浏览器与 Electron 烟测](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) 准备环境，不在 `pnpm test:smoke` 或源码检查 CI 中运行。历史结果见 [验证报告](docs/CODEX_REMOTE_REPAIR_RESULTS.md)，报告与截图中的 Codex Remote 是项目旧名称。
+独立的浏览器集成烟测覆盖真实 Vue 页面、运行中的后端、Socket.IO、WebRTC 视频解码和输入 DataChannel，其中原生视频源与系统输入使用测试替身。它需要按 [浏览器与 Electron 烟测](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) 准备环境，不在 `pnpm test:smoke` 或源码检查 CI 中运行。历史结果见 [存档的验证报告](docs/archive/2026-09-07-codex-remote-validation.md)，其中的 Codex Remote 是项目旧名称。
 
 单独的 Windows 原生测试验证真实窗口捕获与输入。[公网后端验证](docs/smoke-artifacts/public-backend-2026-09-08.md) 记录了打包版 Windows 主机的真实 WGC 视频和 Win32 输入，以及用户随后确认的手机实测成功；跨网络 TURN 行为尚未验证。
 
@@ -193,16 +193,16 @@ node scripts/dev.mjs --prepare-only
 
 ## 文档导航
 
-| 文档                                                | 内容                                             |
-| --------------------------------------------------- | ------------------------------------------------ |
-| [本地开发](docs/LOCAL_DEVELOPMENT.md)               | 后端准备、Windows 开发、烟测、应用身份和权限恢复 |
-| [服务配置](docs/SERVICE_CONFIGURATION.md)           | API、信令、扫码连接、HTTPS 和 TURN               |
-| [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)      | 安装包、签名、版本规则和发布流程                 |
-| [会话阅读](docs/GLASSLINE_INTEGRATION.md)           | 支持来源、读取限制、窗口关联和验证入口           |
-| [容器镜像](containers/README.md)                    | 网页与后端镜像、固定后端源码及部署适配层         |
-| [TURN 验证](docs/TURN_TESTING.md)                   | 强制中继与凭据续期验证                           |
-| [历史验证报告](docs/CODEX_REMOTE_REPAIR_RESULTS.md) | 历史测试结果及待验收项目                         |
-| [开源准备记录](docs/OPEN_SOURCE_READINESS.md)       | 历史依赖审计和稳定分发前提                       |
+| 文档                                           | 内容                                             |
+| ---------------------------------------------- | ------------------------------------------------ |
+| [本地开发](docs/LOCAL_DEVELOPMENT.md)          | 后端准备、Windows 开发、烟测、应用身份和权限恢复 |
+| [服务配置](docs/SERVICE_CONFIGURATION.md)      | API、信令、扫码连接、HTTPS 和 TURN               |
+| [桌面安装包与预发布](docs/DESKTOP_RELEASES.md) | 安装包、签名、版本规则和发布流程                 |
+| [会话阅读](docs/GLASSLINE_INTEGRATION.md)      | 支持来源、读取限制、窗口关联和验证入口           |
+| [容器镜像](containers/README.md)               | 网页与后端镜像、固定后端源码及部署适配层         |
+| [TURN 验证](docs/TURN_TESTING.md)              | 强制中继与凭据续期验证                           |
+| [验证记录](docs/smoke-artifacts/)              | 按日期记录的测试结果及待验收项目                 |
+| [开源准备记录](docs/OPEN_SOURCE_READINESS.md)  | 历史依赖审计和稳定分发前提                       |
 
 ## 贡献与许可证
 

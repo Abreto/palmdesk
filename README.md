@@ -211,7 +211,7 @@ GitHub Actions in the main repository can build the web client and the backend w
 
 ### Validation Coverage
 
-The separate browser integration smoke tests exercise real Vue pages, a running backend, Socket.IO, WebRTC video decoding, and the input DataChannel. Native video sources and system input use test doubles in those tests. They require the setup in the [development guide](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) and are not run by `pnpm test:smoke` or the source-check CI. Historical results are in the [validation report](docs/CODEX_REMOTE_REPAIR_RESULTS.md); references to Codex Remote in reports and screenshots use the project's former name.
+The separate browser integration smoke tests exercise real Vue pages, a running backend, Socket.IO, WebRTC video decoding, and the input DataChannel. Native video sources and system input use test doubles in those tests. They require the setup in the [development guide](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) and are not run by `pnpm test:smoke` or the source-check CI. Historical results are in the [archived validation report](docs/archive/2026-09-07-codex-remote-validation.md), written under the project's former name, Codex Remote.
 
 Separate Windows native tests verify real window capture and input. The [public backend verification](docs/smoke-artifacts/public-backend-2026-09-08.md) records a packaged Windows host with real WGC video and Win32 input, followed by user-confirmed testing from a physical phone. Cross-network TURN behavior remains unverified.
 
@@ -242,17 +242,17 @@ Set `SMOKE_PREVIEWS_ONLY=true` to check only previews from other Spaces and cont
 
 The detailed guides are currently in Chinese.
 
-| Guide                                                    | Contents                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [Chinese README](README.zh-CN.md)                        | Chinese project overview and usage instructions                                                |
-| [Local development](docs/LOCAL_DEVELOPMENT.md)           | Backend setup, browser and Electron smoke tests, application identity, and permission recovery |
-| [Service configuration](docs/SERVICE_CONFIGURATION.md)   | API and signaling addresses, QR connections, HTTPS deployment, and TURN                        |
-| [Desktop releases](docs/DESKTOP_RELEASES.md)             | Preview installers, signing, version rules and release workflow                                |
-| [Session reading](docs/GLASSLINE_INTEGRATION.md)         | Supported sources, reading limits, window associations and test setup                          |
-| [Container images](containers/README.md)                 | Web and backend images, pinned backend source and deployment adapter                           |
-| [TURN testing](docs/TURN_TESTING.md)                     | Forced-relay and credential-renewal verification                                               |
-| [Validation report](docs/CODEX_REMOTE_REPAIR_RESULTS.md) | Historical test results and remaining acceptance work                                          |
-| [Open-source readiness](docs/OPEN_SOURCE_READINESS.md)   | Historical dependency audit and release prerequisites                                          |
+| Guide                                                  | Contents                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| [Chinese README](README.zh-CN.md)                      | Chinese project overview and usage instructions                                                |
+| [Local development](docs/LOCAL_DEVELOPMENT.md)         | Backend setup, browser and Electron smoke tests, application identity, and permission recovery |
+| [Service configuration](docs/SERVICE_CONFIGURATION.md) | API and signaling addresses, QR connections, HTTPS deployment, and TURN                        |
+| [Desktop releases](docs/DESKTOP_RELEASES.md)           | Preview installers, signing, version rules and release workflow                                |
+| [Session reading](docs/GLASSLINE_INTEGRATION.md)       | Supported sources, reading limits, window associations and test setup                          |
+| [Container images](containers/README.md)               | Web and backend images, pinned backend source and deployment adapter                           |
+| [TURN testing](docs/TURN_TESTING.md)                   | Forced-relay and credential-renewal verification                                               |
+| [Validation records](docs/smoke-artifacts/)            | Dated test results and remaining acceptance work                                               |
+| [Open-source readiness](docs/OPEN_SOURCE_READINESS.md) | Historical dependency audit and release prerequisites                                          |
 
 ## Contributing and License
 
