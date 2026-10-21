@@ -10,6 +10,7 @@ import {
 } from "./claude-session-file.mjs";
 import { commandTokens, listAgentProcesses, processSession } from "./process-utils.mjs";
 import { resolveClaudeDesktopDataDirs } from "./claude-desktop-sessions.mjs";
+import { createSessionFileCache } from "./session-file-io.mjs";
 
 const CLAUDE_PROCESS_MATCHERS = [matchesClaudeCodeAgentProcess];
 
@@ -53,6 +54,7 @@ export function createClaudeCodeProvider(options = {}) {
         : options.claudeDesktopDataDir ? [options.claudeDesktopDataDir] : [],
       summaryOnly: true
     });
+  const parseCache = createSessionFileCache();
   const listProcesses =
     options.listAgentProcesses ??
     (() =>
@@ -128,6 +130,7 @@ export function createClaudeCodeProvider(options = {}) {
         return getClaudeSessionFileTimelinePage(id, {
           ...options,
           claudeConfigDir,
+          parseCache,
           sessionFilePath: location.filePath
         });
       }

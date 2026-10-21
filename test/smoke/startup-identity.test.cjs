@@ -117,6 +117,7 @@ test('startup validates identity before singleton handoff or loading the permiss
         },
       },
       './native-window': {
+        CapturePreviews: class {},
         nativeHelperPath: () => '/unused-native-helper',
         NativeWindowBridge: class {
           async request(command) {

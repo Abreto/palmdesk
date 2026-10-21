@@ -4,9 +4,12 @@ const load = require('./load-source.cjs');
 const { CaptureSession, InputUnavailableError, normalizedPoint } = load(
   'electron-main/capture-session.ts'
 );
-const { NativeWindowBridge, matchCaptureSources } = load(
-  'electron-main/native-window.ts'
-);
+const {
+  CapturePreviews,
+  NativeWindowBridge,
+  captureSourceOptions,
+  matchCaptureSources,
+} = load('electron-main/native-window.ts');
 
 const source = (extra = {}) => ({
   id: 'window:10:0',
@@ -27,7 +30,12 @@ const source = (extra = {}) => ({
   ...extra,
 });
 function harness() {
-  const state = { sources: [source()], events: [], focusCalls: 0 };
+  const state = {
+    sources: [source()],
+    events: [],
+    focusCalls: 0,
+    listOptions: [],
+  };
   const record =
     (name) =>
     async (...args) => {
@@ -46,7 +54,8 @@ function harness() {
   };
   state.session = new CaptureSession(
     driver,
-    async () => {
+    async (options) => {
+      state.listOptions.push(options);
       if (state.listError) throw state.listError;
       if (state.listWait) await state.listWait;
       if (state.listSequence?.length) return state.listSequence.shift();
@@ -241,6 +250,89 @@ test('a failed or partial native preview batch preserves the window list', async
   bridge.request = () =>
     Promise.reject(new Error('ScreenCaptureKit unavailable'));
   assert.equal(await bridge.addThumbnails(sources), sources);
+});
+test('window previews are generated only while no window is captured', async () => {
+  const h = harness();
+  await h.session.refresh();
+  await h.session.begin('window:10:0');
+  await h.session.refresh();
+  await h.session.end();
+  await h.session.refresh({ previews: false });
+  await h.session.refresh();
+  assert.deepEqual(
+    h.listOptions.map((options) => options.previews),
+    [true, false, false, false, true]
+  );
+});
+test('listing without previews skips thumbnails and icons but keeps the last ones', () => {
+  assert.deepEqual(
+    { ...captureSourceOptions(true) },
+    {
+      types: ['window'],
+      thumbnailSize: { width: 320, height: 180 },
+      fetchWindowIcons: true,
+    }
+  );
+  assert.deepEqual(
+    { ...captureSourceOptions(false) },
+    {
+      types: ['window'],
+      thumbnailSize: { width: 0, height: 0 },
+      fetchWindowIcons: false,
+    }
+  );
+  const previews = new CapturePreviews();
+  const listed = previews.apply(
+    [source({ thumbnail: 'data:image/jpeg;base64,b2xk', appIcon: 'icon' })],
+    true
+  );
+  assert.equal(listed[0].thumbnail, 'data:image/jpeg;base64,b2xk');
+  const moved = source({ bounds: { x: 0, y: 0, width: 300, height: 200 } });
+  const opened = source({ id: 'window:11:0', nativeId: 11 });
+  const [kept, added] = previews.apply([moved, opened], false);
+  assert.equal(kept.thumbnail, 'data:image/jpeg;base64,b2xk');
+  assert.equal(kept.appIcon, 'icon');
+  assert.deepEqual(kept.bounds, moved.bounds);
+  assert.equal(added.thumbnail, '');
+});
+test('input checks overtake waiting lists and diagnostics, never a running command', async () => {
+  const bridge = new NativeWindowBridge('unused', 'darwin');
+  const order = [];
+  let finish;
+  bridge.dispatch = (command) => {
+    order.push(command);
+    if (command !== 'list' || finish) return Promise.resolve(command);
+    return new Promise((resolve) => {
+      finish = () => resolve(command);
+    });
+  };
+  const running = bridge.request('list');
+  await tick();
+  const commands = [
+    'diagnostics',
+    'thumbnails',
+    'focus',
+    'list',
+    'text',
+    'pasteImage',
+  ];
+  const waiting = commands.map((command) => bridge.request(command));
+  await tick();
+  assert.deepEqual(order, ['list']);
+  finish();
+  assert.deepEqual(await Promise.all([running, ...waiting]), [
+    'list',
+    ...commands,
+  ]);
+  assert.deepEqual(order, [
+    'list',
+    'focus',
+    'text',
+    'pasteImage',
+    'diagnostics',
+    'thumbnails',
+    'list',
+  ]);
 });
 test('viewing an available window and refreshing the all-Spaces list do not change focus', async () => {
   const h = harness();
