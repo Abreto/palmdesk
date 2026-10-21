@@ -1,7 +1,7 @@
 const http = require('node:http');
 const { readConfig } = require('./config.cjs');
 const { initializeDatabase } = require('./init.cjs');
-const { cors, errors, engineCors, deskPackets } = require('./http.cjs');
+const { cors, errors, engineCors, deskPackets, passwordChanges } = require('./http.cjs');
 const { createDeskSessions } = require('./desk-sessions.cjs');
 const { createTurnService, iceRoute } = require('./turn.cjs');
 
@@ -46,6 +46,7 @@ async function main() {
     ctx.body = { status: 'ok' };
   });
   app.use(bodyParser({ enableTypes: ['json'], jsonLimit: '64kb' }));
+  app.use(passwordChanges(sessions));
   app.use(iceRoute({ sessions, turn, redis: redisClient }));
   app.use(deskRouter.routes());
   app.use(deskRouter.allowedMethods());

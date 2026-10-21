@@ -23,6 +23,15 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
     await redis.del(session.members.flatMap((member) => [tokenKey(member.token), `palmdesk:ice:${id}:${member.socketId}`]));
   }
 
+  // A new password must remove everyone, not only block new connections.
+  async function endDevice(device, reason) {
+    const ids = [...active.values()]
+      .filter((session) => session.members.some((member) => member.device === device))
+      .map((session) => session.id);
+    await Promise.all(ids.map((id) => end(id, reason)));
+    return ids.length;
+  }
+
   function current(member) {
     const socket = socketFor(member.socketId);
     return socket?.connected && socket.data.desk?.device === member.device &&
@@ -168,7 +177,7 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
       }
     });
   }
-  return { attach, authorize, end };
+  return { attach, authorize, end, endDevice };
 }
 
 module.exports = { createDeskSessions };
