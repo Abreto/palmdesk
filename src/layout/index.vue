@@ -101,6 +101,7 @@
       </div>
     </nav>
     <div class="view">
+      <ReleaseBanner v-if="ipcRenderer" />
       <RouterView></RouterView>
     </div>
     <div
@@ -143,6 +144,7 @@ import palmdeskMark from '@/assets/img/palmdesk-mark.svg';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
+import type { IReleaseStatus } from '@/interface';
 import { routerName } from '@/router';
 import { useAppStore } from '@/store/app';
 import {
@@ -173,6 +175,7 @@ onMounted(() => {
 });
 
 async function init() {
+  if (ipcRenderer) void loadReleaseStatus();
   const res = await ipcRendererInvoke({
     windowId: WINDOW_ID_ENUM.remote,
     channel: IPC_EVENT.getPlatform,
@@ -200,9 +203,30 @@ ipcRendererOn(IPC_EVENT.response_open_about, () => {
   openWindow(routerName.about);
 });
 
-ipcRendererOn(IPC_EVENT.response_open_version, () => {
-  openWindow(routerName.version);
+// Report the result of a check the user asked for; automatic checks only
+// show the banner.
+ipcRendererOn(IPC_EVENT.response_releaseStatus, ({ data }) => {
+  const release = data as unknown as IReleaseStatus;
+  appStore.release = release;
+  if (!release.manual || release.checking) return;
+  if (release.error) window.$message.error('检查更新失败，请稍后重试');
+  else if (!release.available)
+    window.$message.success(`已是最新版本 v${release.current}`);
 });
+
+async function loadReleaseStatus() {
+  try {
+    const result = await ipcRendererInvoke({
+      windowId: WINDOW_ID_ENUM.remote,
+      channel: IPC_EVENT.releaseStatus,
+      requestId: getRandomString(8),
+      data: {},
+    });
+    if (result?.code === 0) appStore.release = result.data;
+  } catch {
+    // Without a status the banner stays hidden; nothing else depends on it.
+  }
+}
 
 function handleOpenDebug() {
   if (clickNum.value < 5) {

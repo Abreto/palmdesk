@@ -55,6 +55,34 @@
           role="switch"
           aria-label="窗口置顶"
       /></label>
+      <label class="toggle"
+        ><span
+          ><strong>自动检查更新</strong
+          ><small
+            >每天向 GitHub 查询新版本，只提示，不会自动下载或安装</small
+          ></span
+        ><input
+          :checked="appStore.release?.enabled"
+          :disabled="!appStore.release || releaseBusy"
+          type="checkbox"
+          class="pd-switch"
+          role="switch"
+          aria-label="自动检查更新"
+          @change="configureRelease"
+      /></label>
+      <div class="release-check">
+        <span>{{ releaseSummary }}</span>
+        <button
+          type="button"
+          class="pd-icon-button"
+          title="立即检查更新"
+          aria-label="立即检查更新"
+          :disabled="!appStore.release || appStore.release.checking"
+          @click="checkRelease"
+        >
+          <RefreshOutline />
+        </button>
+      </div>
     </section>
     <section class="pd-card about-card">
       <div class="about-brand">
@@ -97,9 +125,11 @@ import {
   LaptopOutline,
   OpenOutline,
   PhonePortraitOutline,
+  RefreshOutline,
   ServerOutline,
 } from '@vicons/ionicons5';
-import { ref, watch } from 'vue';
+import { getRandomString } from 'billd-utils';
+import { computed, ref, watch } from 'vue';
 
 import {
   AXIOS_BASEURL,
@@ -110,10 +140,11 @@ import {
   WEBSOCKET_URL,
   WINDOW_ID_ENUM,
 } from '@/constant';
+import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
 import { useAppStore } from '@/store/app';
 import { usePiniaCacheStore } from '@/store/cache';
-import { ipcRenderer } from '@/utils';
+import { ipcRenderer, ipcRendererInvoke } from '@/utils';
 import {
   getAxiosBaseUrl,
   getClientUrl,
@@ -127,6 +158,44 @@ const appStore = useAppStore();
 const cacheStore = usePiniaCacheStore();
 const showUrlModal = ref(false);
 const { handleOpenExternal, handlesetAlwaysOnTop } = useIpcRendererSend();
+const releaseBusy = ref(false);
+const releaseSummary = computed(() => {
+  const release = appStore.release;
+  if (!release) return '';
+  if (release.checking) return '正在检查更新…';
+  if (release.available && release.latest)
+    return `新版本 v${release.latest.version} 已发布`;
+  if (release.error) return `上次检查失败，当前版本 v${release.current}`;
+  if (release.checkedAt)
+    return `已是最新版本 v${release.current}，${new Date(release.checkedAt).toLocaleString()} 检查`;
+  return `当前版本 v${release.current}`;
+});
+
+async function releaseRequest(channel: string, data = {}) {
+  const result = await ipcRendererInvoke({
+    windowId: WINDOW_ID_ENUM.remote,
+    channel,
+    requestId: getRandomString(8),
+    data,
+  });
+  if (result?.code === 0) appStore.release = result.data;
+  else window.$message.error(result?.msg || '无法更新检查设置');
+}
+
+async function configureRelease(event: Event) {
+  releaseBusy.value = true;
+  try {
+    await releaseRequest(IPC_EVENT.releaseConfigure, {
+      enabled: (event.target as HTMLInputElement).checked,
+    });
+  } finally {
+    releaseBusy.value = false;
+  }
+}
+
+function checkRelease() {
+  void releaseRequest(IPC_EVENT.releaseCheck);
+}
 function openProject(url: string) {
   handleOpenExternal({
     windowId: WINDOW_ID_ENUM.remote,
@@ -201,6 +270,18 @@ dd {
   font-family: var(--pd-mono);
   font-size: 12px;
   user-select: text;
+}
+.release-check {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 12px;
+  color: var(--pd-muted);
+  font-size: 12px;
+}
+.toggle + .toggle {
+  margin-top: 16px;
 }
 .toggle {
   display: flex;
