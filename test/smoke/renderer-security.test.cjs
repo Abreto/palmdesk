@@ -178,6 +178,24 @@ test('permissions are denied unless a trusted PalmDesk page needs them', () => {
     false
   );
   assert.equal(isPermissionAllowed('media', controller), false);
+  assert.equal(
+    isPermissionAllowed('display-capture', { ...host, mediaTypes: ['video'] }),
+    true
+  );
+  assert.equal(
+    isPermissionAllowed('display-capture', {
+      ...host,
+      mediaTypes: ['video', 'audio'],
+    }),
+    false
+  );
+  assert.equal(
+    isPermissionAllowed('display-capture', {
+      ...controller,
+      mediaTypes: ['video'],
+    }),
+    false
+  );
   ['clipboard-read', 'clipboard-sanitized-write', 'fullscreen'].forEach(
     (permission) => {
       assert.equal(isPermissionAllowed(permission, controller), true);
@@ -189,7 +207,6 @@ test('permissions are denied unless a trusted PalmDesk page needs them', () => {
     'notifications',
     'openExternal',
     'pointerLock',
-    'display-capture',
     'midiSysex',
     'unknown',
   ].forEach((permission) =>

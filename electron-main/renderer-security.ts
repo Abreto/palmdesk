@@ -106,7 +106,10 @@ export type RendererPermissionRequest = {
   trusted: boolean;
   /** The request comes from the host window that owns capture and input. */
   mainWindow: boolean;
-  /** Camera/microphone devices requested; desktop capture requests none. */
+  /**
+   * For `media`, the camera/microphone devices requested; desktop capture
+   * requests none. For `display-capture`, the display video/audio requested.
+   */
   mediaTypes?: readonly string[];
 };
 
@@ -121,9 +124,12 @@ export function isPermissionAllowed(
   if (!request.trusted) return false;
   switch (permission) {
     case 'media':
-      // Desktop capture selects a window source and requests no device.
-      // Cameras and microphones are never used by the desktop app.
+      // Before Electron 45, window capture arrives as `media` without
+      // devices. Cameras and microphones are never used by the desktop app.
       return request.mainWindow && !request.mediaTypes?.length;
+    case 'display-capture':
+      // Electron 45 and later report window capture here; video only.
+      return request.mainWindow && !request.mediaTypes?.includes('audio');
     case 'clipboard-read':
     case 'clipboard-sanitized-write':
     case 'fullscreen':

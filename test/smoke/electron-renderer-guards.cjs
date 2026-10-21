@@ -182,10 +182,26 @@ app
     assert.equal(page.inlineScript, 'script-src-elem');
     assert.equal(page.eval, 'EvalError');
     assert.equal(page.desktopCapture, 'NotAllowedError');
-    // Desktop capture asks for "media" without camera or microphone devices.
-    assert.deepEqual(permissions, [
-      { permission: 'media', mediaTypes: [], trusted: true },
-    ]);
+    // The policy must allow the request desktop capture actually makes (its
+    // name changed in Electron 45), and only for the host window.
+    assert.equal(permissions.length, 1);
+    const [capture] = permissions;
+    assert.equal(capture.trusted, true);
+    const request = { trusted: true, mediaTypes: capture.mediaTypes };
+    assert.equal(
+      security.isPermissionAllowed(capture.permission, {
+        ...request,
+        mainWindow: true,
+      }),
+      true
+    );
+    assert.equal(
+      security.isPermissionAllowed(capture.permission, {
+        ...request,
+        mainWindow: false,
+      }),
+      false
+    );
     assert.deepEqual(navigations, [
       { url: 'https://example.com/', allowed: false },
     ]);
