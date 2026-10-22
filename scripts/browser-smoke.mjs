@@ -17,12 +17,12 @@ const suites = [
   { scripts: ['credential-visibility.mjs', 'mobile-resume.mjs'] },
   {
     config: 'test/smoke/image-paste.vite.mjs',
-    port: 5196,
+    page: 'http://127.0.0.1:5196/test/smoke/image-paste.html',
     scripts: ['image-paste-browser.mjs', 'viewport-gestures-browser.mjs'],
   },
   {
     config: 'test/smoke/agent-launch.vite.mjs',
-    port: 5197,
+    page: 'http://127.0.0.1:5197/test/smoke/agent-launch.html',
     scripts: ['agent-launch-browser.mjs'],
   },
 ];
@@ -52,7 +52,7 @@ function run(script, env) {
   });
 }
 
-async function serve(config, port) {
+async function serve(config, page) {
   const vite = path.join(
     path.dirname(require.resolve('vite/package.json')),
     'bin/vite.js'
@@ -66,16 +66,16 @@ async function serve(config, port) {
     if (server.exitCode !== null)
       throw new Error(`The Vite server for ${config} exited.`);
     try {
-      // Any HTTP response means the server is listening.
-      await fetch(`http://127.0.0.1:${port}/`);
-      return server;
+      // Loading the fixture page also prepares its modules.
+      if ((await fetch(page)).ok) return server;
     } catch {
-      if (Date.now() > deadline) {
-        server.kill();
-        throw new Error(`The Vite server for ${config} did not start.`);
-      }
-      await delay(250);
+      // Not listening yet.
     }
+    if (Date.now() > deadline) {
+      server.kill();
+      throw new Error(`The Vite server for ${config} did not start.`);
+    }
+    await delay(250);
   }
 }
 
@@ -92,7 +92,7 @@ if (!existsSync(path.join(root, 'dist/index.html')))
 const env = { ...process.env, SMOKE_BROWSER_EXECUTABLE: browserExecutable() };
 const failed = [];
 for (const suite of suites) {
-  const server = suite.config && (await serve(suite.config, suite.port));
+  const server = suite.config && (await serve(suite.config, suite.page));
   try {
     for (const script of suite.scripts) {
       console.log(`\n# ${script}`);
