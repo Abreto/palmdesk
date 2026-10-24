@@ -25,7 +25,7 @@ if (process.platform === 'darwin') {
   const signer = process.env.CSC_NAME?.trim() || '-';
   const version = JSON.stringify({
     electron: require('electron/package.json').version,
-    revision: 3,
+    revision: 4,
     appId: identity.appId,
     productName: identity.productName,
     signer,
@@ -71,6 +71,9 @@ if (process.platform === 'darwin') {
         'Focus the selected application window for remote input.',
       NSScreenCaptureUsageDescription:
         'Share the selected application window with your phone.',
+      // Required by desktopCapturer on macOS 14.2+; no audio is recorded.
+      NSAudioCaptureUsageDescription:
+        'PalmDesk shares window video only and never records audio.',
     });
     const frameworks = path.join(target, 'Contents/Frameworks');
     const helpers = await readdir(frameworks, { withFileTypes: true });

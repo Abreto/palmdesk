@@ -603,7 +603,7 @@ export const useWebsocket = () => {
     ws.socketIo.on(
       WsMsgTypeEnum.billdDeskBehavior,
       (data: WsBilldDeskBehaviorType['data']) => {
-        console.log('收到billdDeskBehavior', data);
+        console.log('收到billdDeskBehavior', data?.type);
       }
     );
 

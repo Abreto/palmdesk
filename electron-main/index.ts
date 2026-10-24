@@ -1,29 +1,30 @@
 import { mkdirSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import path from 'path';
 import { platform } from 'process';
 
 import {
   app,
   BrowserWindow,
-  clipboard,
   desktopCapturer,
   dialog,
   ipcMain,
   Menu,
   nativeImage,
+  net,
   powerMonitor,
-  powerSaveBlocker,
   screen,
+  session,
   shell,
   systemPreferences,
 } from 'electron';
 
 import { IPC_EVENT } from '../src/event';
-import { WINDOW_ID_ENUM } from '../src/pure-constant';
 
 import { AgentLauncher } from './agent-launcher';
 import { assertUniqueApplicationIdentity } from './app-identity';
 import { CaptureSession, InputUnavailableError } from './capture-session';
+import { readClipboardImage, writeClipboardImage } from './clipboard-image';
 import {
   pasteClipboardImage,
   pasteWindowsClipboardImage,
@@ -37,10 +38,18 @@ import {
   enableWindowsCapture,
   discoverAgents,
 } from './native-window';
+import { ReleaseChecker, RELEASES_API } from './release-check';
+import {
+  externalLinkUrl,
+  isAppDocumentUrl,
+  isPermissionAllowed,
+  parseControllerSession,
+} from './renderer-security';
 import { DesktopSessionReader } from './session-reader';
 
 import type { ApplicationIdentity } from './app-identity';
 import type { NativeApplication, NativeWindow } from './native-window';
+import type { ControllerSession } from './renderer-security';
 import type { nutjsTs } from './types';
 import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
@@ -66,9 +75,6 @@ if (platform === 'darwin') {
   console.log(`运行在: ${platform}上`);
 }
 
-// https://www.electronjs.org/zh/docs/latest/tutorial/security#%E9%9A%94%E7%A6%BB%E4%B8%8D%E5%8F%97%E4%BF%A1%E4%BB%BB%E7%9A%84%E5%86%85%E5%AE%B9
-process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true';
-
 process.env.DIST = path.join(__dirname, '../dist');
 process.env.VITE_PUBLIC = app.isPackaged
   ? process.env.DIST
@@ -85,8 +91,20 @@ app.setPath('sessionData', userData);
 
 const windowNormalParams = { width: 960, height: 720 };
 let winBounds: Electron.Rectangle | null;
-const mainWindowId = WINDOW_ID_ENUM.remote;
-const windowMap = new Map<number, BrowserWindow>();
+let mainWindow: BrowserWindow | undefined;
+type ChildWindowKind = 'about' | 'webrtc';
+const childWindows = new Map<BrowserWindow, ChildWindowKind>();
+// Credentials for each controller window; its page takes them once after loading.
+const controllerSessions = new WeakMap<
+  Electron.WebContents,
+  ControllerSession
+>();
+// Only this document, in a PalmDesk window, may use IPC or navigate.
+const appEntryUrl =
+  process.env.VITE_DEV_SERVER_URL ||
+  pathToFileURL(path.join(process.env.DIST as string, 'index.html')).href;
+const isAppUrl = (url: string) =>
+  isAppDocumentUrl(url, appEntryUrl, platform === 'win32');
 const nativeWindows = new NativeWindowBridge(
   nativeHelperPath(
     platform,
@@ -158,8 +176,8 @@ const captureSession = new CaptureSession(
     pasteImage: (image, source, current) => {
       const clipboardDriver = {
         decode: (bytes) => nativeImage.createFromBuffer(Buffer.from(bytes)),
-        write: (value) => clipboard.writeImage(value),
-        read: () => clipboard.readImage(),
+        write: writeClipboardImage,
+        read: readClipboardImage,
       };
       if (platform === 'win32')
         return pasteWindowsClipboardImage(image, source, current, {
@@ -218,164 +236,270 @@ app.on('before-quit', (event) => {
   });
 });
 
-async function createWindow({
-  windowId,
-  width,
-  height,
-  minWidth,
-  minHeight,
-  route,
-  query,
-  x,
-  y,
-  useWorkAreaSize,
-  frame,
-}) {
-  let w = width || windowNormalParams.width;
-  let h = height || windowNormalParams.height;
-  const workAreaSize = screen.getPrimaryDisplay().workAreaSize;
+// Keep every page on the bundled app: no new windows, no navigation
+// elsewhere and no <webview>. Allowed links open in the system browser.
+app.on('web-contents-created', (_event, contents) => {
+  contents.setWindowOpenHandler(({ url }) => {
+    const external = externalLinkUrl(url);
+    if (external) void shell.openExternal(external);
+    return { action: 'deny' };
+  });
+  contents.on('will-frame-navigate', (event) => {
+    // DevTools, available only in development, navigates its own frames.
+    if (!isAppUrl(event.url) && !event.url.startsWith('devtools://'))
+      event.preventDefault();
+  });
+  contents.on('will-attach-webview', (event) => event.preventDefault());
+});
 
-  if (useWorkAreaSize) {
-    w = workAreaSize.width;
-    h = workAreaSize.height;
+function secureWebPreferences(): Electron.WebPreferences {
+  return {
+    preload: path.join(__dirname, 'preload.mjs'),
+    sandbox: true,
+    contextIsolation: true,
+    nodeIntegration: false,
+    webviewTag: false,
+    devTools: !app.isPackaged,
+  };
+}
+
+function loadApp(win: BrowserWindow, route?: string) {
+  if (process.env.VITE_DEV_SERVER_URL)
+    return win.loadURL(
+      route
+        ? `${process.env.VITE_DEV_SERVER_URL}#/${route}`
+        : process.env.VITE_DEV_SERVER_URL
+    );
+  return win.loadFile(
+    path.join(process.env.DIST as string, 'index.html'),
+    route ? { hash: route } : undefined
+  );
+}
+
+const CHILD_WINDOWS: Record<
+  ChildWindowKind,
+  {
+    width?: number;
+    height?: number;
+    minWidth?: number;
+    minHeight?: number;
+    useWorkAreaSize?: boolean;
+    singleton?: boolean;
   }
-  let xx = x;
-  let yy = y;
-  if (x === undefined && y === undefined) {
-    // 计算居中位置
-    xx = Math.round((workAreaSize.width - w) / 2);
-    yy = Math.round((workAreaSize.height - h) / 2);
+> = {
+  about: { width: 550, height: 380, singleton: true },
+  webrtc: { minWidth: 300, minHeight: 300, useWorkAreaSize: true },
+};
+
+function createChildWindow(
+  kind: ChildWindowKind,
+  controllerSession?: ControllerSession
+) {
+  const spec = CHILD_WINDOWS[kind];
+  const existing = spec.singleton
+    ? [...childWindows].find(([, value]) => value === kind)?.[0]
+    : undefined;
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
   }
+  const workAreaSize = screen.getPrimaryDisplay().workAreaSize;
+  const w = spec.useWorkAreaSize
+    ? workAreaSize.width
+    : spec.width || windowNormalParams.width;
+  const h = spec.useWorkAreaSize
+    ? workAreaSize.height
+    : spec.height || windowNormalParams.height;
   const win = new BrowserWindow({
     width: w,
     height: h,
-    minWidth: minWidth || w,
-    minHeight: minHeight || h,
+    minWidth: spec.minWidth || w,
+    minHeight: spec.minHeight || h,
     autoHideMenuBar: true,
-    x: xx,
-    y: yy,
+    // 计算居中位置
+    x: Math.round((workAreaSize.width - w) / 2),
+    y: Math.round((workAreaSize.height - h) / 2),
     icon: path.join(__dirname, '../public/favicon.ico'),
-    webPreferences: {
-      devTools: true,
-      // nodeIntegration: true, // 在网页中集成Node
-      preload: path.join(__dirname, 'preload.mjs'),
-    },
-    frame,
+    webPreferences: secureWebPreferences(),
+    frame: true,
   });
-
-  windowMap.set(windowId, win);
-  let url = '';
-  const params = `${(route ? route : '') as string}${handleUrlQuery({
-    windowId: `${windowId as number}`,
-    ...query,
-  })}`;
-  if (process.env.VITE_DEV_SERVER_URL) {
-    url = `${process.env.VITE_DEV_SERVER_URL as string}#/${params}`;
-    await win.loadURL(url);
-  } else {
-    url = `${path.join(process.env.DIST as string, 'index.html')}#/${params}`;
-    await win.loadFile(
-      `${path.join(process.env.DIST as string, 'index.html')}`,
-      {
-        hash: route
-          ? `${route as string}${handleUrlQuery({
-              windowId: `${windowId as number}`,
-              ...query,
-            })}`
-          : undefined,
-      }
-    );
-  }
-  win.on('close', () => {
-    console.log('close', windowId);
-    winWebContentsSend({
-      windowId,
-      channel: IPC_EVENT.response_closeWindow,
-      requestId: '',
-      data: { windowId },
-      code: 0,
-    });
-  });
+  childWindows.set(win, kind);
+  if (controllerSession)
+    controllerSessions.set(win.webContents, controllerSession);
   win.on('closed', () => {
-    console.log('closed', windowId);
-    win.removeAllListeners();
-    windowMap.delete(windowId);
-    winWebContentsSend({
-      windowId,
-      channel: IPC_EVENT.response_closeWindowed,
-      requestId: '',
-      data: { windowId },
-      code: 0,
-    });
+    childWindows.delete(win);
+  });
+  loadApp(win, kind).catch((error) => {
+    console.error('[PalmDesk] window failed to load', kind, error);
   });
 }
 
-function winWebContentsSend(data: IIpcRendererData) {
-  const win = windowMap.get(data.windowId);
-  if (win && !win?.isDestroyed()) {
-    win.webContents.send(data.channel, data);
-  }
+function closeChildWindows() {
+  childWindows.forEach((_kind, win) => {
+    if (!win.isDestroyed()) win.close();
+  });
+  childWindows.clear();
 }
 
-function handleUrlQuery(obj: Record<string, string>) {
-  const query = new URLSearchParams(obj).toString();
-  return query ? `?${query}` : '';
+function appWindows() {
+  return [mainWindow, ...childWindows.keys()].filter(
+    (win): win is BrowserWindow => !!win && !win.isDestroyed()
+  );
+}
+
+function sendToWindow(
+  win: BrowserWindow | undefined,
+  channel: string,
+  data: object = {}
+) {
+  if (win && !win.isDestroyed())
+    win.webContents.send(channel, { channel, requestId: '', data, code: 0 });
+}
+
+type WindowScope = 'main' | 'any';
+
+/**
+ * The PalmDesk window behind an IPC message, if the message came from the
+ * top-level app document of that window. `main` also requires the host
+ * window, which owns capture, input and the local services.
+ */
+function senderWindow(
+  event: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent,
+  scope: WindowScope
+) {
+  const frame = event.senderFrame;
+  if (!frame || frame.parent || !isAppUrl(frame.url)) return undefined;
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || (win !== mainWindow && !childWindows.has(win))) return undefined;
+  return scope === 'any' || win === mainWindow ? win : undefined;
+}
+
+function handle(
+  channel: string,
+  scope: WindowScope,
+  action: (data: any, win: BrowserWindow) => unknown
+) {
+  ipcMain.handle(channel, async (event, request: IIpcRendererData) => {
+    try {
+      const win = senderWindow(event, scope);
+      if (!win) throw new Error('无权访问本机功能');
+      return {
+        code: 0,
+        requestId: request?.requestId,
+        data: (await action(request?.data || {}, win)) ?? {},
+      };
+    } catch (error) {
+      return {
+        code: 1,
+        requestId: request?.requestId,
+        data: {},
+        msg: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+}
+
+function listen(
+  channel: string,
+  scope: WindowScope,
+  action: (data: any, win: BrowserWindow) => void
+) {
+  ipcMain.on(channel, (event, request: IIpcRendererData) => {
+    const win = senderWindow(event, scope);
+    if (win) action(request?.data || {}, win);
+  });
+}
+
+function permissionRequest(
+  contents: Electron.WebContents | null,
+  requestingUrl: string | undefined
+) {
+  const win = contents ? BrowserWindow.fromWebContents(contents) : null;
+  return {
+    trusted:
+      !!win &&
+      (win === mainWindow || childWindows.has(win)) &&
+      !!requestingUrl &&
+      isAppUrl(requestingUrl),
+    mainWindow: !!win && win === mainWindow,
+  };
+}
+
+function installPermissionHandlers() {
+  session.defaultSession.setPermissionRequestHandler(
+    (contents, permission, callback, details) => {
+      callback(
+        isPermissionAllowed(permission, {
+          ...permissionRequest(contents, details.requestingUrl),
+          mediaTypes: 'mediaTypes' in details ? details.mediaTypes : undefined,
+        })
+      );
+    }
+  );
+  session.defaultSession.setPermissionCheckHandler(
+    (contents, permission, _requestingOrigin, details) =>
+      isPermissionAllowed(permission, {
+        ...permissionRequest(contents, details.requestingUrl),
+        mediaTypes:
+          details.mediaType && details.mediaType !== 'unknown'
+            ? [details.mediaType]
+            : undefined,
+      })
+  );
 }
 
 function main() {
-  const mainWindow = new BrowserWindow({
+  const win = new BrowserWindow({
     width: windowNormalParams.width,
     height: windowNormalParams.height,
     minWidth: 800,
     minHeight: 560,
     // 隐藏菜单栏
     autoHideMenuBar: true,
-    webPreferences: {
-      // devTools: true,
-      // nodeIntegration: true, // 在网页中集成Node
-      preload: path.join(__dirname, 'preload.mjs'),
-    },
+    webPreferences: secureWebPreferences(),
     frame: false,
   });
+  mainWindow = win;
+  void loadApp(win);
 
-  if (process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL as string);
-  } else {
-    mainWindow.loadFile(path.join(process.env.DIST as string, 'index.html'));
-  }
+  // Notify about new releases; never download or install anything.
+  const releaseChecker = new ReleaseChecker({
+    directory: app.getPath('userData'),
+    current: app.getVersion(),
+    fetchReleases: async () => {
+      const response = await net.fetch(RELEASES_API, {
+        headers: {
+          Accept: 'application/vnd.github+json',
+          'User-Agent': `PalmDesk/${app.getVersion()}`,
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error(`GitHub 返回 ${response.status}`);
+      return response.json();
+    },
+    onChange: (status) =>
+      sendToWindow(mainWindow, IPC_EVENT.response_releaseStatus, status),
+  });
+  releaseChecker.start();
 
-  windowMap.set(mainWindowId, mainWindow);
-
-  mainWindow.webContents.on('render-process-gone', () => {
+  win.webContents.on('render-process-gone', () => {
     void captureSession.end();
   });
-  mainWindow.webContents.on(
+  win.webContents.on(
     'did-start-navigation',
     (_event, _url, inPlace, isMainFrame) => {
       if (isMainFrame && !inPlace) void captureSession.end();
     }
   );
-  mainWindow.on('close', () => {
+  win.on('close', () => {
     void captureSession.end();
-    console.log('mainWindow-close');
-    windowMap.forEach((item) => {
-      if (!item?.isDestroyed()) {
-        item.removeAllListeners();
-        item.close();
-      }
-    });
-    windowMap.clear();
+    closeChildWindows();
   });
-  mainWindow.on('closed', () => {
+  win.on('closed', () => {
     void captureSession.end();
-    console.log('mainWindow-closed');
-    windowMap.forEach((item) => {
-      if (!item?.isDestroyed()) {
-        item.removeAllListeners();
-        item.close();
-      }
-    });
-    windowMap.clear();
+    closeChildWindows();
+    mainWindow = undefined;
+    releaseChecker.stop();
   });
 
   // 创建菜单
@@ -386,26 +510,14 @@ function main() {
         {
           label: `关于${appName}`,
           click: () => {
-            winWebContentsSend({
-              windowId: mainWindowId,
-              channel: IPC_EVENT.response_open_about,
-              requestId: '',
-              data: {},
-              code: 0,
-            });
+            sendToWindow(mainWindow, IPC_EVENT.response_open_about);
           },
         },
         { type: 'separator' }, // 分隔线
         {
           label: '检查更新',
           click: () => {
-            winWebContentsSend({
-              windowId: mainWindowId,
-              channel: IPC_EVENT.response_open_version,
-              requestId: '',
-              data: {},
-              code: 0,
-            });
+            void releaseChecker.check(true);
           },
         },
 
@@ -452,282 +564,44 @@ function main() {
 
   Menu.setApplicationMenu(menu);
 
-  winBounds = mainWindow.getBounds();
+  winBounds = win.getBounds();
 
-  ipcMain.handle(IPC_EVENT.getPlatform, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.getPlatform}`, reqData);
-    const { requestId } = reqData;
-    const res = {
-      requestId,
-      data: { platform },
-      code: 0,
-    };
+  handle(IPC_EVENT.getPlatform, 'any', () => ({ platform }));
 
-    return res;
+  handle(IPC_EVENT.releaseStatus, 'main', () => releaseChecker.settings());
+  handle(IPC_EVENT.releaseCheck, 'main', () => releaseChecker.check(true));
+  handle(IPC_EVENT.releaseConfigure, 'main', (data) =>
+    releaseChecker.configure(data.enabled)
+  );
+
+  handle(IPC_EVENT.shellOpenExternal, 'any', async (data) => {
+    // Never hand renderer-chosen schemes, files or hosts to the OS.
+    const url = externalLinkUrl(data.url);
+    if (!url) throw new Error('不支持打开此链接');
+    await shell.openExternal(url);
   });
 
-  ipcMain.handle(
-    IPC_EVENT.shellOpenExternal,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.shellOpenExternal}`, reqData);
-      const { requestId, data } = reqData;
-      const { url } = data;
-      const res = {
-        requestId,
-        data: {},
-        code: 0,
-      };
-      try {
-        await shell.openExternal(url);
-      } catch (error) {
-        console.log(error);
-        res.code = 1;
-      }
-      return res;
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.powerSaveBlockerStart,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.powerSaveBlockerStart}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      try {
-        powerSaveBlocker.start('prevent-display-sleep');
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_powerSaveBlockerStart,
-          requestId,
-          data: {},
-          code: 0,
-        });
-      } catch (error) {
-        console.log('powerSaveBlockerStart失败');
-        console.log(error);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_powerSaveBlockerStart,
-          requestId,
-          data,
-          code: 1,
-          msg: JSON.stringify(error),
-        });
-      }
-    }
-  );
-
-  ipcMain.on(IPC_EVENT.closeAllWindow, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.closeAllWindow}`, reqData);
-    windowMap.forEach((item) => {
-      if (!item?.isDestroyed()) {
-        item.removeAllListeners();
-        item.close();
-      }
-    });
-    windowMap.clear();
+  listen(IPC_EVENT.closeAllWindow, 'main', (_data, sender) => sender.close());
+  listen(IPC_EVENT.closeWindow, 'any', (_data, sender) => sender.close());
+  listen(IPC_EVENT.windowMinimize, 'any', (_data, sender) => sender.minimize());
+  listen(IPC_EVENT.handleOpenDevTools, 'any', (_data, sender) => {
+    if (!app.isPackaged)
+      sender.webContents.openDevTools({ mode: 'detach', activate: true });
   });
 
-  ipcMain.on(IPC_EVENT.closeWindow, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.closeWindow}`, reqData);
-    const { data } = reqData;
-    const { windowId } = data;
-    const win = windowMap.get(windowId);
-    win?.close();
+  handle(IPC_EVENT.setWindowPosition, 'main', (data, sender) => {
+    const x = Math.round(Number(data.x));
+    const y = Math.round(Number(data.y));
+    if (!Number.isFinite(x) || !Number.isFinite(y))
+      throw new Error('窗口位置无效');
+    if (winBounds) {
+      // electron无边框窗口在Windows下拖拽导致窗口放大（Windows系统缩放不为100%时）
+      // https://github.com/electron/electron/issues/20320
+      // https://github.com/electron/electron/issues/10862
+      sender.setBounds(winBounds);
+    }
+    sender.setPosition(x, y);
   });
-
-  ipcMain.on(IPC_EVENT.windowMinimize, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.windowMinimize}`, reqData);
-    const { data } = reqData;
-    const { windowId } = data;
-    const win = windowMap.get(windowId);
-    win?.minimize();
-  });
-
-  ipcMain.on(IPC_EVENT.windowMaximize, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.windowMaximize}`, reqData);
-    const { data } = reqData;
-    const { windowId } = data;
-    const win = windowMap.get(windowId);
-    win?.maximize();
-  });
-
-  ipcMain.on(
-    IPC_EVENT.handleOpenDevTools,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.handleOpenDevTools}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(Number(windowId || 1));
-      win?.webContents.openDevTools({
-        mode: 'detach',
-        activate: true,
-      });
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_handleOpenDevTools,
-        requestId,
-        data,
-        code: 0,
-      });
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.handleMoveScreenRightBottom,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(
-        `electron收到${IPC_EVENT.handleMoveScreenRightBottom}`,
-        reqData
-      );
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(windowId);
-      if (win) {
-        const { width, height, y } = screen.getPrimaryDisplay().workArea;
-        // 窗口的高度和宽度
-        const bounds = win.getBounds();
-        const windowWidth = bounds.width;
-        const windowHeight = bounds.height;
-        // const [windowWidth, windowHeight] = win?.getContentSize() ;
-        // 计算新位置
-        const newX = width - windowWidth; // 屏幕左下角的 X 坐标是 0
-        const newY = height - windowHeight; // 需要减去窗口本身的高度
-        // 移动窗口
-        win.setPosition(newX, newY + y);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_handleMoveScreenRightBottom,
-          requestId,
-          data: {},
-          code: 0,
-        });
-      }
-    }
-  );
-
-  ipcMain.on(IPC_EVENT.setWindowBounds, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.setWindowBounds}`, reqData);
-    const { requestId, data } = reqData;
-    const { windowId, width, height } = data;
-    const win = windowMap.get(windowId);
-    if (win) {
-      if (!win?.isDestroyed()) {
-        win.setBounds({ width, height });
-      }
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_setWindowBounds,
-        requestId,
-        data,
-        code: 0,
-      });
-    }
-  });
-
-  ipcMain.handle(
-    IPC_EVENT.getWindowTitlebarHeight,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.getWindowTitlebarHeight}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(Number(windowId));
-      const res = {
-        windowId,
-        requestId,
-        data: { height: 0 },
-        code: 0,
-      };
-      if (win) {
-        const contentBounds = win.getContentBounds();
-        const windowBounds = win.getBounds();
-        const borderWidth = (windowBounds.width - contentBounds.width) / 2;
-        res.data.height =
-          windowBounds.height - contentBounds.height - borderWidth;
-      } else {
-        res.code = 1;
-      }
-      return res;
-    }
-  );
-
-  ipcMain.handle(
-    IPC_EVENT.setWindowPosition,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.setWindowPosition}`, reqData);
-      const { requestId, data } = reqData;
-      const { x, y, windowId } = data;
-      const win = windowMap.get(windowId);
-      const res = {
-        windowId,
-        requestId,
-        data: {},
-        code: 0,
-      };
-      if (win) {
-        if (winBounds) {
-          // electron无边框窗口在Windows下拖拽导致窗口放大（Windows系统缩放不为100%时）
-          // https://github.com/electron/electron/issues/20320
-          // https://github.com/electron/electron/issues/10862
-          if (!win?.isDestroyed()) {
-            win.setBounds(winBounds);
-          }
-        }
-        win?.setPosition(x, y);
-      } else {
-        res.code = 1;
-      }
-      return res;
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.setWindowPosition,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.setWindowPosition}`, reqData);
-      const { requestId, data } = reqData;
-      const { x, y, windowId } = data;
-      const win = windowMap.get(Number(windowId));
-      if (win) {
-        if (winBounds) {
-          // electron无边框窗口在Windows下拖拽导致窗口放大（Windows系统缩放不为100%时）
-          // https://github.com/electron/electron/issues/20320
-          // https://github.com/electron/electron/issues/10862
-          if (!win?.isDestroyed()) {
-            win.setBounds(winBounds);
-          }
-        }
-        win?.setPosition(x, y);
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_setWindowPosition,
-          requestId,
-          data: {},
-          code: 0,
-        });
-      }
-    }
-  );
-
-  ipcMain.on(
-    IPC_EVENT.getWindowPosition,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.getWindowPosition}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(Number(windowId));
-      if (win) {
-        const point = win.getPosition();
-        winWebContentsSend({
-          windowId,
-          channel: IPC_EVENT.response_getWindowPosition,
-          requestId,
-          data: { position: { x: point[0], y: point[1] } },
-          code: 0,
-        });
-      }
-    }
-  );
 
   const captureHandler = (
     channel: string,
@@ -735,22 +609,22 @@ function main() {
   ) => {
     ipcMain.handle(channel, async (event, request: IIpcRendererData) => {
       try {
-        if (windowMap.get(mainWindowId)?.webContents !== event.sender)
+        if (!senderWindow(event, 'main'))
           throw new Error('无权访问本机捕获会话');
         return {
           code: 0,
-          requestId: request.requestId,
-          data: await action(request.data || {}),
+          requestId: request?.requestId,
+          data: await action(request?.data || {}),
         };
       } catch (error) {
         console.warn('[PalmDesk] capture request failed', {
           channel,
-          action: request.data?.input?.action,
+          action: request?.data?.input?.action,
           message: error instanceof Error ? error.message : String(error),
         });
         return {
           code: 1,
-          requestId: request.requestId,
+          requestId: request?.requestId,
           data: { inputBlocked: error instanceof InputUnavailableError },
           msg: error instanceof Error ? error.message : String(error),
         };
@@ -840,9 +714,6 @@ function main() {
       ),
     };
   });
-  captureHandler(IPC_EVENT.showTargetApplication, (data) =>
-    nativeWindows.request('reveal', { bundleId: data.bundleId })
-  );
   captureHandler(IPC_EVENT.openCapturePermission, async (data) => {
     if (platform !== 'darwin') throw new Error('当前平台不支持此权限设置');
     if (data.kind === 'accessibility') {
@@ -861,125 +732,38 @@ function main() {
     }
   });
 
-  ipcMain.on(IPC_EVENT.setAlwaysOnTop, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.setAlwaysOnTop}`, reqData);
-    const { requestId, data } = reqData;
-    const { flag } = data;
-    const { windowId } = data;
-    const win = windowMap.get(Number(windowId));
-    if (win) {
-      win.setAlwaysOnTop(flag);
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_setAlwaysOnTop,
-        requestId,
-        data,
-        code: 0,
-      });
-    }
-  });
-
-  ipcMain.handle(IPC_EVENT.scaleFactor, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.scaleFactor}`, reqData);
-    const { requestId, data } = reqData;
-    const { windowId } = data;
-    const win = windowMap.get(Number(windowId));
-    const res = {
-      windowId,
-      requestId,
-      data: { scaleFactor: 0, platform: '' },
-      code: 0,
-    };
-    if (win) {
-      const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
-      res.data.scaleFactor = scaleFactor;
-      res.data.platform = platform;
-    } else {
-      res.code = 1;
-    }
-    return res;
-  });
-
-  ipcMain.on(IPC_EVENT.workAreaSize, (_event, reqData: IIpcRendererData) => {
-    console.log(`electron收到${IPC_EVENT.workAreaSize}`, reqData);
-    const { requestId, data } = reqData;
-    const { windowId } = data;
-    const win = windowMap.get(Number(windowId));
-    if (win) {
-      const { width, height } = screen.getPrimaryDisplay().workAreaSize;
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_workAreaSize,
-        requestId,
-        data: { width, height },
-        code: 0,
-      });
-    }
-  });
-
-  ipcMain.handle(
-    IPC_EVENT.getPrimaryDisplaySize,
-    (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.getPrimaryDisplaySize}`, reqData);
-      const { requestId, data } = reqData;
-      const { windowId } = data;
-      const win = windowMap.get(Number(windowId));
-      const res = {
-        windowId,
-        requestId,
-        data: { width: 0, height: 0 },
-        code: 0,
-      };
-      if (win) {
-        const { width, height } = screen.getPrimaryDisplay().size;
-        res.data.width = width;
-        res.data.height = height;
-      } else {
-        res.code = 1;
-      }
-      return res;
-    }
+  listen(IPC_EVENT.setAlwaysOnTop, 'main', (data, sender) =>
+    sender.setAlwaysOnTop(data.flag === true)
   );
 
-  ipcMain.on(
-    IPC_EVENT.createWindow,
-    async (_event, reqData: IIpcRendererData) => {
-      console.log(`electron收到${IPC_EVENT.createWindow}`, reqData);
-      const { data } = reqData;
-      const {
-        windowId,
-        width,
-        height,
-        minWidth,
-        minHeight,
-        route,
-        query,
-        x,
-        y,
-        useWorkAreaSize,
-        frame,
-      } = data;
-      try {
-        await createWindow({
-          windowId,
-          width,
-          height,
-          minWidth,
-          minHeight,
-          route,
-          query,
-          x,
-          y,
-          useWorkAreaSize,
-          frame,
-        });
-        console.log('createWindow成功');
-      } catch (error) {
-        console.log('createWindow失败');
-        console.log(error);
-      }
-    }
-  );
+  handle(IPC_EVENT.scaleFactor, 'main', () => ({
+    scaleFactor: screen.getPrimaryDisplay().scaleFactor,
+    platform,
+  }));
+
+  listen(IPC_EVENT.workAreaSize, 'main', (_data, sender) => {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    sendToWindow(sender, IPC_EVENT.response_workAreaSize, { width, height });
+  });
+
+  handle(IPC_EVENT.getPrimaryDisplaySize, 'main', () => {
+    const { width, height } = screen.getPrimaryDisplay().size;
+    return { width, height };
+  });
+
+  // The renderer names a window kind; size, route and identity stay here.
+  handle(IPC_EVENT.createWindow, 'main', (data) => {
+    if (data.kind === 'about') return createChildWindow('about');
+    if (data.kind === 'webrtc')
+      return createChildWindow('webrtc', parseControllerSession(data.session));
+    throw new Error('不支持打开此窗口');
+  });
+
+  handle(IPC_EVENT.takeWindowSession, 'any', (_data, sender) => {
+    const controllerSession = controllerSessions.get(sender.webContents);
+    controllerSessions.delete(sender.webContents);
+    return controllerSession || {};
+  });
 }
 
 app.on('ready', async () => {
@@ -1013,28 +797,15 @@ app.on('ready', async () => {
   nutjs = require('@nut-tree-fork/nut-js');
   // Remote pointer events already arrive at the user's gesture cadence.
   nutjs.mouse.config.autoDelayMs = 0;
+  installPermissionHandlers();
   powerMonitor.on('suspend', () => {
-    windowMap.forEach((item) => {
-      const windowId = item.id;
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_powerMonitorSuspend,
-        requestId: '',
-        data: { windowId: item.id },
-        code: 0,
-      });
+    appWindows().forEach((win) => {
+      sendToWindow(win, IPC_EVENT.response_powerMonitorSuspend);
     });
   });
   powerMonitor.on('resume', () => {
-    windowMap.forEach((item) => {
-      const windowId = item.id;
-      winWebContentsSend({
-        windowId,
-        channel: IPC_EVENT.response_powerMonitorResume,
-        requestId: '',
-        data: { windowId: item.id },
-        code: 0,
-      });
+    appWindows().forEach((win) => {
+      sendToWindow(win, IPC_EVENT.response_powerMonitorResume);
     });
   });
   main();
@@ -1042,7 +813,7 @@ app.on('ready', async () => {
 
 app.on('window-all-closed', () => {
   app.quit();
-  windowMap.clear();
+  childWindows.clear();
 });
 
 // app.whenReady().then(main);

@@ -37,6 +37,26 @@ macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`�
 
 生成本地测试安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`，默认使用当前工作区的隔离身份。对外发布的固定身份须显式添加 `--release`。手动触发 GitHub Actions 构建并发布 Apple Silicon Mac 和 Windows x64 测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
 
+## 桌面渲染进程边界
+
+渲染进程只能通过 `electron-main/preload.ts` 暴露的 `invoke`、`send` 和 `on` 访问主进程，可用通道列在 `electron-main/renderer-security.ts`。新增 IPC 时需同时更新该列表，并在 `electron-main/index.ts` 中用 `handle` 或 `listen` 注册，注明只允许主窗口（`main`）还是任一 PalmDesk 窗口（`any`）调用。主进程只接受应用自身页面顶层框架发出的消息；捕获、输入、会话阅读和创建窗口仅限主窗口。
+
+- 窗口：渲染进程只能请求 `about`、`version` 或 `webrtc` 窗口，尺寸、路由和窗口身份由主进程决定。远控窗口的连接凭据在页面加载后经 IPC 取回一次，不写入 URL。
+- 导航：页面不能打开新窗口、跳转到应用以外的地址或嵌入 `<webview>`。`shellOpenExternal` 只打开 `github.com` 的 HTTPS 链接。
+- 权限：Chromium 权限默认拒绝，只允许主窗口捕获应用窗口，以及剪贴板读写和全屏。
+- 构建产物带有 Content-Security-Policy，禁止内联脚本和 `eval`；开发服务器不注入该策略。
+- DevTools 只在未打包的开发版中可用；`VITE_OPEN_DEVTOOLS=true` 时启动即打开。
+- IPC 日志只记录通道名，且只在开发构建中输出。
+
+以下烟测在真实 Electron 中加载构建后的网页和 preload，验证上述规则依赖的运行时行为：框架 URL、导航与新窗口拦截、CSP，以及桌面捕获发出的权限请求。测试拦截全部网络请求并拒绝所有权限，不需要后端，也不会弹出系统权限提示。升级 Electron 后应重新运行：
+
+```bash
+pnpm exec vite build
+pnpm exec electron test/smoke/electron-renderer-guards.cjs
+```
+
+结果写入 `.local/renderer-guards/result.json`。
+
 ## Windows 桌面
 
 会话阅读与窗口捕获独立，macOS 和 Windows 均默认关闭；在电脑首页显式开启后持久化，关闭会撤销进行中和后续的读取并清空已连接阅读页。

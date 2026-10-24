@@ -3,41 +3,41 @@
 import { computeBox, getRangeRandom } from 'billd-utils';
 import sparkMD5 from 'spark-md5';
 
-import { IPC_EVENT } from '@/event';
 import { IIpcRendererData } from '@/interface';
 
 export const ipcRenderer = window.electronAPI?.ipcRenderer;
 
 const ipcRendererOnMap = {};
 
+// Payloads carry passwords, typed text and image bytes; log channels only.
+function logIpc(kind: string, channel: string) {
+  if (import.meta.env.DEV) console.debug(kind, channel);
+}
+
 export function ipcRendererSend(data: IIpcRendererData) {
-  console.log('ipcRendererSend', data.channel, data.data);
+  logIpc('ipcRendererSend', data.channel);
   ipcRenderer?.send(data.channel, {
     requestId: data.requestId,
     data: { windowId: data.windowId, ...data.data },
   });
 }
 export function ipcRendererInvoke(data: IIpcRendererData) {
-  // Do not retain uploaded image bytes in the renderer's console history.
-  if (data.channel === IPC_EVENT.pasteImage)
-    console.log('ipcRendererInvoke', data.channel);
-  else console.log('ipcRendererInvoke', data.channel, data.data);
+  logIpc('ipcRendererInvoke', data.channel);
   return ipcRenderer?.invoke(data.channel, {
     requestId: data.requestId,
     data: { windowId: data.windowId, ...data.data },
   });
 }
 
-export function ipcRendererOn(channel, cb) {
+/** Listeners receive the payload sent by the main process. */
+export function ipcRendererOn(
+  channel: string,
+  cb: (data: IIpcRendererData) => void
+) {
   if (ipcRendererOnMap[channel]) return;
   ipcRendererOnMap[channel] = true;
-  console.log('ipcRendererOn', channel);
+  logIpc('ipcRendererOn', channel);
   ipcRenderer?.on(channel, cb);
-}
-
-export function ipcRendererOff(channel, cb) {
-  console.log('ipcRendererOff', channel);
-  ipcRenderer?.removeListener(channel, cb);
 }
 
 /** 设置约束 */
