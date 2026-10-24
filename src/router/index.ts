@@ -18,7 +18,6 @@ export const routerName = {
   remote: 'remote',
   home: 'home',
   about: 'about',
-  version: 'version',
   webrtc: 'webrtc',
   deviceManage: 'deviceManage',
   setting: 'setting',
@@ -69,11 +68,6 @@ export const defaultRoutes: RouteRecordRaw[] = [
     name: routerName.about,
     path: '/about',
     component: () => import('@/views/about/index.vue'),
-  },
-  {
-    name: routerName.version,
-    path: '/version',
-    component: () => import('@/views/version/index.vue'),
   },
   {
     name: mobileRouterName.h5privatizationDeployment,

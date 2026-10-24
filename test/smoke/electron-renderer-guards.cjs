@@ -41,7 +41,9 @@ const timeout = setTimeout(() => {
   app.exit(1);
 }, 60000);
 
-function stubIpc(senders) {
+const RELEASE_URL = 'https://github.com/Abreto/palmdesk/releases/tag/v9.9.9';
+
+function stubIpc(senders, opened) {
   const reply = (channel, data) =>
     ipcMain.handle(channel, (event, request) => {
       const frame = event.senderFrame;
@@ -66,6 +68,17 @@ function stubIpc(senders) {
   reply(IPC_EVENT.getCaptureSources, { sources: [] });
   reply(IPC_EVENT.stopCapture, {});
   reply(IPC_EVENT.sessionReaderSettings, { enabled: false, supported: true });
+  reply(IPC_EVENT.releaseStatus, {
+    enabled: true,
+    current: '0.0.7',
+    checking: false,
+    available: true,
+    latest: { version: '9.9.9', url: RELEASE_URL, security: false },
+  });
+  ipcMain.handle(IPC_EVENT.shellOpenExternal, (_event, request) => {
+    opened.push(request?.data?.url);
+    return { code: 0, requestId: request?.requestId, data: {} };
+  });
   ipcMain.on(IPC_EVENT.workAreaSize, (event) =>
     event.sender.send(IPC_EVENT.response_workAreaSize, {
       data: { width: 1440, height: 900 },
@@ -94,7 +107,8 @@ app
     );
     session.defaultSession.setPermissionCheckHandler(() => false);
     const senders = [];
-    stubIpc(senders);
+    const opened = [];
+    stubIpc(senders, opened);
 
     const win = new BrowserWindow({
       show: false,
@@ -116,6 +130,15 @@ app
       out.csp = !!document.querySelector('meta[http-equiv="Content-Security-Policy"]');
       out.api = Object.keys(window.electronAPI.ipcRenderer).sort();
       out.rendered = !!document.querySelector('.page-heading h1');
+      const banner = document.querySelector('.release-banner');
+      out.banner = banner?.textContent.includes('v9.9.9');
+      banner?.querySelector('.pd-button')?.click();
+      banner?.querySelector('.dismiss')?.click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      out.dismissed = {
+        hidden: !document.querySelector('.release-banner'),
+        remembered: localStorage.getItem('palmdesk-release-dismissed'),
+      };
       try {
         await window.electronAPI.ipcRenderer.invoke('showTargetApplication', {});
         out.blockedInvoke = 'allowed';
@@ -162,6 +185,7 @@ app
     const result = {
       electron: process.versions.electron,
       page,
+      opened,
       navigations,
       windowOpen,
       urlAfterNavigation,
@@ -175,6 +199,10 @@ app
     );
     assert.equal(page.csp, true);
     assert.equal(page.rendered, true);
+    // The release banner renders, opens only the release page and can be dismissed.
+    assert.equal(page.banner, true);
+    assert.deepEqual(opened, [RELEASE_URL]);
+    assert.deepEqual(page.dismissed, { hidden: true, remembered: '9.9.9' });
     assert.deepEqual(page.api, ['invoke', 'on', 'send']);
     assert.match(page.blockedInvoke, /not allowed/);
     assert.equal(page.windowOpen, null);
@@ -207,6 +235,9 @@ app
     ]);
     assert.ok(security.isAppDocumentUrl(urlAfterNavigation, entry));
     assert.ok(senders.length > 1);
+    assert.ok(
+      senders.some(({ channel }) => channel === IPC_EVENT.releaseStatus)
+    );
     assert.deepEqual(senders.at(-1), {
       channel: IPC_EVENT.getPlatform,
       topLevel: true,

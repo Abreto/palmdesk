@@ -21,8 +21,8 @@ export function supportsImagePaste(source: ICaptureSource, platform: string) {
 
 type ClipboardDriver = {
   decode: (bytes: Uint8Array) => Electron.NativeImage;
-  write: (image: Electron.NativeImage) => void;
-  read: () => Electron.NativeImage;
+  write: (image: Electron.NativeImage) => Promise<void>;
+  read: () => Promise<Electron.NativeImage>;
 };
 
 // Hash each bitmap in turn so a large image is never held twice for comparison.
@@ -53,10 +53,10 @@ export async function pasteClipboardImage(
   // Leave the image in the clipboard, as a normal copy/paste would. Restoring
   // immediately can race Codex's asynchronous reading of the pasteboard.
   try {
-    driver.write(image);
-    // Electron can return without writing when Windows cannot acquire the
-    // clipboard. Confirm the decoded pixels before allowing the paste shortcut.
-    const copied = driver.read();
+    await driver.write(image);
+    // A write can resolve without taking effect when Windows cannot acquire
+    // the clipboard. Confirm the decoded pixels before allowing the shortcut.
+    const copied = await driver.read();
     const copiedSize = copied.getSize();
     if (
       copied.isEmpty() ||

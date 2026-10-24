@@ -1,0 +1,35 @@
+# Weekly update PRs. Security updates open as soon as an advisory is
+# published; routine updates wait a few days for releases to settle.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 10
+    groups:
+      # Majors such as Electron arrive one by one: they need native validation.
+      npm-minor-and-patch:
+        update-types:
+          - minor
+          - patch
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - '*'
+  - package-ecosystem: docker
+    directories:
+      - /containers/web
+      - /containers/backend
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns:
+          - '*'

@@ -6,11 +6,21 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 
-const { app, BrowserWindow, clipboard, nativeImage } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  clipboard,
+  ClipboardItem,
+  nativeImage,
+} = require('electron');
 
+const { restoreClipboard, saveClipboard } = require('./clipboard-snapshot.cjs');
 const load = require('./load-source.cjs');
 
 const { pasteClipboardImage } = load('electron-main/image-paste.ts');
+const { readClipboardImage, writeClipboardImage } = load(
+  'electron-main/clipboard-image.ts'
+);
 const root = path.resolve(__dirname, '../..');
 const output = path.join(root, '.local/image-paste');
 fs.mkdirSync(output, { recursive: true });
@@ -22,12 +32,7 @@ app
   .then(async () => {
     let window;
     let lastWritten;
-    const saved = {
-      text: clipboard.readText(),
-      html: clipboard.readHTML(),
-      rtf: clipboard.readRTF(),
-      image: clipboard.readImage(),
-    };
+    const saved = await saveClipboard(clipboard);
     try {
       assert.equal(process.platform, 'darwin');
       window = new BrowserWindow({
@@ -64,11 +69,11 @@ app
           .getSize();
         await pasteClipboardImage({ mime, bytes }, () => true, {
           decode: (value) => nativeImage.createFromBuffer(Buffer.from(value)),
-          write: (image) => {
-            clipboard.writeImage(image);
-            lastWritten = clipboard.readImage().toPNG();
+          write: async (image) => {
+            await writeClipboardImage(image);
+            lastWritten = (await readClipboardImage()).toBitmap();
           },
-          read: () => clipboard.readImage(),
+          read: readClipboardImage,
           press: async () => {
             window.webContents.paste();
           },
@@ -109,9 +114,12 @@ app
         'PASS real PNG/JPEG decoding, macOS image clipboard and Electron paste events'
       );
     } finally {
-      // Restore common clipboard content only if it still contains our test image.
-      if (lastWritten && clipboard.readImage().toPNG().equals(lastWritten))
-        clipboard.write(saved);
+      // Restore the clipboard only if it still contains our test image.
+      if (
+        lastWritten &&
+        (await readClipboardImage()).toBitmap().equals(lastWritten)
+      )
+        await restoreClipboard(clipboard, ClipboardItem, saved);
       window?.destroy();
       app.quit();
     }
