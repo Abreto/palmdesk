@@ -133,6 +133,12 @@ app
       const banner = document.querySelector('.release-banner');
       out.banner = banner?.textContent.includes('v9.9.9');
       banner?.querySelector('.pd-button')?.click();
+      banner?.querySelector('.dismiss')?.click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      out.dismissed = {
+        hidden: !document.querySelector('.release-banner'),
+        remembered: localStorage.getItem('palmdesk-release-dismissed'),
+      };
       try {
         await window.electronAPI.ipcRenderer.invoke('showTargetApplication', {});
         out.blockedInvoke = 'allowed';
@@ -193,9 +199,10 @@ app
     );
     assert.equal(page.csp, true);
     assert.equal(page.rendered, true);
-    // The release banner renders and opens only the release page.
+    // The release banner renders, opens only the release page and can be dismissed.
     assert.equal(page.banner, true);
     assert.deepEqual(opened, [RELEASE_URL]);
+    assert.deepEqual(page.dismissed, { hidden: true, remembered: '9.9.9' });
     assert.deepEqual(page.api, ['invoke', 'on', 'send']);
     assert.match(page.blockedInvoke, /not allowed/);
     assert.equal(page.windowOpen, null);

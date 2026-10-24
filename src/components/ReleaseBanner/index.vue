@@ -34,32 +34,15 @@
 
 <script lang="ts" setup>
 import { CloseOutline } from '@vicons/ionicons5';
-import { computed, ref } from 'vue';
 
 import { WINDOW_ID_ENUM } from '@/constant';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
+import { useReleaseBanner } from '@/hooks/use-release-banner';
 import { useAppStore } from '@/store/app';
-
-const DISMISSED_KEY = 'palmdesk-release-dismissed';
 
 const appStore = useAppStore();
 const { handleOpenExternal } = useIpcRendererSend();
-
-function readDismissed() {
-  try {
-    return localStorage.getItem(DISMISSED_KEY) || '';
-  } catch {
-    return '';
-  }
-}
-
-const dismissed = ref(readDismissed());
-const latest = computed(() => {
-  const release = appStore.release;
-  return release?.available && release.latest?.version !== dismissed.value
-    ? release.latest
-    : undefined;
-});
+const { latest, dismiss } = useReleaseBanner(() => appStore.release);
 
 function openRelease() {
   if (latest.value)
@@ -67,18 +50,6 @@ function openRelease() {
       windowId: WINDOW_ID_ENUM.remote,
       url: latest.value.url,
     });
-}
-
-// A dismissed release stays hidden after restarts, unless it fixes security issues.
-function dismiss() {
-  if (!latest.value) return;
-  dismissed.value = latest.value.version;
-  if (latest.value.security) return;
-  try {
-    localStorage.setItem(DISMISSED_KEY, latest.value.version);
-  } catch {
-    // Without storage the banner returns on the next launch.
-  }
 }
 </script>
 
