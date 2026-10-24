@@ -60,7 +60,7 @@ let updates = 0;
 export default defineConfig({
   root,
   resolve: { alias: { '@': path.join(root, 'src') } },
-  define: { 'process.env': { NODE_ENV: 'development', BilldHtmlWebpackPlugin: {} } },
+  define: { 'process.env': { NODE_ENV: 'development' }, PALMDESK_VERSION: JSON.stringify('0.0.0-smoke') },
   css: { preprocessorOptions: { scss: { additionalData: '@use "billd-scss/src/index.scss" as *;@import "@/assets/css/constant.scss";' } } },
   plugins: [vue(), {
     name: 'synthetic-session-reader',

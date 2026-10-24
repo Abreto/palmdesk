@@ -20,7 +20,7 @@ function host() {
     'utf8'
   );
   const begin = source.indexOf('async function handleWindowRequest(');
-  const end = source.indexOf('\nfunction changeDebugUrl()', begin);
+  const end = source.indexOf('\nasync function handleResetDeskuuid()', begin);
   assert.ok(begin >= 0 && end > begin);
   const handler = ts.transpileModule(source.slice(begin, end), {
     compilerOptions: { target: ts.ScriptTarget.ES2022 },

@@ -353,19 +353,25 @@ try {
     if (message.type() === 'error') diagnostics.push(message.text());
   });
   phone.on('pageerror', (error) => errors.push(`phone: ${error.message}`));
-  const query = new URLSearchParams({
+  const controllerSession = {
     deskUserUuid: 'fixture-phone',
     deskUserPassword: 'fixture-password',
     remoteDeskUserUuid: device.uuid,
     remoteDeskUserPassword: device.password,
-  });
+  };
   await phone.goto(base);
   await phone.locator('.quality-settings summary').click();
   assert.equal(
     await phone.getByLabel('画质预设', { exact: true }).inputValue(),
     'balanced'
   );
-  await phone.goto(`${base}/#/webrtc?${query}`);
+  // The web connection form hands the controller its credentials through
+  // sessionStorage; the controller ignores credentials in its URL.
+  await phone.evaluate(
+    (value) => sessionStorage.setItem('codex-remote-session', value),
+    JSON.stringify(controllerSession)
+  );
+  await phone.goto(`${base}/#/webrtc`);
   await phone.getByRole('button', { name: /Synthetic reading task/ }).click();
   assert.equal(qualityRequests.at(-1).maxBitrate, 3000);
   assert.equal(qualityRequests.at(-1).maxFramerate, 20);
