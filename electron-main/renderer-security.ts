@@ -12,6 +12,9 @@ export const RENDERER_INVOKE_CHANNELS: readonly string[] = [
   IPC_EVENT.getPrimaryDisplaySize,
   IPC_EVENT.createWindow,
   IPC_EVENT.takeWindowSession,
+  IPC_EVENT.releaseStatus,
+  IPC_EVENT.releaseCheck,
+  IPC_EVENT.releaseConfigure,
   IPC_EVENT.getCaptureSources,
   IPC_EVENT.getAgentApplications,
   IPC_EVENT.getInstalledAgents,
@@ -42,7 +45,7 @@ export const RENDERER_SEND_CHANNELS: readonly string[] = [
 /** Main-process events the renderer may subscribe to. */
 export const RENDERER_RECEIVE_CHANNELS: readonly string[] = [
   IPC_EVENT.response_open_about,
-  IPC_EVENT.response_open_version,
+  IPC_EVENT.response_releaseStatus,
   IPC_EVENT.response_powerMonitorSuspend,
   IPC_EVENT.response_powerMonitorResume,
   IPC_EVENT.response_workAreaSize,

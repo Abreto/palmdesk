@@ -1,13 +1,19 @@
 import { UploadFileInfo } from 'naive-ui';
 import { defineStore } from 'pinia';
 
-import { LiveLineEnum, LiveRenderEnum, MediaTypeEnum } from '@/interface';
+import {
+  IReleaseStatus,
+  LiveLineEnum,
+  LiveRenderEnum,
+  MediaTypeEnum,
+} from '@/interface';
 import { ILiveRoom } from '@/types/ILiveRoom';
 
 export type AppRootState = {
   isMac: boolean;
   showDebug: boolean;
   version: string;
+  release?: IReleaseStatus;
   scaleFactor: number;
   windowId: number;
   workAreaSize: {
@@ -95,6 +101,7 @@ export const useAppStore = defineStore('app', {
       isMac: false,
       showDebug: false,
       version: '',
+      release: undefined,
       scaleFactor: 1,
       windowId: -1,
       workAreaSize: { width: 0, height: 0 },

@@ -10,6 +10,9 @@ export const IPC_EVENT = {
   getPrimaryDisplaySize: 'getPrimaryDisplaySize',
   createWindow: 'createWindow',
   takeWindowSession: 'takeWindowSession',
+  releaseStatus: 'releaseStatus',
+  releaseCheck: 'releaseCheck',
+  releaseConfigure: 'releaseConfigure',
   shellOpenExternal: 'shellOpenExternal',
   getPlatform: 'getPlatform',
   getCaptureSources: 'getCaptureSources',
@@ -33,5 +36,5 @@ export const IPC_EVENT = {
   response_powerMonitorSuspend: 'response_powerMonitorSuspend',
   response_powerMonitorResume: 'response_powerMonitorResume',
   response_open_about: 'response_open_about',
-  response_open_version: 'response_open_version',
+  response_releaseStatus: 'response_releaseStatus',
 };

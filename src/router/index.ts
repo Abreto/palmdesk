@@ -8,7 +8,6 @@ export const routerName = {
   remote: 'remote',
   home: 'home',
   about: 'about',
-  version: 'version',
   webrtc: 'webrtc',
   deviceManage: 'deviceManage',
   setting: 'setting',
@@ -48,11 +47,6 @@ const routes: RouteRecordRaw[] = [
     name: routerName.about,
     path: '/about',
     component: () => import('@/views/about/index.vue'),
-  },
-  {
-    name: routerName.version,
-    path: '/version',
-    component: () => import('@/views/version/index.vue'),
   },
   {
     path: '/:pathMatch(.*)*',
