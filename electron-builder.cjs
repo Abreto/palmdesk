@@ -43,6 +43,9 @@ module.exports = {
       PalmDeskBuildChannel: channel,
       NSScreenCaptureUsageDescription:
         '用于远程观察或控制时捕获选定的应用窗口。',
+      // Electron 39+ needs this key for desktopCapturer on macOS 14.2+.
+      // PalmDesk captures window video only and never records audio.
+      NSAudioCaptureUsageDescription: 'PalmDesk 只捕获窗口画面，不录制音频。',
       NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },

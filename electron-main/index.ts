@@ -6,7 +6,6 @@ import { platform } from 'process';
 import {
   app,
   BrowserWindow,
-  clipboard,
   desktopCapturer,
   dialog,
   ipcMain,
@@ -25,6 +24,7 @@ import { IPC_EVENT } from '../src/event';
 import { AgentLauncher } from './agent-launcher';
 import { assertUniqueApplicationIdentity } from './app-identity';
 import { CaptureSession, InputUnavailableError } from './capture-session';
+import { readClipboardImage, writeClipboardImage } from './clipboard-image';
 import {
   pasteClipboardImage,
   pasteWindowsClipboardImage,
@@ -176,8 +176,8 @@ const captureSession = new CaptureSession(
     pasteImage: (image, source, current) => {
       const clipboardDriver = {
         decode: (bytes) => nativeImage.createFromBuffer(Buffer.from(bytes)),
-        write: (value) => clipboard.writeImage(value),
-        read: () => clipboard.readImage(),
+        write: writeClipboardImage,
+        read: readClipboardImage,
       };
       if (platform === 'win32')
         return pasteWindowsClipboardImage(image, source, current, {
