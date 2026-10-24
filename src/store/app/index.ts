@@ -2,7 +2,7 @@ import { UploadFileInfo } from 'naive-ui';
 import { defineStore } from 'pinia';
 
 import {
-  IDeskVersion,
+  IReleaseStatus,
   LiveLineEnum,
   LiveRenderEnum,
   MediaTypeEnum,
@@ -13,32 +13,7 @@ export type AppRootState = {
   isMac: boolean;
   showDebug: boolean;
   version: string;
-  updateModalInfo?: {
-    version: string;
-    show_version: string;
-    isUpdate: number;
-    forceUpdate: number;
-    checkUpdate: number;
-    updateContent: string;
-    updateDate: string;
-    download: {
-      macos_dmg: string;
-      window_64_exe: string;
-      window_32_exe: string;
-      window_arm_exe: string;
-      linux_64_deb: string;
-      linux_64_tar: string;
-      linux_arm_deb: string;
-      linux_arm_tar: string;
-    };
-    disableList: {
-      version: string;
-      msg: string;
-    }[];
-    remark: string;
-  };
-  deskVersionInfo?: IDeskVersion;
-  lastBuildDate: string;
+  release?: IReleaseStatus;
   scaleFactor: number;
   windowId: number;
   workAreaSize: {
@@ -126,9 +101,7 @@ export const useAppStore = defineStore('app', {
       isMac: false,
       showDebug: false,
       version: '',
-      updateModalInfo: undefined,
-      deskVersionInfo: undefined,
-      lastBuildDate: '',
+      release: undefined,
       scaleFactor: 1,
       windowId: -1,
       workAreaSize: { width: 0, height: 0 },

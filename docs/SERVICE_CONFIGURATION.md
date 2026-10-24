@@ -19,7 +19,7 @@
 | `VITE_TURN_USERNAME`   | 空              | 空                      |
 | `VITE_TURN_CREDENTIAL` | 空              | 空                      |
 
-`VITE_ENABLE_UPSTREAM_VERSION_CHECK=true` 才调用上游版本接口；`VITE_OPEN_DEVTOOLS=true` 才在开发客户端自动打开控制台。默认都关闭。
+`VITE_OPEN_DEVTOOLS=true` 只在开发客户端启动时自动打开控制台，默认关闭；打包版不提供控制台。
 
 信令地址填服务的 origin，例如 `https://remote.example.com`，Socket.IO 会使用 `/socket.io` 路径。API 地址可填同域的 `/api`，或完整的 `https://remote.example.com/api`。
 

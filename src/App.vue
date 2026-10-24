@@ -19,12 +19,7 @@
 import { GlobalThemeOverrides, lightTheme, NConfigProvider } from 'naive-ui';
 import { onMounted } from 'vue';
 
-import {
-  fetchDeskVersionByVersion,
-  fetchDeskVersionCheck,
-  fetchDeskVersionLatest,
-} from '@/api/deskVersion';
-import { APP_BUILD_INFO, WINDOW_ID_ENUM } from '@/constant';
+import { APP_VERSION, WINDOW_ID_ENUM } from '@/constant';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
 import { useAppStore } from '@/store/app';
 import { usePiniaCacheStore } from '@/store/cache';
@@ -65,45 +60,17 @@ const themeOverrides: GlobalThemeOverrides = {
 };
 
 onMounted(() => {
-  appStore.version = APP_BUILD_INFO.pkgVersion;
-  appStore.lastBuildDate = APP_BUILD_INFO.lastBuildDate;
+  appStore.version = APP_VERSION;
   handlesetAlwaysOnTop({
     windowId: WINDOW_ID_ENUM.remote,
     flag: cacheStore.isAlwaysOnTop,
   });
-  if (import.meta.env.VITE_ENABLE_UPSTREAM_VERSION_CHECK === 'true') {
-    getClient();
-    if (ipcRenderer) handleDeskVersionCheck();
-  }
-  if (ipcRenderer && import.meta.env.VITE_OPEN_DEVTOOLS === 'true') {
+  if (
+    ipcRenderer &&
+    import.meta.env.DEV &&
+    import.meta.env.VITE_OPEN_DEVTOOLS === 'true'
+  ) {
     handleOpenDevTools({ windowId: WINDOW_ID_ENUM.remote });
   }
 });
-
-async function handleDeskVersionCheck() {
-  try {
-    const res = await fetchDeskVersionCheck(appStore.version);
-    if (res.code === 200 && res.data) {
-      appStore.updateModalInfo = res.data;
-    }
-  } catch (error) {
-    console.log(error);
-  }
-}
-
-async function getClient() {
-  try {
-    let res;
-    if (ipcRenderer) {
-      res = await fetchDeskVersionByVersion(appStore.version);
-    } else {
-      res = await fetchDeskVersionLatest();
-    }
-    if (res.code === 200 && res.data) {
-      appStore.deskVersionInfo = res.data;
-    }
-  } catch (error) {
-    console.log(error);
-  }
-}
 </script>

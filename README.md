@@ -68,6 +68,8 @@ Images travel in chunks over a dedicated WebRTC channel on the authenticated con
 
 Download an Apple Silicon Mac DMG or Windows x64 installer from [GitHub Releases](https://github.com/Abreto/palmdesk/releases). Installing a packaged client does not require Node.js, pnpm or development tools. Open the DMG and drag PalmDesk into Applications, or run the Windows installer, then connect from the phone web client using the desktop's QR code or device credentials.
 
+The desktop app checks GitHub Releases once a day and shows a notice when a newer release is published, with a stronger prompt for security fixes. It never downloads or installs updates. To check now, choose “检查更新” (Check for updates) in the macOS app menu or use the check button in “高级设置” (Advanced settings), where the daily check can also be turned off; while it is off, PalmDesk sends no update requests.
+
 Intel Mac installers are not provided. Mac previews require macOS 13 Ventura or later and are built on macOS 15; macOS 13 and 14 have not been validated. Windows requires Windows 10 1903 or later / Windows 11 x64 with Windows Graphics Capture available. macOS previews use a fixed self-signed certificate from v0.0.3 onward, without Developer ID signing or notarization; Windows installers are unsigned. See [installation and release details](docs/DESKTOP_RELEASES.md).
 
 ### Development Prerequisites

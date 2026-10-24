@@ -206,7 +206,6 @@ import {
 } from '@vicons/ionicons5';
 import { getRandomString } from 'billd-utils';
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
-import { useRoute } from 'vue-router';
 
 import AgentPicker from '@/components/AgentPicker/index.vue';
 import RemoteVideoSettings from '@/components/RemoteVideoSettings/index.vue';
@@ -229,7 +228,7 @@ import {
   WsConnectStatusEnum,
   WsMsgTypeEnum,
 } from '@/types/websocket';
-import { ipcRenderer, ipcRendererSend } from '@/utils';
+import { ipcRenderer, ipcRendererInvoke, ipcRendererSend } from '@/utils';
 import { windowContext, type AgentBindings } from '@/utils/agent-directory';
 import {
   AGENT_DEFINITIONS,
@@ -243,7 +242,6 @@ import { ReaderClient } from '@/utils/session-reader-channel';
 
 import type { ReaderSession } from '../../../session-core/index.mjs';
 
-const route = useRoute();
 const networkStore = useNetworkStore();
 const appStore = useAppStore();
 const {
@@ -1077,7 +1075,18 @@ watch(
       error.value ||= '连接已结束，目标窗口可能已关闭或不可用';
   }
 );
-onMounted(() => {
+// The desktop host hands a new controller window its credentials over IPC.
+async function takeWindowSession(): Promise<Record<string, unknown>> {
+  if (!ipcRenderer) return {};
+  const result = await ipcRendererInvoke({
+    windowId: WINDOW_ID_ENUM.webrtc,
+    channel: IPC_EVENT.takeWindowSession,
+    requestId: getRandomString(8),
+    data: {},
+  });
+  return result?.code === 0 ? result.data || {} : {};
+}
+onMounted(async () => {
   document.addEventListener('visibilitychange', visibilityChanged);
   window.addEventListener(REMOTE_SESSION_ENDED_EVENT, remoteSessionEnded);
   window.addEventListener('pagehide', pageHidden);
@@ -1089,7 +1098,8 @@ onMounted(() => {
   } catch {
     /* A stale tab starts at the connection form. */
   }
-  const params = { ...saved, ...route.query };
+  const params = { ...saved, ...(await takeWindowSession()) };
+  if (leaving) return;
   deskUserUuid.value = String(params.deskUserUuid || '');
   deskUserPassword.value = String(params.deskUserPassword || '');
   remoteDeskUserUuid.value = String(params.remoteDeskUserUuid || '');
@@ -1114,8 +1124,6 @@ onMounted(() => {
       remoteDeskUserPassword: remoteDeskUserPassword.value,
     })
   );
-  if (Object.keys(route.query).length)
-    void router.replace({ name: routerName.webrtc });
   connect();
   heartbeat = setInterval(() => {
     checkRecovery();
