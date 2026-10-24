@@ -64,11 +64,8 @@ export class WebSocketClass {
     data?: T;
   }) => {
     if (!this.socketIo?.connected) {
-      console.error(
-        '【websocket】未连接成功，不发送websocket消息！',
-        msgType,
-        data
-      );
+      // Payloads can carry device passwords; log the type only.
+      console.error('【websocket】未连接成功，不发送websocket消息！', msgType);
       return;
     }
     prettierSendWsMsg({ requestId, msgType, data });
