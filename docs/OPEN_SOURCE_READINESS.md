@@ -37,6 +37,26 @@ Gitleaks 只做本地扫描，不上传源码。历史扫描没有改写 Git 历
 
 critical 公告涉及 [form-data](https://github.com/advisories/GHSA-fjxv-7rqg-78g4)、[fast-xml-parser](https://github.com/advisories/GHSA-m7jm-9gc2-mpf2)、[handlebars](https://github.com/advisories/GHSA-2w6w-674q-4c4q) 和 [tar](https://github.com/advisories/GHSA-23hp-3jrh-7fpw)。本轮报告原件保存在被忽略的 `.local/palmdesk-public-audit.json`，可按上述命令重新生成。本轮不进行未经回归验证的批量依赖升级。
 
+### 2026-10-21 复查（#46）
+
+升级 Electron 33.2.1 → 44.9.3、Vite 6.0.3 → 6.4.5、Axios 1.4.0 → 1.20.0（`form-data` 4.0.6、`follow-redirects` 1.16.1）、Vue I18n 9.9.1 → 11.4.16、Vue 3.5.13 → 3.5.44、socket.io-client 4.8.0 → 4.8.4、js-cookie 3.0.5 → 3.0.8，并在各自版本范围内更新了存在公告的传递依赖。移除从未引用的 `billd-deploy` 和 `vconsole`，`billd-html-webpack-plugin` 只在构建时使用，移入 `devDependencies`。Electron 升级的验证记录见 [Electron 44 升级验证](smoke-artifacts/electron-44-upgrade-2026-10-21.md)。
+
+| 审计范围 | `cd366c1`（升级前） | 升级后 |
+| --- | --- | --- |
+| `pnpm audit --prod` | 3 critical、62 high、68 moderate、10 low | 0 critical、1 high（已忽略）、3 moderate |
+| `pnpm audit`（含开发工具） | 7 critical、135 high、122 moderate、23 low | 5 critical、59 high、51 moderate、9 low |
+
+剩余生产依赖告警均判断为不可达：
+
+| 公告 | 来源 | 不可达原因 | 处理 |
+| --- | --- | --- | --- |
+| [GHSA-5c6j-r48x-rmvq](https://github.com/advisories/GHSA-5c6j-r48x-rmvq) serialize-javascript（high） | `billd-utils` 把自己的 Rollup 构建工具链声明为运行时依赖 | 客户端只打包 `billd-utils` 的辅助函数，`rollup-plugin-terser` 从不执行 | 在 `pnpm-workspace.yaml` 的 `auditConfig.ignoreGhsas` 中忽略；移除 `billd-utils` 后删除（#52） |
+| [GHSA-67mh-4wv8-2f99](https://github.com/advisories/GHSA-67mh-4wv8-2f99) esbuild 0.15（moderate） | 同上 | 只影响 esbuild 开发服务器，PalmDesk 不运行它 | 随 #52 移除 |
+| [GHSA-x565-32qp-m3vf](https://github.com/advisories/GHSA-x565-32qp-m3vf) phin（moderate） | `@nut-tree-fork/nut-js` → `jimp` | PalmDesk 只用 nut-js 控制鼠标和键盘，从不通过 jimp 下载图片 | 等待 nut-js 更新 |
+| [GHSA-5v7r-6r5c-r473](https://github.com/advisories/GHSA-5v7r-6r5c-r473) file-type（moderate） | `@nut-tree-fork/nut-js` → `jimp` | 只在解析 ASF 媒体时触发，PalmDesk 不用 jimp 读取文件 | 等待 nut-js 更新 |
+
+CI 在每个拉取请求上运行 `pnpm audit --prod --audit-level high`，新的 high 或 critical 告警会使检查失败。Dependabot 每周提交 npm、GitHub Actions 和容器基础镜像的更新。pnpm 只解析发布满一天的版本（`minimumReleaseAge`）；`minimumReleaseAgeExclude` 中列出的两个当日安全版本到期后应删除。开发工具链中的告警主要来自 electron-builder 25、standard-version、commitizen 和旧 ESLint 插件，留待 #52 和 #54 清理。
+
 ## 安装包与对外服务
 
 - [ ] 处理高风险依赖，重新审计并记录剩余告警的可达性。

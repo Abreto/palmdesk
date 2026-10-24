@@ -22,7 +22,7 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 | macOS Apple Silicon | `macos-15`     | `PalmDesk-<version>-mac-arm64.dmg`   |
 | Windows x64         | `windows-2022` | `PalmDesk-<version>-windows-x64.exe` |
 
-当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包在 macOS 15 构建，较早系统尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
+当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包需要 macOS 13 Ventura 及以上，在 macOS 15 构建，macOS 13 和 14 尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
 
 普通 push 和 pull request 不触发此发布流程。工作流固定构建触发时的提交；输入标签必须匹配该提交的版本，已有标签必须指向同一提交。标签不存在时，发布步骤为该提交创建标签。已存在的 Release 不覆盖；发布阶段失败若留下草稿，需先检查和处理该草稿再重跑，或者使用新版本。
 
