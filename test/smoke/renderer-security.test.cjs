@@ -322,6 +322,7 @@ function desktop({ packaged = false } = {}) {
           isPackaged: packaged,
           commandLine: {},
           getName: () => 'PalmDesk Test',
+          getVersion: () => '0.0.7',
           setName() {},
           getPath: () => '/tmp',
           setPath() {},
@@ -354,6 +355,13 @@ function desktop({ packaged = false } = {}) {
           },
         },
         powerMonitor: { on() {} },
+        net: {
+          fetch: () =>
+            Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve([{ tag_name: 'v0.0.8', body: '' }]),
+            }),
+        },
         dialog: { showErrorBox() {} },
         systemPreferences: {},
         desktopCapturer: {},
@@ -507,6 +515,16 @@ test('main-process IPC accepts only the app document of a PalmDesk window', asyn
   app.send(IPC_EVENT.closeWindow, fromController);
   assert.equal(controller.destroyed, true);
   assert.equal(main.destroyed, false);
+
+  // Release checks belong to the host window.
+  assert.equal(
+    (await app.invoke(IPC_EVENT.releaseStatus, trusted)).data.current,
+    '0.0.7'
+  );
+  assert.equal(
+    (await app.invoke(IPC_EVENT.releaseCheck, app.event(about))).code,
+    1
+  );
 
   app.send(IPC_EVENT.handleOpenDevTools, trusted);
   assert.equal(main.webContents.devTools, true);
