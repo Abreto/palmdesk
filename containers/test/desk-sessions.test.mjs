@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDeskSessions } from '../backend/runtime/desk-sessions.cjs';
 import { passwordChanges } from '../backend/runtime/http.cjs';
-import { MemoryRedis, TestSocket } from './fixtures.mjs';
+import { flush, MemoryRedis, TestSocket } from './fixtures.mjs';
 
 async function fixture() {
   const redis = new MemoryRedis();
@@ -120,6 +120,44 @@ test('a password change ends every session of that device and invalidates its to
   for (const token of tokens) await assert.rejects(sessions.authorize(token), { status: 401 });
   assert.equal((await sessions.authorize(unrelated)).device, 'laptop01');
   assert.equal(other.last('billdDeskSessionEnded'), undefined);
+});
+
+test('a password change also rejects a session that was still being published', async () => {
+  for (const [device, code] of [['target01', 3], ['phone001', 1]]) {
+    const { redis, sessions, host, phone, start } = await fixture();
+    // Hold the token writes: both passwords are checked, the session is not yet active.
+    let release;
+    let reached = false;
+    const held = new Promise((resolve) => { release = resolve; });
+    const set = redis.set.bind(redis);
+    redis.set = async (key, ...rest) => {
+      if (key.startsWith('palmdesk:session:')) {
+        reached = true;
+        await held;
+      }
+      return set(key, ...rest);
+    };
+    await phone.receive('billdDeskStartRemote', start);
+    assert.equal(reached, true);
+    const ctx = { method: 'PUT', path: '/desk_user/update_by_uuid', request: { body: { uuid: device, new_password: 'new' } } };
+    await passwordChanges(sessions)(ctx, async () => {
+      ctx.status = 200;
+      ctx.body = { code: 200 };
+    });
+    release();
+    await flush();
+    const result = phone.last('billdDeskStartRemoteResult');
+    assert.equal(result.code, code, device);
+    assert.equal(result.session, undefined);
+    assert.equal(host.last('billdDeskStartRemoteResult'), undefined);
+    assert.ok(![...redis.rows.keys()].some((key) => key.startsWith('palmdesk:session:')));
+    // A request checked after the change still connects.
+    redis.set = set;
+    await phone.receive('billdDeskStartRemote', start);
+    const fresh = phone.last('billdDeskStartRemoteResult');
+    assert.equal(fresh.code, 0);
+    assert.equal((await sessions.authorize(fresh.session.token)).device, 'phone001');
+  }
 });
 
 test('only a successful password update ends sessions', async () => {
