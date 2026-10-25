@@ -68,9 +68,30 @@ app.whenReady().then(async () => {
         const focused = await native.request('focus', selected.source);
         assert.equal(focused.nativeId, selected.source.nativeId);
         assert.equal(selected.window.isFocused(), true);
+        const verified = await native.request('verifyFocus', selected.source);
+        assert.equal(verified.nativeId, selected.source.nativeId);
       }
     }
     console.log('PASS identical titles and frames retain exact native focus');
+
+    await assert.rejects(native.request('verifyFocus', second.source), {
+      code: 'focus',
+    });
+    assert.equal(first.window.isFocused(), true);
+    second.window.focus();
+    await until(() => second.window.isFocused(), 'second fixture focused');
+    await assert.rejects(native.request('verifyFocus', first.source), {
+      code: 'focus',
+    });
+    assert.equal(second.window.isFocused(), true);
+    assert.equal(
+      (await native.request('verifyFocus', second.source)).nativeId,
+      second.source.nativeId
+    );
+    await native.request('focus', first.source);
+    console.log(
+      'PASS focus verification follows changes without activating another window'
+    );
 
     // eslint-disable-next-line no-restricted-syntax -- Keep native requests sequential.
     for (const mismatch of [

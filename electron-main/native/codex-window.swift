@@ -320,21 +320,17 @@ func activateOffscreenWindow(_ target: TargetWindow) throws {
     throw WindowError.spaceControls
 }
 
-// NSWorkspace learns about activations through the run loop, which this
-// helper runs only while it waits, so frontmostApplication can be stale
-// between requests. The accessibility server always answers for now.
-func frontmostProcess() -> pid_t? {
-    let system = AXUIElementCreateSystemWide()
-    AXUIElementSetMessagingTimeout(system, 0.5)
-    guard let focused = attribute(system, kAXFocusedApplicationAttribute as CFString),
-          CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
-    var pid: pid_t = 0
-    return AXUIElementGetPid(focused as! AXUIElement, &pid) == .success ? pid : nil
+// Query the target directly: NSWorkspace can retain stale activation state
+// between requests, and the system-wide AXFocusedApplication query can return
+// noValue even when a real application is focused. AXFrontmost remains readable
+// in that case and does not activate the application.
+func isFrontmost(_ application: AXUIElement) -> Bool {
+    attribute(application, kAXFrontmostAttribute as CFString) as? Bool == true
 }
 
 // The target when it is the focused window of the frontmost application.
 func focusedWindow(_ id: UInt32, _ pid: Int32, _ bundle: String, _ application: AXUIElement) -> TargetWindow? {
-    guard frontmostProcess() == pid,
+    guard isFrontmost(application),
           let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
           CFGetTypeID(focused) == AXUIElementGetTypeID(),
           windowNumber(focused as! AXUIElement) == id,
@@ -379,7 +375,7 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
           appWindows.filter({ matches(candidates[0], $0) }).count == 1 else { throw WindowError.ambiguous }
     let window = candidates[0]
     func focusedTarget() -> TargetWindow? {
-        guard frontmostProcess() == pid,
+        guard isFrontmost(application),
               let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
               CFGetTypeID(focused) == AXUIElementGetTypeID(),
               CFEqual(focused, window) else { return nil }
