@@ -9,11 +9,16 @@ const load = require('./load-source.cjs');
 const capture = load('electron-main/capture-session.ts');
 const { CaptureSession, InputUnavailableError } = capture;
 const nativeWindow = load('electron-main/native-window.ts');
-const { pasteClipboardImage, pasteWindowsClipboardImage, supportsImagePaste } =
-  load('electron-main/image-paste.ts', {
-    './capture-session': capture,
-    './native-window': nativeWindow,
-  });
+const {
+  pasteClipboardImage,
+  pasteMacClipboardImage,
+  pasteWindowsClipboardImage,
+  supportsImagePaste,
+} = load('electron-main/image-paste.ts', {
+  './capture-session': capture,
+  './native-window': nativeWindow,
+});
+const { NativeWindowError } = nativeWindow;
 const { inspectImage } = load('src/utils/image-payload.ts');
 const image = {
   mime: 'image/png',
@@ -190,11 +195,11 @@ function windowsDriver() {
       assert.deepEqual(bytes, image.bytes);
       return native;
     },
-    write: (value) => {
+    write: async (value) => {
       events.push('write');
       clipboardImage = value;
     },
-    read: () => {
+    read: async () => {
       events.push('read');
       return clipboardImage;
     },
@@ -235,8 +240,10 @@ test('a silent Windows clipboard write failure cannot paste old text or an old i
     },
   ]) {
     const { events, driver } = windowsDriver();
-    driver.write = () => events.push('write');
-    driver.read = () => contents;
+    driver.write = async () => {
+      events.push('write');
+    };
+    driver.read = async () => contents;
     await assert.rejects(
       pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
       /剪贴板.*手动重试/
@@ -245,10 +252,23 @@ test('a silent Windows clipboard write failure cannot paste old text or an old i
   }
 });
 
+test('a rejected clipboard write stops input before the paste shortcut', async () => {
+  const { events, driver } = windowsDriver();
+  driver.write = async () => {
+    events.push('write');
+    throw new Error('OpenClipboard failed');
+  };
+  await assert.rejects(
+    pasteWindowsClipboardImage(image, windowsSource, () => true, driver),
+    /剪贴板.*手动重试/
+  );
+  assert.deepEqual(events, ['verifyImagePaste', 'write']);
+});
+
 test('a clipboard read failure stops input and permits a later explicit paste', async () => {
   const { events, driver } = windowsDriver();
   const read = driver.read;
-  driver.read = () => {
+  driver.read = async () => {
     throw new Error('clipboard is locked');
   };
   await assert.rejects(
@@ -407,11 +427,11 @@ test('clipboard write precedes the paste shortcut, and modifiers release even on
   };
   const driver = {
     decode: () => native,
-    write: (value) => {
+    write: async (value) => {
       assert.equal(value, native);
       events.push('write');
     },
-    read: () => native,
+    read: async () => native,
     press: async () => {
       events.push('paste');
       throw new Error('keyboard failed');
@@ -440,6 +460,72 @@ test('clipboard write precedes the paste shortcut, and modifiers release even on
       }),
     }),
     /解码/
+  );
+  assert.deepEqual(events, []);
+});
+
+function macDriver(events) {
+  const native = {
+    isEmpty: () => false,
+    getSize: () => inspectImage(image.bytes),
+    toBitmap: () => Buffer.alloc(238 * 48 * 4, 127),
+  };
+  return {
+    decode: () => native,
+    write: () => events.push('write'),
+    read: () => native,
+    request: async (command, target) => {
+      assert.equal(command, 'verifyFocus');
+      assert.deepEqual(target, {
+        nativeId: 10,
+        ownerPid: 42,
+        bundleId: 'com.openai.codex',
+      });
+      events.push(command);
+    },
+    press: async () => events.push('press'),
+    release: async () => events.push('release'),
+  };
+}
+
+test('macOS paste checks focus without activating before the clipboard write and before Cmd+V', async () => {
+  const events = [];
+  await pasteMacClipboardImage(image, source, () => true, macDriver(events));
+  assert.deepEqual(events, [
+    'verifyFocus',
+    'write',
+    'verifyFocus',
+    'press',
+    'release',
+  ]);
+});
+
+test('macOS paste sends no Cmd+V when the window loses focus during clipboard work', async () => {
+  const events = [];
+  const driver = macDriver(events);
+  let checks = 0;
+  driver.request = async () => {
+    checks += 1;
+    events.push('verifyFocus');
+    if (checks === 2)
+      throw new NativeWindowError(
+        'The selected window could not be focused',
+        'focus'
+      );
+  };
+  await assert.rejects(
+    pasteMacClipboardImage(image, source, () => true, driver),
+    (error) =>
+      error instanceof InputUnavailableError && /前台/.test(error.message)
+  );
+  assert.deepEqual(events, ['verifyFocus', 'write', 'verifyFocus']);
+  events.length = 0;
+  driver.request = async () => {
+    throw new NativeWindowError('操作已取消', 'cancelled');
+  };
+  await assert.rejects(
+    pasteMacClipboardImage(image, source, () => true, driver),
+    /取消/
   );
   assert.deepEqual(events, []);
 });

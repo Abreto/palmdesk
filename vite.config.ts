@@ -1,7 +1,6 @@
 import path from 'path';
 
 import vue from '@vitejs/plugin-vue';
-import { BilldHtmlWebpackPlugin, logData } from 'billd-html-webpack-plugin';
 import autoImport from 'unplugin-auto-import/vite';
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers';
 import unpluginVueComponents from 'unplugin-vue-components/vite';
@@ -16,6 +15,23 @@ import pkg from './package.json';
 import type { ChildProcess } from 'node:child_process';
 
 const isWeb = process.env['VITE_APP_RELEASE_PROJECT_ISWEB'] === 'true';
+
+// Scripts come only from the bundle. Network access stays open to the
+// http(s)/ws(s) services users can configure for self-hosting.
+const contentSecurityPolicy = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "media-src 'self' blob: mediastream:",
+  "connect-src 'self' https: wss: http: ws:",
+  "worker-src 'self' blob:",
+  "frame-src 'none'",
+  "object-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+].join('; ');
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -139,11 +155,26 @@ export default defineConfig(({ mode }) => {
         // eslint-disable-next-line
         resolvers: [NaiveUiResolver()],
       }),
-      new BilldHtmlWebpackPlugin({ env: 'vite4' }).config,
+      {
+        name: 'palmdesk-content-security-policy',
+        apply: 'build',
+        transformIndexHtml: () => [
+          {
+            tag: 'meta',
+            attrs: {
+              'http-equiv': 'Content-Security-Policy',
+              content: contentSecurityPolicy,
+            },
+            injectTo: 'head-prepend',
+          },
+        ],
+      },
     ],
     define: {
+      PALMDESK_VERSION: JSON.stringify(pkg.version),
+      // Compile i18n messages without eval, which the CSP blocks.
+      __INTLIFY_JIT_COMPILATION__: true,
       'process.env': {
-        BilldHtmlWebpackPlugin: logData(null),
         NODE_ENV: JSON.stringify(isProduction ? 'production' : 'development'),
         PUBLIC_PATH: outputStaticUrl(),
         VUE_APP_RELEASE_PROJECT_NAME: JSON.stringify(

@@ -24,7 +24,12 @@ export interface InputDriver {
     direction: 'up' | 'down' | 'left' | 'right',
     amount: number
   ) => Promise<unknown>;
-  text: (value: string, source: ICaptureSource) => Promise<unknown>;
+  /** `current` turns false when the session ends or changes; stop typing then. */
+  text: (
+    value: string,
+    source: ICaptureSource,
+    current: () => boolean
+  ) => Promise<unknown>;
   keysDown: (keys: number[]) => Promise<unknown>;
   keysUp: (keys: number[]) => Promise<unknown>;
   validKey: (key: number) => boolean;
@@ -37,6 +42,41 @@ export interface InputDriver {
 }
 
 export class InputUnavailableError extends Error {}
+
+/** Code points typed between checks of the session and the target's focus. */
+export const TEXT_CHUNK_LENGTH = 32;
+
+/**
+ * Types text in chunks. Before each later chunk it confirms, without
+ * activating anything, that the session is still current and the target
+ * still has focus, so the rest never lands elsewhere or outlives the session.
+ */
+export async function typeInChunks(
+  text: string,
+  current: () => boolean,
+  driver: {
+    type: (chunk: string) => Promise<unknown>;
+    verifyFocus: () => Promise<unknown>;
+  }
+) {
+  const characters = Array.from(text);
+  for (let start = 0; start < characters.length; start += TEXT_CHUNK_LENGTH) {
+    if (start > 0) {
+      if (!current()) throw new Error('远程控制会话已结束，已停止输入文字');
+      try {
+        await driver.verifyFocus();
+      } catch {
+        throw new InputUnavailableError(
+          `已输入 ${start}/${characters.length} 个字符后目标窗口失去焦点，已停止输入。请在电脑上切回该窗口后重试`
+        );
+      }
+    }
+    if (!current()) throw new Error('远程控制会话已结束，已停止输入文字');
+    await driver.type(
+      characters.slice(start, start + TEXT_CHUNK_LENGTH).join('')
+    );
+  }
+}
 
 export function normalizedPoint(
   source: ICaptureSource,
@@ -325,7 +365,11 @@ export class CaptureSession {
               input.text.length > 4096
             )
               throw new Error('文字长度须为 1 至 4096');
-            await this.driver.text(input.text, source);
+            await this.driver.text(
+              input.text,
+              source,
+              () => this.active === active
+            );
             break;
           case 'keysDown':
           case 'keysUp': {

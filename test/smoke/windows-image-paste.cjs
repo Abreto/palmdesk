@@ -9,8 +9,9 @@ const { rm } = require('node:fs/promises');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 
-const { app, clipboard, nativeImage } = require('electron');
+const { app, clipboard, ClipboardItem, nativeImage } = require('electron');
 
+const { restoreClipboard, saveClipboard } = require('./clipboard-snapshot.cjs');
 const load = require('./load-source.cjs');
 
 const nativeModule = load('electron-main/native-window.ts');
@@ -18,6 +19,9 @@ const { NativeWindowBridge } = nativeModule;
 const { pasteWindowsClipboardImage } = load('electron-main/image-paste.ts', {
   './native-window': nativeModule,
 });
+const { readClipboardImage, writeClipboardImage } = load(
+  'electron-main/clipboard-image.ts'
+);
 const root = path.resolve(__dirname, '../..');
 const output = path.join(root, '.local/image-paste');
 fs.mkdirSync(output, { recursive: true });
@@ -45,12 +49,7 @@ app
       path.join(root, 'native-bin/palmdesk-window.exe')
     );
     const fixture = new NativeWindowBridge(executable);
-    const saved = {
-      text: clipboard.readText(),
-      html: clipboard.readHTML(),
-      rtf: clipboard.readRTF(),
-      image: clipboard.readImage(),
-    };
+    const saved = await saveClipboard(clipboard);
     const marker = `PalmDesk clipboard smoke ${Date.now()}`;
     let lastImage;
     let writes = 0;
@@ -81,12 +80,12 @@ app
       assert.ok(target && other);
       const driver = {
         decode: (bytes) => nativeImage.createFromBuffer(Buffer.from(bytes)),
-        write: (image) => {
-          clipboard.writeImage(image);
-          lastImage = clipboard.readImage().toPNG();
+        write: async (image) => {
           writes += 1;
+          await writeClipboardImage(image);
+          lastImage = (await readClipboardImage()).toBitmap();
         },
-        read: () => clipboard.readImage(),
+        read: readClipboardImage,
         request: (command, identity, current) =>
           native.request(command, identity, current),
       };
@@ -102,23 +101,19 @@ app
           fs.readFileSync(path.join(root, 'src/assets/img/logo.png'))
         ),
       };
-      clipboard.writeText(marker);
+      await clipboard.writeText(marker);
       await fixture.request('lockClipboard');
       try {
         await assert.rejects(
           pasteWindowsClipboardImage(payload, target, () => true, driver),
           /剪贴板.*手动重试/
         );
-        assert.equal(
-          writes,
-          1,
-          'Electron silently returned from the locked write'
-        );
+        assert.equal(writes, 1, 'the locked write was attempted once');
       } finally {
         await fixture.request('unlockClipboard');
       }
       assert.equal(
-        clipboard.readText(),
+        await clipboard.readText(),
         marker,
         'the failed write left old text'
       );
@@ -180,7 +175,7 @@ app
           draftPreserved: true,
         });
       }
-      clipboard.writeText(marker);
+      await clipboard.writeText(marker);
       await assert.rejects(
         pasteWindowsClipboardImage(payload, target, () => false, driver),
         /取消/
@@ -276,10 +271,10 @@ app
       fixture.close();
       native.close();
       if (
-        clipboard.readText() === marker ||
-        (lastImage && clipboard.readImage().toPNG().equals(lastImage))
+        (await clipboard.readText()) === marker ||
+        (lastImage && (await readClipboardImage()).toBitmap().equals(lastImage))
       )
-        clipboard.write(saved);
+        await restoreClipboard(clipboard, ClipboardItem, saved);
       await rm(directory, {
         recursive: true,
         force: true,

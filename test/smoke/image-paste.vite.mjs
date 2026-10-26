@@ -8,7 +8,8 @@ export default defineConfig({
   root,
   resolve: { alias: { '@': path.join(root, 'src') } },
   define: {
-    'process.env': { NODE_ENV: 'development', BilldHtmlWebpackPlugin: {} },
+    'process.env': { NODE_ENV: 'development' },
+    PALMDESK_VERSION: JSON.stringify('0.0.0-smoke'),
   },
   css: {
     preprocessorOptions: {
@@ -19,5 +20,13 @@ export default defineConfig({
     },
   },
   plugins: [vue()],
-  server: { host: '127.0.0.1', port: 5196, strictPort: true },
+  // Scan only the fixture page; the root index.html loads the real router.
+  optimizeDeps: { entries: ['test/smoke/image-paste.html'] },
+  server: {
+    host: '127.0.0.1',
+    port: 5196,
+    strictPort: true,
+    // Smoke screenshots written to .local/ must not reload the page.
+    watch: { ignored: ['**/.local/**'] },
+  },
 });

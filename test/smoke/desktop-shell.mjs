@@ -44,6 +44,12 @@ try {
     electron: process.versions.electron,
     executable: process.execPath,
   }));
+  // Results are committed under docs/; never record a personal absolute path.
+  const relative = path.relative(root, identity.executable);
+  identity.executable =
+    relative && !relative.startsWith('..') && !path.isAbsolute(relative)
+      ? relative
+      : path.basename(identity.executable);
   assert.equal(
     identity.name,
     getDesktopIdentity(root, { development: !packaged }).productName

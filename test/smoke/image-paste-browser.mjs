@@ -10,6 +10,8 @@ const browser = await chromium.launch({
     process.env.SMOKE_BROWSER_EXECUTABLE ||
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
   headless: true,
+  // The fixture's peers are local; do not depend on multicast DNS resolution.
+  args: ['--disable-features=WebRtcHideLocalIpsWithMdns'],
 });
 const artifacts = path.resolve('.local/image-paste');
 await mkdir(artifacts, { recursive: true });

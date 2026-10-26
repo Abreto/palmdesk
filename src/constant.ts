@@ -1,7 +1,6 @@
 export * from '@/pure-constant';
 import { Key } from '@nut-tree-fork/shared';
 
-import type { BilldHtmlWebpackPluginLog } from '@/interface';
 import { serviceDefaults } from '@/utils/service-defaults';
 
 export const PROJECT_GITHUB = 'https://github.com/Abreto/palmdesk';
@@ -25,9 +24,7 @@ export const COMMON_URL = {
 
 export const PROJECT_NAME = 'palmdesk';
 
-// @ts-ignore
-export const APP_BUILD_INFO = process.env
-  .BilldHtmlWebpackPlugin as BilldHtmlWebpackPluginLog;
+export const APP_VERSION = PALMDESK_VERSION;
 
 export const NODE_ENV = process.env.NODE_ENV;
 

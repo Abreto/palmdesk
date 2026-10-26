@@ -1,12 +1,12 @@
 # 桌面安装包与预发布
 
-当前发行流程用于测试版：从 v0.0.3 起，macOS 使用固定自签名证书，不包含 Developer ID 签名和 Apple 公证；Windows 安装包未签名。系统可能提示或阻止打开。自动更新和真实远控验收不包含在此流程中。
+当前发行流程用于测试版：从 v0.0.3 起，macOS 使用固定自签名证书，不包含 Developer ID 签名和 Apple 公证；Windows 安装包未签名。系统可能提示或阻止打开。此流程不包含自动更新和真实远控验收；桌面端只会提示有新版本，并在发布说明含有以 `Security:` 开头的行时醒目提示。
 
 当前使用 `0.0.x` 迭代 Preview；`0.1.0` 保留给完成打磨、可正式分发的里程碑。
 
 ## 手动触发 GitHub Actions
 
-1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号。
+1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号，并在 [CHANGELOG.md](../CHANGELOG.md) 中把 `Unreleased` 条目移到该版本下；有安全修复时写入 **Security**，并在 GitHub 发布对应的安全公告。
 2. 打开仓库 **Actions → Desktop Prerelease → Run workflow**。
 3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.3` 输入 `v0.0.3`，然后运行。
 4. 等待两个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传两个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。
@@ -22,7 +22,7 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 | macOS Apple Silicon | `macos-15`     | `PalmDesk-<version>-mac-arm64.dmg`   |
 | Windows x64         | `windows-2022` | `PalmDesk-<version>-windows-x64.exe` |
 
-当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包在 macOS 15 构建，较早系统尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
+当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包需要 macOS 13 Ventura 及以上，在 macOS 15 构建，macOS 13 和 14 尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
 
 普通 push 和 pull request 不触发此发布流程。工作流固定构建触发时的提交；输入标签必须匹配该提交的版本，已有标签必须指向同一提交。标签不存在时，发布步骤为该提交创建标签。已存在的 Release 不覆盖；发布阶段失败若留下草稿，需先检查和处理该草稿再重跑，或者使用新版本。
 
