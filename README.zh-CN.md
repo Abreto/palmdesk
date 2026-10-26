@@ -51,7 +51,7 @@ Codex 读取 `CODEX_HOME` 或 `~/.codex`。Claude Code 读取 `CLAUDE_CONFIG_DIR
 - 点击、双击、长按右键、拖拽、滚动、双指捏合缩放、平移与只读模式。
 - 本地中文输入框、发送文字、回车、常用按键和硬件键盘。
 - macOS 和 Windows Codex 窗口支持从手机选择或粘贴单张 PNG/JPEG 图片，预览后粘贴为 prompt 附件。
-- macOS 按应用 bundle ID、PID 和原生窗口 ID 识别目标；输入前刷新边界并验证聚焦。
+- macOS 按应用 bundle ID、PID 和原生窗口 ID 识别目标；输入前刷新边界并验证聚焦。长文本分段输入并在段间复查焦点：窗口失去焦点时停止输入并提示已输入的字符数，结束控制也会立即停止。
 - Windows 按 HWND、PID、可执行文件路径和进程启动时间识别目标；支持当前虚拟桌面的普通窗口、指定窗口最小化还原，以及高 DPI 和多显示器物理坐标。
 - Windows 发送文字使用原生 Unicode 输入，保留中英文原文，避免中文输入法把英文转成候选词。
 - 窗口消失、捕获结束、连接断开时停止输入并释放按键。
@@ -171,7 +171,7 @@ GitHub Actions 配置包含 Linux、macOS、Windows 单元测试、类型检查�
 
 ## 验证边界与计划
 
-独立的浏览器集成烟测覆盖真实 Vue 页面、运行中的后端、Socket.IO、WebRTC 视频解码和输入 DataChannel，其中原生视频源与系统输入使用测试替身。它需要按 [浏览器与 Electron 烟测](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) 准备环境，不在 `pnpm test:smoke` 或源码检查 CI 中运行。历史结果见 [验证报告](docs/CODEX_REMOTE_REPAIR_RESULTS.md)，报告与截图中的 Codex Remote 是项目旧名称。
+独立的浏览器集成烟测覆盖真实 Vue 页面、运行中的后端、Socket.IO、WebRTC 视频解码和输入 DataChannel，其中原生视频源与系统输入使用测试替身。它需要按 [浏览器与 Electron 烟测](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) 准备环境，不在 `pnpm test:smoke` 或源码检查 CI 中运行。历史结果见 [存档的验证报告](docs/archive/2026-09-07-codex-remote-validation.md)，其中的 Codex Remote 是项目旧名称。
 
 单独的 Windows 原生测试验证真实窗口捕获与输入。[公网后端验证](docs/smoke-artifacts/public-backend-2026-09-08.md) 记录了打包版 Windows 主机的真实 WGC 视频和 Win32 输入，以及用户随后确认的手机实测成功；跨网络 TURN 行为尚未验证。
 
@@ -195,16 +195,16 @@ node scripts/dev.mjs --prepare-only
 
 ## 文档导航
 
-| 文档                                                | 内容                                             |
-| --------------------------------------------------- | ------------------------------------------------ |
-| [本地开发](docs/LOCAL_DEVELOPMENT.md)               | 后端准备、Windows 开发、烟测、应用身份和权限恢复 |
-| [服务配置](docs/SERVICE_CONFIGURATION.md)           | API、信令、扫码连接、HTTPS 和 TURN               |
-| [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)      | 安装包、签名、版本规则和发布流程                 |
-| [会话阅读](docs/GLASSLINE_INTEGRATION.md)           | 支持来源、读取限制、窗口关联和验证入口           |
-| [容器镜像](containers/README.md)                    | 网页与后端镜像、固定后端源码及部署适配层         |
-| [TURN 验证](docs/TURN_TESTING.md)                   | 强制中继与凭据续期验证                           |
-| [历史验证报告](docs/CODEX_REMOTE_REPAIR_RESULTS.md) | 历史测试结果及待验收项目                         |
-| [开源准备记录](docs/OPEN_SOURCE_READINESS.md)       | 历史依赖审计和稳定分发前提                       |
+| 文档                                           | 内容                                             |
+| ---------------------------------------------- | ------------------------------------------------ |
+| [本地开发](docs/LOCAL_DEVELOPMENT.md)          | 后端准备、Windows 开发、烟测、应用身份和权限恢复 |
+| [服务配置](docs/SERVICE_CONFIGURATION.md)      | API、信令、扫码连接、HTTPS 和 TURN               |
+| [桌面安装包与预发布](docs/DESKTOP_RELEASES.md) | 安装包、签名、版本规则和发布流程                 |
+| [会话阅读](docs/GLASSLINE_INTEGRATION.md)      | 支持来源、读取限制、窗口关联和验证入口           |
+| [容器镜像](containers/README.md)               | 网页与后端镜像、固定后端源码及部署适配层         |
+| [TURN 验证](docs/TURN_TESTING.md)              | 强制中继与凭据续期验证                           |
+| [验证记录](docs/smoke-artifacts/)              | 按日期记录的测试结果及待验收项目                 |
+| [开源准备记录](docs/OPEN_SOURCE_READINESS.md)  | 历史依赖审计和稳定分发前提                       |
 
 ## 贡献与许可证
 

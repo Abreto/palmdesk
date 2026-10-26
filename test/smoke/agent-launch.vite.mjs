@@ -37,5 +37,13 @@ export default defineConfig({
     },
   },
   plugins: [vue()],
-  server: { host: '127.0.0.1', port: 5197, strictPort: true },
+  // Scan only the fixture page; the root index.html loads the real router.
+  optimizeDeps: { entries: ['test/smoke/agent-launch.html'] },
+  server: {
+    host: '127.0.0.1',
+    port: 5197,
+    strictPort: true,
+    // Smoke screenshots written to .local/ must not reload the page.
+    watch: { ignored: ['**/.local/**'] },
+  },
 });

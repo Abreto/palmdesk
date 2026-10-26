@@ -6,7 +6,7 @@
 
 ## 手动触发 GitHub Actions
 
-1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号。
+1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号，并在 [CHANGELOG.md](../CHANGELOG.md) 中把 `Unreleased` 条目移到该版本下；有安全修复时写入 **Security**，并在 GitHub 发布对应的安全公告。
 2. 打开仓库 **Actions → Desktop Prerelease → Run workflow**。
 3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.3` 输入 `v0.0.3`，然后运行。
 4. 等待两个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传两个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。

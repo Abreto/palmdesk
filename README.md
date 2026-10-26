@@ -46,7 +46,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 - Use tap, double tap, long-press right click, drag, scroll, pinch-to-zoom, pan, and read-only mode.
 - Compose text locally, including Chinese text, then send it to the host. Send Enter, common keys, and hardware keyboard input.
 - Select or paste a single PNG/JPEG on your phone, preview it, and paste it into a macOS or Windows Codex prompt.
-- On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input.
+- On macOS, identify the target by application bundle ID, process ID, and native window ID; refresh its bounds and verify focus before sending input. Long text is typed in short chunks with a focus check between them: if the window loses focus, typing stops and reports how many characters were entered, and ending control stops it too.
 - On Windows, identify the target by HWND, process ID, executable path, and process start time. Support regular windows on the current virtual desktop, restoring a selected minimized window, and physical coordinates across high-DPI and multiple displays.
 - Send literal Unicode text on Windows, preserving Chinese and English text without conversion by the host's input method.
 - Stop input and release held keys when the window disappears, capture ends, or the connection closes.
@@ -213,7 +213,7 @@ GitHub Actions in the main repository can build the web client and the backend w
 
 ### Validation Coverage
 
-The separate browser integration smoke tests exercise real Vue pages, a running backend, Socket.IO, WebRTC video decoding, and the input DataChannel. Native video sources and system input use test doubles in those tests. They require the setup in the [development guide](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) and are not run by `pnpm test:smoke` or the source-check CI. Historical results are in the [validation report](docs/CODEX_REMOTE_REPAIR_RESULTS.md); references to Codex Remote in reports and screenshots use the project's former name.
+The separate browser integration smoke tests exercise real Vue pages, a running backend, Socket.IO, WebRTC video decoding, and the input DataChannel. Native video sources and system input use test doubles in those tests. They require the setup in the [development guide](docs/LOCAL_DEVELOPMENT.md#浏览器与-electron-烟测) and are not run by `pnpm test:smoke` or the source-check CI. Historical results are in the [archived validation report](docs/archive/2026-09-07-codex-remote-validation.md), written under the project's former name, Codex Remote.
 
 Separate Windows native tests verify real window capture and input. The [public backend verification](docs/smoke-artifacts/public-backend-2026-09-08.md) records a packaged Windows host with real WGC video and Win32 input, followed by user-confirmed testing from a physical phone. Cross-network TURN behavior remains unverified.
 
@@ -244,17 +244,17 @@ Set `SMOKE_PREVIEWS_ONLY=true` to check only previews from other Spaces and cont
 
 The detailed guides are currently in Chinese.
 
-| Guide                                                    | Contents                                                                                       |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [Chinese README](README.zh-CN.md)                        | Chinese project overview and usage instructions                                                |
-| [Local development](docs/LOCAL_DEVELOPMENT.md)           | Backend setup, browser and Electron smoke tests, application identity, and permission recovery |
-| [Service configuration](docs/SERVICE_CONFIGURATION.md)   | API and signaling addresses, QR connections, HTTPS deployment, and TURN                        |
-| [Desktop releases](docs/DESKTOP_RELEASES.md)             | Preview installers, signing, version rules and release workflow                                |
-| [Session reading](docs/GLASSLINE_INTEGRATION.md)         | Supported sources, reading limits, window associations and test setup                          |
-| [Container images](containers/README.md)                 | Web and backend images, pinned backend source and deployment adapter                           |
-| [TURN testing](docs/TURN_TESTING.md)                     | Forced-relay and credential-renewal verification                                               |
-| [Validation report](docs/CODEX_REMOTE_REPAIR_RESULTS.md) | Historical test results and remaining acceptance work                                          |
-| [Open-source readiness](docs/OPEN_SOURCE_READINESS.md)   | Historical dependency audit and release prerequisites                                          |
+| Guide                                                  | Contents                                                                                       |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| [Chinese README](README.zh-CN.md)                      | Chinese project overview and usage instructions                                                |
+| [Local development](docs/LOCAL_DEVELOPMENT.md)         | Backend setup, browser and Electron smoke tests, application identity, and permission recovery |
+| [Service configuration](docs/SERVICE_CONFIGURATION.md) | API and signaling addresses, QR connections, HTTPS deployment, and TURN                        |
+| [Desktop releases](docs/DESKTOP_RELEASES.md)           | Preview installers, signing, version rules and release workflow                                |
+| [Session reading](docs/GLASSLINE_INTEGRATION.md)       | Supported sources, reading limits, window associations and test setup                          |
+| [Container images](containers/README.md)               | Web and backend images, pinned backend source and deployment adapter                           |
+| [TURN testing](docs/TURN_TESTING.md)                   | Forced-relay and credential-renewal verification                                               |
+| [Validation records](docs/smoke-artifacts/)            | Dated test results and remaining acceptance work                                               |
+| [Open-source readiness](docs/OPEN_SOURCE_READINESS.md) | Historical dependency audit and release prerequisites                                          |
 
 ## Contributing and License
 

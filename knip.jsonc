@@ -24,9 +24,6 @@
     "billd-scss",
     // Named as a plugin in postcss.config.js.
     "postcss-preset-env",
-    // Installed on demand for the manual browser smoke tests (#55).
-    "playwright",
-    "socket.io",
   ],
   // Browser smoke tests import these from the Vite dev server at run time.
   "ignoreUnresolved": [

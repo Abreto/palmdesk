@@ -79,6 +79,13 @@ try {
     { id: 1, x: center.x + dx - spread, y: center.y + dy },
     { id: 2, x: center.x + dx + spread, y: center.y + dy },
   ];
+  // Narrow phones hide the zoom menu; pinching in returns to fit.
+  async function zoomToFit() {
+    await touch('touchStart', pair(40));
+    await touch('touchMove', pair(5));
+    await touch('touchEnd', []);
+    assert.equal((await layout()).zoom, 1);
+  }
   await clearInputs();
   await touch('touchStart', pair(40));
   await touch('touchMove', pair(80));
@@ -178,7 +185,7 @@ try {
     true
   );
   for (const mode of ['点击', '滚动', '拖拽']) {
-    await page.getByLabel('画面缩放').selectOption('1');
+    await zoomToFit();
     await page.getByLabel(mode, { exact: true }).click();
     await clearInputs();
     await page.touchscreen.tap(center.x, center.y);
@@ -199,7 +206,7 @@ try {
     await noRemoteInput();
   }
   for (const watchOnly of [false, true]) {
-    await page.getByLabel('画面缩放').selectOption('1');
+    await zoomToFit();
     if (watchOnly) {
       await page.getByLabel('点击', { exact: true }).click();
       await page.getByLabel('仅观看').check();
@@ -228,7 +235,7 @@ try {
     'PASS blocked host input preserves local gestures in every mode; remote input resumes only after recovery'
   );
 
-  await page.getByLabel('画面缩放').selectOption('1');
+  await zoomToFit();
   await page.getByLabel('点击', { exact: true }).click();
   await clearInputs();
   await touch('touchStart', pair(40));
