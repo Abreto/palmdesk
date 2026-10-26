@@ -6,6 +6,10 @@ const password = (value) => typeof value === 'string' && value.length > 0 && val
 
 function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
   const active = new Map();
+  // Bumped when a device's password changes, so a start that checked the old
+  // password cannot publish its session after the change.
+  const revisions = new Map();
+  const revision = (device) => revisions.get(device) || 0;
   const tokenTtl = ttl + 3600;
   const tokenKey = (token) => `palmdesk:session:${hash(token)}`;
   const socketFor = (id) => io.of('/').sockets.get(id);
@@ -21,6 +25,16 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
       socket?.emit('billdDeskSessionEnded', { sessionId: id, peerId: member.peerId, reason });
     }
     await redis.del(session.members.flatMap((member) => [tokenKey(member.token), `palmdesk:ice:${id}:${member.socketId}`]));
+  }
+
+  // A new password must remove everyone, not only block new connections.
+  async function endDevice(device, reason) {
+    revisions.set(device, revision(device) + 1);
+    const ids = [...active.values()]
+      .filter((session) => session.members.some((member) => member.device === device))
+      .map((session) => session.id);
+    await Promise.all(ids.map((id) => end(id, reason)));
+    return ids.length;
   }
 
   function current(member) {
@@ -73,6 +87,8 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
       throw failure(401, 'Invalid remote session');
     }
     await rateLimit(redis, 'start-device', desk.device, 12);
+    const devices = [desk.device, data.remoteDeskUserUuid];
+    const checked = devices.map(revision);
     if (!await users.login({ uuid: desk.device, password: data.deskUserPassword })) throw failure(401, 'Controller password is incorrect');
     if (!await users.login({ uuid: data.remoteDeskUserUuid, password: data.remoteDeskUserPassword })) {
       throw failure(403, 'Remote password is incorrect');
@@ -106,8 +122,11 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
       await Promise.all(session.members.map(({ token, ...member }) =>
         redis.set(tokenKey(token), JSON.stringify(member), { EX: tokenTtl })
       ));
-      if (!socket.connected || !target.connected) {
+      const changed = devices.findIndex((device, index) => revision(device) !== checked[index]);
+      if (!socket.connected || !target.connected || changed !== -1) {
         await redis.del(session.members.map((member) => tokenKey(member.token)));
+        if (changed === 0) throw failure(401, 'Controller password has changed');
+        if (changed === 1) throw failure(403, 'Remote password has changed');
         return;
       }
       active.set(id, session);
@@ -168,7 +187,7 @@ function createDeskSessions({ io, redis, users, prefixes, ttl = 3600 }) {
       }
     });
   }
-  return { attach, authorize, end };
+  return { attach, authorize, end, endDevice };
 }
 
 module.exports = { createDeskSessions };
