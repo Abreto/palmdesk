@@ -320,20 +320,41 @@ func activateOffscreenWindow(_ target: TargetWindow) throws {
     throw WindowError.spaceControls
 }
 
-// Query the target directly: NSWorkspace can retain stale activation state
-// between requests, and the system-wide AXFocusedApplication query can return
-// noValue even when a real application is focused. AXFrontmost remains readable
-// in that case and does not activate the application.
-func isFrontmost(_ application: AXUIElement) -> Bool {
-    attribute(application, kAXFrontmostAttribute as CFString) as? Bool == true
+// WindowServer sends keystrokes to its key-focus process. Spotlight and other
+// non-activating panels take key focus without deactivating the target, so the
+// target's own AXFrontmost and AXFocusedWindow stay unchanged. The system-wide
+// AXFocusedApplication starts from this process but then needs its
+// AXFocusedUIElement, which can be empty even while it has key focus. Without
+// these symbols, focus checks fail closed.
+func keyFocusProcess() -> pid_t? {
+    guard let focusSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "CPSGetKeyFocusProcess"),
+          let pidSymbol = dlsym(UnsafeMutableRawPointer(bitPattern: -2), "GetProcessPID") else { return nil }
+    // SkyLight always writes a flag byte through the second argument.
+    typealias KeyFocusProcess = @convention(c) (UnsafeMutablePointer<ProcessSerialNumber>, UnsafeMutablePointer<UInt8>) -> Int32
+    typealias ProcessPID = @convention(c) (UnsafePointer<ProcessSerialNumber>, UnsafeMutablePointer<pid_t>) -> Int32
+    var process = ProcessSerialNumber()
+    var flag: UInt8 = 0
+    var pid: pid_t = 0
+    guard unsafeBitCast(focusSymbol, to: KeyFocusProcess.self)(&process, &flag) == 0,
+          unsafeBitCast(pidSymbol, to: ProcessPID.self)(&process, &pid) == 0,
+          pid > 0 else { return nil }
+    return pid
 }
 
-// The target when it is the focused window of the frontmost application.
-func focusedWindow(_ id: UInt32, _ pid: Int32, _ bundle: String, _ application: AXUIElement) -> TargetWindow? {
-    guard isFrontmost(application),
+// The target's focused window while it receives keystrokes and is active.
+// Activation is read from the target: NSWorkspace can be stale between requests.
+func keyWindow(_ application: AXUIElement, _ pid: Int32) -> AXUIElement? {
+    guard keyFocusProcess() == pid,
+          attribute(application, kAXFrontmostAttribute as CFString) as? Bool == true,
           let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
-          CFGetTypeID(focused) == AXUIElementGetTypeID(),
-          windowNumber(focused as! AXUIElement) == id,
+          CFGetTypeID(focused) == AXUIElementGetTypeID() else { return nil }
+    return (focused as! AXUIElement)
+}
+
+// The target when it is the window receiving keystrokes.
+func focusedWindow(_ id: UInt32, _ pid: Int32, _ bundle: String, _ application: AXUIElement) -> TargetWindow? {
+    guard let focused = keyWindow(application, pid),
+          windowNumber(focused) == id,
           let target = windows(id).first(where: {
               $0.nativeId == id && $0.ownerPid == pid && $0.bundleId == bundle
           }), target.isOnScreen else { return nil }
@@ -375,10 +396,7 @@ func focus(_ id: UInt32, _ pid: Int32, _ bundle: String) throws -> TargetWindow 
           appWindows.filter({ matches(candidates[0], $0) }).count == 1 else { throw WindowError.ambiguous }
     let window = candidates[0]
     func focusedTarget() -> TargetWindow? {
-        guard isFrontmost(application),
-              let focused = attribute(application, kAXFocusedWindowAttribute as CFString),
-              CFGetTypeID(focused) == AXUIElementGetTypeID(),
-              CFEqual(focused, window) else { return nil }
+        guard let focused = keyWindow(application, pid), CFEqual(focused, window) else { return nil }
         let refreshedWindows = windows().filter { $0.ownerPid == pid && $0.bundleId == bundle }
         guard let refreshed = refreshedWindows.first(where: { $0.nativeId == id }),
               refreshed.isOnScreen,

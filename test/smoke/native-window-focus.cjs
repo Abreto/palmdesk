@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { spawn } = require('node:child_process');
 const path = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 
@@ -14,8 +15,8 @@ const native = new NativeWindowBridge(
   path.join(root, 'native-bin/codex-window')
 );
 const fixtures = [];
-async function until(check, label) {
-  const deadline = Date.now() + 5000;
+async function until(check, label, timeout = 5000) {
+  const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
     const result = await check();
     if (result) return result;
@@ -51,6 +52,7 @@ async function fixture(title, bounds = {}) {
 
 app.whenReady().then(async () => {
   let failed = false;
+  let other;
   try {
     assert.equal((await native.request('permissions')).accessibility, true);
     const first = await fixture('PalmDesk focus fixture A');
@@ -91,6 +93,39 @@ app.whenReady().then(async () => {
     await native.request('focus', first.source);
     console.log(
       'PASS focus verification follows changes without activating another window'
+    );
+
+    other = spawn(
+      process.execPath,
+      [path.join(__dirname, 'fixtures/other-app-window.cjs')],
+      { stdio: 'ignore' }
+    );
+    const otherSource = await until(
+      async () =>
+        (await native.request('list')).find(
+          (item) => item.ownerPid === other.pid && item.isOnScreen
+        ),
+      'other application window',
+      15000
+    );
+    await native.request('focus', otherSource);
+    await until(() => !first.window.isFocused(), 'other application focused');
+    await assert.rejects(native.request('verifyFocus', first.source), {
+      code: 'focus',
+    });
+    assert.equal(first.window.isFocused(), false);
+    // Still on screen, so the rejection comes from the focus check.
+    assert.equal(
+      (await ownWindows()).find(
+        (item) => item.nativeId === first.source.nativeId
+      )?.isOnScreen,
+      true
+    );
+    await native.request('focus', first.source);
+    assert.equal(first.window.isFocused(), true);
+    other.kill();
+    console.log(
+      'PASS focus verification rejects another application without activating the target'
     );
 
     // eslint-disable-next-line no-restricted-syntax -- Keep native requests sequential.
@@ -151,6 +186,7 @@ app.whenReady().then(async () => {
     failed = true;
     console.error(error);
   } finally {
+    other?.kill();
     native.close();
     fixtures.forEach((window) => {
       if (!window.isDestroyed()) window.destroy();
