@@ -12,7 +12,7 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 
 1. 电脑首页开启「会话阅读」。默认关闭，可在 macOS 和 Windows 启用，范围是当前用户的 Codex、Claude Code 与 Claude Desktop 本地 Code 会话。读取目录遵循 `CODEX_HOME`、`CLAUDE_CONFIG_DIR` 和 `CLAUDE_USER_DATA_DIR`。所有来源按更新时间合并展示，列表、详情和助手署名标明来源。
 2. 扫码认证后进入阅读视图，无须先授权或启动窗口捕获。没有开启读取时默认进入窗口选择。
-3. 选择会话，阅读 Markdown、复制回复、向前加载历史；工具活动及长输出默认折叠。
+3. 选择会话，阅读 Markdown、复制回复、向前加载历史；工具活动及长输出默认折叠。命令、工具调用和文件改动分卡显示，文件差异按增删着色；非零退出码、Claude Code 工具结果的 `is_error` 和 Codex 补丁事件的 `success: false` 会在卡片和分组摘要中标为失败。
 4. 页面可见时每 8 秒检查所选会话，出现新内容后显示提示；点击查看更新才重新定位到最近消息。
 5. 切换到窗口，选择原应用后可关联到正在阅读的会话。已有窗口也可手动关联。发送 prompt 前由用户确认 GUI 当前任务。
 6. 切回阅读保留位置、会话和连接；窗口输入草稿也保留。阅读时暂停视频传输，阻止窗口控制，并释放按住的键和鼠标按钮。
@@ -24,7 +24,7 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 
 | 模块 | 职责 |
 | --- | --- |
-| `session-core/index.mjs` | 本地会话列表与分页读取、对外数据投影、长内容限制 |
+| `session-core/index.mjs` | 本地会话列表与分页读取、对外数据投影（含退出码、状态、工具名和文件路径；保留 `title` 供旧版控制端显示）、长内容限制 |
 | `session-core/src/` | Codex、Claude Code 解析器和缓存，以及共享的有界文件读取；Codex 摘要读取头尾各最多 64 KiB，Claude 摘要以流读取并保留紧凑父链记录，最多 32 MiB |
 | `session-core/public/timeline-renderers.js` | 浏览器端 Markdown 渲染，转义原始 HTML 并限制链接协议 |
 | `electron-main/session-reader.ts` | 默认关闭的读取设置、平台检查、设置持久化、撤销正在处理的请求 |
@@ -51,7 +51,7 @@ Linux 主机不启用阅读。Windows 上 `~` 是当前用户主目录（通常�
 
 按照 [Claude Code 会话文档](https://code.claude.com/docs/en/sessions)，读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`。自定义目录须出现在启动 PalmDesk 的环境中。只发现项目根会话文件，不递归读取嵌套子 Agent 日志，也不读取 Claude 网页聊天。
 
-会话 ID 使用 `claude-code:session-file:<uuid>`，与 Codex 的相同 UUID 分开路由。标题优先使用 `custom-title`（用户重命名），其次为 `agent-name`、`ai-title` 和首条有效用户消息。存在有效 `last-prompt.leafUuid` 时沿当前父链读取，并接上标记之后的回复；缺失或损坏时退回有效文件顺序。Sidechain、thinking、图片和内部命令包装不展示。Bash 映射为命令，其他工具显示名称、输入和按 `tool_use_id` 匹配的结果。
+会话 ID 使用 `claude-code:session-file:<uuid>`，与 Codex 的相同 UUID 分开路由。标题优先使用 `custom-title`（用户重命名），其次为 `agent-name`、`ai-title` 和首条有效用户消息。存在有效 `last-prompt.leafUuid` 时沿当前父链读取，并接上标记之后的回复；缺失或损坏时退回有效文件顺序。Sidechain、thinking、图片和内部命令包装不展示。Bash 映射为命令，其他工具显示名称、输入和按 `tool_use_id` 匹配的结果；结果的 `is_error` 将命令或工具标为失败。
 
 为保留父链，Claude 摘要会流式扫描变化的文件，超过 32 MiB 时保留为不可读的会话项；打开后明确提示前往原窗口。摘要按文件指纹缓存。损坏行不会使其余记录消失，尚未写完的尾行可在后续刷新恢复。两个适配器均关闭进程扫描，不调用 Agent CLI。
 
@@ -102,4 +102,4 @@ Windows 回归另外覆盖默认目录及 MSIX 目录、三个环境变量覆盖
 pnpm exec vite --config test/smoke/session-reader.vite.mjs
 ```
 
-打开 `http://127.0.0.1:5194/test/smoke/session-reader.html`。列表同时包含 Codex、Claude Code 和 Claude Desktop Code；可为当前选中的会话添加合成回复、切换读取开关、重连，并检查阅读位置、输出折叠和窗口输入。此页面用于验证新增功能，不替代真实手机、原生窗口输入或跨网络 TURN 验收。
+打开 `http://127.0.0.1:5194/test/smoke/session-reader.html`。列表同时包含 Codex、Claude Code 和 Claude Desktop Code；可为当前选中的会话添加合成回复、切换读取开关、重连，并检查阅读位置、输出折叠和窗口输入。Codex 与 Claude Code 合成会话包含失败的命令、补丁和工具调用，用于检查失败标记和差异着色。此页面用于验证新增功能，不替代真实手机、原生窗口输入或跨网络 TURN 验收。

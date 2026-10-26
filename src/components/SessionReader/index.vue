@@ -199,16 +199,36 @@
           <details
             v-else
             class="activity-group"
+            :class="{ 'has-failure': failureCount(block.actions) }"
           >
             <summary>
-              工具活动 <span>{{ block.actions.length }} 项</span>
+              工具活动
+              <span
+                >{{ activitySummary(block.actions) }}
+                <strong v-if="failureCount(block.actions)"
+                  >· {{ failureCount(block.actions) }} 项失败</strong
+                ></span
+              >
             </summary>
             <section
               v-for="item in block.actions"
               :key="item.id"
               class="activity-item"
+              :class="{ failed: isFailed(item) }"
             >
-              <strong>{{ item.title || '活动' }}</strong>
+              <header>
+                <component
+                  :is="activityIcons[item.type] || InformationCircleOutline"
+                  class="activity-icon"
+                  aria-hidden="true"
+                />
+                <strong>{{ activityTitle(item) }}</strong>
+                <span
+                  v-if="activityBadge(item)"
+                  class="badge"
+                  >{{ activityBadge(item) }}</span
+                >
+              </header>
               <pre v-if="item.text">{{ item.text }}</pre>
               <details
                 v-if="item.detail"
@@ -217,7 +237,16 @@
                 <summary>
                   {{ item.type === 'file_change' ? '查看差异' : '查看输出' }}
                 </summary>
-                <pre>{{ item.detail }}</pre>
+                <!-- Diff lines are text interpolations, so the content stays escaped. -->
+                <pre
+                  v-if="item.type === 'file_change'"
+                  class="diff"
+                ><span
+                  v-for="(line, index) in diffLines(item.detail)"
+                  :key="index"
+                  :class="line.kind"
+                >{{ line.text }}</span></pre>
+                <pre v-else>{{ item.detail }}</pre>
               </details>
               <p
                 v-if="item.truncated"
@@ -269,6 +298,12 @@
 </template>
 
 <script setup lang="ts">
+import {
+  BuildOutline,
+  DocumentTextOutline,
+  InformationCircleOutline,
+  TerminalOutline,
+} from '@vicons/ionicons5';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 
 import type { ReaderClient } from '@/utils/session-reader-channel';
@@ -345,6 +380,56 @@ const roleLabel = (role?: string) =>
   })[role || ''] || '消息';
 const projectName = (value: string) =>
   value.split(/[\\/]/).filter(Boolean).pop() || '未提供项目';
+const activityIcons: Record<string, typeof TerminalOutline> = {
+  command: TerminalOutline,
+  tool_call: BuildOutline,
+  file_change: DocumentTextOutline,
+};
+// Hosts released before the typed fields only send display titles.
+const isLegacy = (item: ReaderItem) => item.status === undefined;
+const isFailed = (item: ReaderItem) =>
+  item.status === 'failed' ||
+  (typeof item.exitCode === 'number' && item.exitCode !== 0);
+const failureCount = (actions: ReaderItem[]) => actions.filter(isFailed).length;
+function activityTitle(item: ReaderItem) {
+  if (isLegacy(item)) return item.title || '活动';
+  if (item.type === 'command') return '命令';
+  if (item.type === 'tool_call') return `工具 · ${item.toolName}`;
+  if (item.type === 'file_change') return item.path;
+  return '状态';
+}
+function activityBadge(item: ReaderItem) {
+  if (typeof item.exitCode === 'number' && item.exitCode !== 0)
+    return `退出码 ${item.exitCode}`;
+  return { failed: '失败', running: '暂无结果' }[item.status || ''] || '';
+}
+function activitySummary(actions: ReaderItem[]) {
+  const count = (type: string) =>
+    actions.filter((item) => item.type === type).length;
+  const parts: [number, string][] = [
+    [count('command'), '条命令'],
+    [count('tool_call'), '次工具调用'],
+    [count('file_change'), '个文件改动'],
+    [count('status'), '条状态'],
+  ];
+  return parts
+    .filter(([value]) => value)
+    .map(([value, unit]) => `${value} ${unit}`)
+    .join(' · ');
+}
+function diffKind(line: string) {
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'added';
+  if (line.startsWith('-')) return 'removed';
+  return '';
+}
+function diffLines(diff: string) {
+  const lines = diff.split('\n');
+  return lines.map((line, index) => ({
+    text: index < lines.length - 1 ? `${line}\n` : line,
+    kind: diffKind(line),
+  }));
+}
 function formatTime(value: string) {
   const date = new Date(value);
   return Number.isFinite(date.getTime())
@@ -783,25 +868,77 @@ pre {
   background: var(--pd-surface-soft);
   font-size: 13px;
 }
+.activity-group.has-failure {
+  border-color: var(--pd-danger);
+}
 summary {
   cursor: pointer;
   line-height: 1.7;
 }
-summary span {
+summary > span {
   float: right;
   color: var(--pd-muted);
   font-size: 11px;
+}
+/* Long counts wrap below the label on phones; keep them inside the box. */
+summary::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+summary strong {
+  color: var(--pd-danger);
 }
 .activity-item {
   padding-top: 14px;
   min-width: 0;
 }
-.activity-item > strong {
-  display: block;
+.activity-item header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-item header strong {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.activity-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--pd-muted);
+}
+.badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 1px solid var(--pd-border);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--pd-muted);
+  font-size: 11px;
+}
+.failed .activity-icon,
+.failed .badge {
+  color: var(--pd-danger);
+}
+.failed .badge {
+  border-color: transparent;
+  background: var(--pd-danger-soft);
 }
 .tool-output {
   margin: 8px 0;
+}
+.diff {
+  color: #9aa79f;
+}
+.diff .added {
+  color: #7ee787;
+}
+.diff .removed {
+  color: #ffa198;
+}
+.diff .hunk {
+  color: #79c0ff;
 }
 .load-older {
   display: block;

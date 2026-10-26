@@ -19,6 +19,14 @@ await writeFile(file, [
   ...Array.from({ length: 64 }, (_, i) => message(i % 2 ? 'assistant' : 'user', `历史消息 ${i + 1}：核对会话读取、窗口切换和手机上的阅读体验。`)),
   record({ type: 'function_call', name: 'exec_command', call_id: 'test-command', arguments: JSON.stringify({ cmd: 'pnpm test:smoke' }) }),
   record({ type: 'function_call_output', call_id: 'test-command', output: '测试输出\n'.repeat(3000) }),
+  record({ type: 'function_call', name: 'exec_command', call_id: 'lint-command', arguments: JSON.stringify({ cmd: 'pnpm lint' }) }),
+  record({ type: 'function_call_output', call_id: 'lint-command', output: 'Process exited with code 1\nOutput:\nsrc/main.ts:3:7 error 未使用的变量' }),
+  record({ type: 'custom_tool_call', status: 'completed', call_id: 'patch', name: 'apply_patch', input: '*** Begin Patch' }),
+  record({ type: 'patch_apply_end', call_id: 'patch', success: true, stdout: 'Success.', stderr: '', changes: { 'src/main.ts': { type: 'update', unified_diff: '@@ -1,3 +1,3 @@\n import { createApp } from "vue";\n-const unused = 1;\n+createApp(App).mount("#app");\n' } } }, 'event_msg'),
+  record({ type: 'custom_tool_call_output', call_id: 'patch', output: 'Success' }),
+  record({ type: 'custom_tool_call', status: 'completed', call_id: 'patch-retry', name: 'apply_patch', input: '*** Begin Patch' }),
+  record({ type: 'patch_apply_end', call_id: 'patch-retry', success: false, stdout: '', stderr: '补丁与当前文件不一致' }, 'event_msg'),
+  record({ type: 'custom_tool_call_output', call_id: 'patch-retry', output: '补丁与当前文件不一致' }),
   message('assistant', '# 会话阅读已接入\n\n现在可以在手机上阅读 **Codex 回复**，并随时回到原窗口继续操作。\n\n- 支持历史记录与复制\n- 命令输出默认折叠\n- 新回复不会打断当前位置\n\n```ts\nconst view = "read";\n```\n\n这是一条合成测试记录。[查看项目](https://github.com/Abreto/palmdesk)。'),
   record({ type: 'task_complete' }, 'event_msg'),
 ].join('\n') + '\n');
@@ -33,6 +41,10 @@ await writeFile(claudeFile, [
   ...Array.from({ length: 65 }, (_, i) => claudeMessage(i % 2 ? 'assistant' : 'user', `Claude 历史消息 ${i + 1}：核对两种来源的会话阅读。`, `claude-message-${i}`)),
   claudeRecord({ type: 'assistant', uuid: 'claude-tool', message: { content: [{ type: 'tool_use', id: 'claude-bash', name: 'Bash', input: { command: 'pnpm test:smoke' } }] } }),
   claudeRecord({ type: 'user', uuid: 'claude-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-bash', content: 'Claude 测试输出\n'.repeat(3000) }] } }),
+  claudeRecord({ type: 'assistant', uuid: 'claude-lint', message: { content: [{ type: 'tool_use', id: 'claude-lint-bash', name: 'Bash', input: { command: 'pnpm lint' } }] } }),
+  claudeRecord({ type: 'user', uuid: 'claude-lint-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-lint-bash', content: 'Exit code 1\nsrc/main.ts:3:7 error 未使用的变量', is_error: true }] } }),
+  claudeRecord({ type: 'assistant', uuid: 'claude-read', message: { content: [{ type: 'tool_use', id: 'claude-read-tool', name: 'Read', input: { file_path: '/workspace/palmdesk/src/main.ts' } }] } }),
+  claudeRecord({ type: 'user', uuid: 'claude-read-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-read-tool', content: 'import { createApp } from "vue";' }] } }),
   claudeMessage('assistant', '# Claude 阅读已接入\n\n现在支持 **Claude Code 回复**，并保留历史分页和工具输出。\n\n```ts\nconst provider = "claude-code";\n```\n\n这是一条合成测试记录。', 'claude-final'),
 ].join('\n') + '\n');
 const claudeDesktopDataDir = path.join(directory, 'Claude');
