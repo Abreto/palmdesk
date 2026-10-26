@@ -1,15 +1,25 @@
-# Runtime downloads and the Vue compatibility bridge used by this client.
+# The bundler binary check and the Vue compatibility bridge used by this client.
 allowBuilds:
-  electron: true
   esbuild: true
   vue-demi: true
-  # Legacy deployment/icon tools and informational installation hooks.
-  billd-deploy: false
+  # Electron 42+ downloads its binary on first use; nothing runs at install.
+  electron: false
+  # Legacy icon tools and informational installation hooks.
   billd-html-webpack-plugin: false
   billd-scss: false
   billd-utils: false
   core-js: false
   core-js-pure: false
-  cpu-features: false
   phantomjs-prebuilt: false
-  ssh2: false
+# Resolve only versions published at least a day ago. The excluded releases
+# are newer and carry security fixes (Electron 44.9.3: Chromium and V8
+# backports; Vite 6.4.5: GHSA-8g5g-mxqh-grgj); drop them once they age.
+minimumReleaseAge: 1440
+minimumReleaseAgeExclude:
+  - electron@44.9.3
+  - vite@6.4.5
+# Advisories judged unreachable; see docs/OPEN_SOURCE_READINESS.md.
+auditConfig:
+  ignoreGhsas:
+    # serialize-javascript in billd-utils' unused Rollup toolchain (#52).
+    - GHSA-5c6j-r48x-rmvq

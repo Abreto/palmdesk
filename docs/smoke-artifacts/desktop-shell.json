@@ -3,7 +3,7 @@
   "identity": {
     "name": "Codex Remote",
     "electron": "33.2.1",
-    "executable": "/Users/abreto/workspace/codex-remote/.local/electron-dev/Electron.app/Contents/MacOS/Electron"
+    "executable": ".local/electron-dev/Electron.app/Contents/MacOS/Electron"
   },
   "permissions": {
     "screen": "granted",

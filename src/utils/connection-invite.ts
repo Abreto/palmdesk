@@ -82,7 +82,7 @@ export function parseConnectionInvite(value: string): ConnectionInvite {
       (key) => params.getAll(key).length !== 1
     )
   ) {
-    throw new Error('这不是有效的 Codex Remote 连接二维码');
+    throw new Error('这不是有效的 PalmDesk 连接二维码');
   }
   const device = params.get('device')!;
   const password = params.get('password')!;

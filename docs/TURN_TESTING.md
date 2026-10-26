@@ -13,7 +13,7 @@ pnpm build:prod
 
 ## 浏览器业务回归
 
-准备已安装依赖的 `containers/backend.lock.json` 对应后端源码，并在项目的测试环境中安装 Playwright（或通过 `NODE_PATH` 使用已有安装）。分别启动：
+准备与 `containers/backend.lock.json` 对应、已安装依赖的后端源码（Playwright 已是项目的开发依赖），然后分别启动：
 
 ```bash
 SMOKE_BACKEND_SOURCE=/absolute/path/to/backend node containers/test/smoke-backend.mjs
