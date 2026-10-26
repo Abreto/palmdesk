@@ -111,7 +111,7 @@ Remove-Item Env:PALMDESK_NATIVE_SMOKE
 
 开发程序仍在运行时，未修改原生源码的构建会复用已有辅助程序。修改了 C# 源码后，先退出开发版 PalmDesk 再编译，避免 Windows 的可执行文件占用限制。
 
-打包版的窗口视频和输入烟测不需要后端。在可解析 `playwright` 的环境中，先执行 `pnpm build:desktop:win`，完全退出同一应用身份的 PalmDesk 打包版，然后运行：
+打包版的窗口视频和输入烟测不需要后端。先执行 `pnpm build:desktop:win`，完全退出同一应用身份的 PalmDesk 打包版，然后运行：
 
 ```powershell
 $env:PALMDESK_NATIVE_SMOKE = 'true'
@@ -139,20 +139,30 @@ node --test test/smoke/signaling.test.mjs
 
 ## 浏览器与 Electron 烟测
 
-窗口手势烟测复用图片粘贴测试页中的真实 `RemoteViewport` 和输入 DataChannel，无须后端。按下文安装 Playwright 后，分别启动测试页和测试：
+Playwright 和 Socket.IO 是固定版本的开发依赖。首次运行前安装测试浏览器，然后在 `pnpm build:prod` 之后运行全部无需后端的浏览器烟测：
+
+```bash
+pnpm exec playwright install chromium
+pnpm build:prod
+pnpm test:browser
+```
+
+`pnpm test:browser` 依次运行凭据显示、手机后台恢复、图片粘贴、窗口手势和打开 Agent 五项烟测，并自动启动测试页所需的 Vite 服务。浏览器依次选用 `SMOKE_BROWSER_EXECUTABLE`、Playwright 安装的 Chromium 和本机 Chrome。CI 的 Browser Smoke 工作流在每个 pull request 上运行同一命令。下文介绍单独运行时的命令和覆盖范围。
+
+窗口手势烟测复用图片粘贴测试页中的真实 `RemoteViewport` 和输入 DataChannel，无须后端。分别启动测试页和测试：
 
 ```bash
 pnpm exec vite --config test/smoke/image-paste.vite.mjs
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/viewport-gestures-browser.mjs
+node test/smoke/viewport-gestures-browser.mjs
 ```
 
 使用 Chrome 的真实触摸事件验证双指缩放的焦点、连续缩放比例、适合至 300% 的范围、双指及单指平移、缩放后的远程点击坐标、仅观看、取消、横屏和文字草稿保留，并检查手势没有产生远程输入或整页缩放。手势仲裁、拖拽释放、长按取消、指针丢失和三指切换由 `pnpm test:smoke` 覆盖。手机 Safari 和 Android Chrome 仍需真机验收。
 
-图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。按下文安装 Playwright 后，分别启动测试页和测试：
+图片粘贴的浏览器烟测使用真实 Vue 输入面板和 WebRTC DataChannel，不需要后端；桌面粘贴操作由测试替身记录。分别启动测试页和测试：
 
 ```bash
 pnpm exec vite --config test/smoke/image-paste.vite.mjs
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/image-paste-browser.mjs
+node test/smoke/image-paste-browser.mjs
 ```
 
 覆盖 PNG/JPEG 选图、文字框图片粘贴、逐字节传输、文字草稿保留、取消后重试、仅观看和手机布局，截图写入 `.local/image-paste/`。回归场景还包括快速点击输入框后立即粘贴、普通输入通道延迟时保持点击与粘贴顺序、传输中保留文字粘贴、收起输入面板后恢复控制、替换图片时禁止发送旧图，以及图片通道断开后独立重连。不代表 iOS Safari 真机或真实 Codex 附件已经验收。协议校验、大小限制、会话失效、去重、取消排队粘贴、点击与粘贴的主进程执行顺序和修饰键释放由 `pnpm test:smoke` 覆盖。
@@ -192,21 +202,19 @@ node scripts/dev.mjs --prepare-only
 
 Windows 可执行 `pnpm exec electron test/smoke/electron-video-quality.cjs`。测试会短暂显示自己的窗口，结果写入 `.local/video-quality/result.json`，包含实际显示器缩放比例。普通显示器上的结果不代表已经完成 Retina 或手机实机验收。
 
-烟测使用 Playwright 和本机 Chrome。把额外依赖装在被 Git 忽略的目录：
+业务流程烟测需要运行中的前端和后端：
 
 ```bash
-npm install --prefix .local/smoke --no-package-lock --no-save playwright
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/business-flow.mjs
+node test/smoke/business-flow.mjs
 ```
 
-默认 Chrome 路径为 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 覆盖。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
+单独运行的浏览器烟测默认使用 `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`，可用 `SMOKE_BROWSER_EXECUTABLE` 改为其他浏览器，例如 Playwright 安装的 Chromium。`SMOKE_CLIENT_URL` 默认 `http://localhost:5173`，`SMOKE_BACKEND_URL` 默认 `http://127.0.0.1:4300`。
 
 凭据显示烟测使用生产网页、真实 Pinia 持久化和二维码解码器，自行启动本地 HTTP / Socket.IO 服务；设备 API 和桌面 IPC 使用测试替身，无需部署后端或控制真实窗口：
 
 ```bash
-npm install --prefix .local/smoke --no-package-lock --no-save playwright socket.io
 pnpm build:prod
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/credential-visibility.mjs
+node test/smoke/credential-visibility.mjs
 ```
 
 覆盖首次启动无明文闪现、旧版显示密码设置、刷新后重新隐藏、密码与二维码独立键盘操作、隐藏截图不可解码／显示截图可解码、复制链接、密码更新、重连和窄屏布局。截图写入 `.local/credential-visibility/`，仅使用测试凭据；不替代实体手机相机验收。
@@ -214,9 +222,8 @@ NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/credential-visibility
 手机后台恢复烟测自行启动本机 HTTP / Socket.IO 服务，使用真实 Vue 页面、会话认证模块和 WebRTC；设备存储、窗口捕获、输入及会话记录使用合成数据，不需要部署后端或控制真实窗口：
 
 ```bash
-npm install --prefix .local/smoke --no-package-lock --no-save playwright socket.io
 pnpm build:prod
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs
+node test/smoke/mobile-resume.mjs
 ```
 
 覆盖后台／阅读暂停视频、未送达状态消息后的主机超时暂停、断线重认证、阅读位置与草稿保留、恢复原窗口及关闭窗口后的拒绝恢复。页面可见性由测试事件模拟，不能代替 iOS Safari 切换应用、锁屏以及 Wi-Fi／蜂窝切换的实机验收。
@@ -224,13 +231,13 @@ NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/mobile-resume.mjs
 Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 PalmDesk 实例占用单实例锁：
 
 ```bash
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-shell.mjs
+node test/smoke/desktop-shell.mjs
 ```
 
 macOS 辅助进程回归测试要求已运行 `pnpm build:desktop`、没有其他打包版实例运行，且已有屏幕录制授权：
 
 ```bash
-NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/native-helper.mjs
+node test/smoke/native-helper.mjs
 ```
 
 测试只截取临时测试窗口，验证生成缩略图后和空闲时辅助进程均不出现在 Dock，并检查命令响应、退出和重启。传入 `native-bin/codex-window` 可检查开发版辅助程序。辅助程序启动时显式设置后台策略，避免沿用主应用的前台身份；主应用的名称、标识及权限归属保持原样。
@@ -244,7 +251,6 @@ pnpm dev:web:lan --port 5187
 另一个终端运行：
 
 ```bash
-NODE_PATH="$PWD/.local/smoke/node_modules" \
 SMOKE_HOST_URL=http://127.0.0.1:5187 \
 SMOKE_CLIENT_URL=http://192.168.1.10:5187 \
 SMOKE_QR=true \
@@ -276,7 +282,7 @@ node test/smoke/business-flow.mjs
 
 `node scripts/dev.mjs --prepare-only` 可只生成开发应用，用于核对 `Info.plist` 和签名，不启动窗口或申请权限。原生及桌面烟测应使用当前 worktree 的开发应用，不能借用主工作区的 Electron，否则权限申请仍会归属被借用的应用。
 
-主工作区的本地打包产物位于 `electron-release/<version>/local-<id>/`，worktree 使用 `electron-release/<version>/worktree-<id>/`，显式发布构建使用 `electron-release/<version>/`。主工作区和 linked worktree 都可在准备开发应用并完成本地打包后，运行 `NODE_PATH="$PWD/.local/smoke/node_modules" node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
+主工作区的本地打包产物位于 `electron-release/<version>/local-<id>/`，worktree 使用 `electron-release/<version>/worktree-<id>/`，显式发布构建使用 `electron-release/<version>/`。主工作区和 linked worktree 都可在准备开发应用并完成本地打包后，运行 `node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
 
 隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；仅重置 TCC 不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。无 Git 元数据时检查当前源码目录。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留；显式发布构建写入 `PalmDeskBuildChannel=release`，用于与旧的本地正式身份产物区分。
 
