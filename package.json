@@ -99,7 +99,7 @@
     "eslint-plugin-vue": "^9.28.0",
     "icon-gen": "2.1.0",
     "playwright": "1.64.1",
-    "postcss-preset-env": "^10.1.2",
+    "postcss-preset-env": "^11.6.1",
     "prettier": "^3.4.2",
     "rimraf": "^6.0.1",
     "sass": "^1.63.6",
