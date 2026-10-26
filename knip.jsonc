@@ -7,6 +7,8 @@
     "electron-builder.cjs",
     "scripts/*.{mjs,cjs}",
     "session-core/index.mjs",
+    // The session worker is a separate Vite build input, which knip doesn't follow.
+    "session-core/worker.mjs",
     "session-core/test/*.mjs",
     "test/smoke/*.{cjs,mjs}",
   ],
