@@ -368,7 +368,10 @@ function desktop({ packaged = false } = {}) {
         clipboard: {},
         nativeImage: {},
       },
-      '@nut-tree-fork/nut-js': { mouse: { config: {} } },
+      '@nut-tree-fork/nut-js': {
+        mouse: { config: {} },
+        keyboard: { config: {} },
+      },
       './capture-session': {
         CaptureSession: class {
           end() {
