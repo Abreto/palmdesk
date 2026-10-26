@@ -27,7 +27,7 @@ await writeFile(file, [
   record({ type: 'custom_tool_call', status: 'completed', call_id: 'patch-retry', name: 'apply_patch', input: '*** Begin Patch' }),
   record({ type: 'patch_apply_end', call_id: 'patch-retry', success: false, stdout: '', stderr: '补丁与当前文件不一致' }, 'event_msg'),
   record({ type: 'custom_tool_call_output', call_id: 'patch-retry', output: '补丁与当前文件不一致' }),
-  message('assistant', '# 会话阅读已接入\n\n现在可以在手机上阅读 **Codex 回复**，并随时回到原窗口继续操作。\n\n- 支持历史记录与复制\n- 命令输出默认折叠\n- 新回复不会打断当前位置\n\n```ts\nconst view = "read";\n```\n\n这是一条合成测试记录。[查看项目](https://github.com/Abreto/palmdesk)。'),
+  message('assistant', '# 会话阅读已接入\n\n现在可以在手机上阅读 **Codex 回复**，并随时回到原窗口继续操作。\n\n- 支持历史记录与复制\n- 命令输出默认折叠\n- 新回复不会打断当前位置\n\n```ts\nconst view = "read";\n```\n\n| 检查 | 结果 |\n| --- | --- |\n| 失败标记 | 通过 |\n| 表格横向滚动 | 通过 |\n\n- [x] 任务列表\n- [ ] 语法高亮\n\n这是一条合成测试记录。[查看项目](https://github.com/Abreto/palmdesk)。'),
   record({ type: 'task_complete' }, 'event_msg'),
 ].join('\n') + '\n');
 await writeFile(path.join(directory, 'session_index.jsonl'), JSON.stringify({ id: uuid, thread_name: 'PalmDesk · 会话阅读', updated_at: new Date().toISOString() }) + '\n');
