@@ -35,8 +35,10 @@ import {
   supportsImagePaste,
 } from './image-paste';
 import {
+  CapturePreviews,
   NativeWindowBridge,
   NativeWindowError,
+  captureSourceOptions,
   matchCaptureSources,
   nativeHelperPath,
   enableWindowsCapture,
@@ -117,18 +119,20 @@ const nativeWindows = new NativeWindowBridge(
   )
 );
 
-async function listCaptureSources(): Promise<ICaptureSource[]> {
+const capturePreviews = new CapturePreviews();
+
+async function listCaptureSources({ previews = true } = {}): Promise<
+  ICaptureSource[]
+> {
   if (platform !== 'darwin' && platform !== 'win32')
     throw new Error('当前单窗口控制支持 macOS 和 Windows');
   if (!windowsCaptureEnabled)
     throw new Error(
       'Windows Graphics Capture 已禁用，无法保证窗口控制坐标准确'
     );
-  const sources = await desktopCapturer.getSources({
-    types: ['window'],
-    thumbnailSize: { width: 320, height: 180 },
-    fetchWindowIcons: true,
-  });
+  const sources = await desktopCapturer.getSources(
+    captureSourceOptions(previews)
+  );
   if (
     platform === 'darwin' &&
     systemPreferences.getMediaAccessStatus('screen') !== 'granted'
@@ -136,9 +140,12 @@ async function listCaptureSources(): Promise<ICaptureSource[]> {
     throw new Error(`请为 ${appName} 开启屏幕录制权限并重启应用`);
   }
   const owners = await nativeWindows.request<NativeWindow[]>('list');
-  return matchCaptureSources(
-    sources,
-    owners.filter((owner) => owner.ownerPid !== process.pid)
+  return capturePreviews.apply(
+    matchCaptureSources(
+      sources,
+      owners.filter((owner) => owner.ownerPid !== process.pid)
+    ),
+    previews
   );
 }
 
@@ -657,7 +664,9 @@ function main() {
     });
   };
   captureHandler(IPC_EVENT.getCaptureSources, async (data) => {
-    const result = await captureSession.refresh();
+    const result = await captureSession.refresh({
+      previews: data.previews !== false,
+    });
     if (!result.sessionId && data.previews !== false)
       result.sources = await nativeWindows.addThumbnails(result.sources);
     return result;

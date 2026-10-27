@@ -1,5 +1,5 @@
 // Shared PalmDesk bounds for the Apache-2.0 Glassline file adapters.
-import { open } from 'node:fs/promises';
+import { open, stat } from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 
 const MAX_SESSION_FILE_BYTES = 32 * 1024 * 1024;
@@ -48,4 +48,22 @@ export async function* readSessionLines(filePath) {
   }
   pending += decoder.end();
   if (pending) yield pending;
+}
+
+// Keeps the most recently parsed session so polling an unchanged log costs a
+// stat instead of a full parse. Any change in size or mtime parses again.
+export function createSessionFileCache() {
+  let entry;
+  return async (filePath, parse) => {
+    const { size, mtimeMs } = await stat(filePath);
+    const key = `${filePath}\0${size}\0${mtimeMs}`;
+    if (entry?.key !== key) {
+      const value = parse();
+      entry = { key, value };
+      value.catch(() => {
+        if (entry?.value === value) entry = undefined;
+      });
+    }
+    return entry.value;
+  };
 }

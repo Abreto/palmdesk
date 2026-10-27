@@ -10,6 +10,7 @@ import {
   isCodexSessionFileSessionId,
   resolveCodexHome
 } from "./codex-session-file.mjs";
+import { createSessionFileCache } from "./session-file-io.mjs";
 
 const CODEX_PROCESS_MATCHERS = [matchesCodexAgentProcess];
 
@@ -39,6 +40,7 @@ export function createCodexProvider(options = {}) {
   const sessionFiles =
     options.sessionFileCatalog ??
     createCodexSessionFileCatalog({ codexHome, summaryOnly: true });
+  const parseCache = createSessionFileCache();
   const listProcesses =
     options.listAgentProcesses ??
     (() =>
@@ -115,6 +117,7 @@ export function createCodexProvider(options = {}) {
         return getCodexSessionFileTimelinePage(id, {
           ...options,
           codexHome,
+          parseCache,
           sessionFilePath: location.filePath,
           indexEntry: location.context?.indexById.get(location.session.resumeRef?.value)
         });

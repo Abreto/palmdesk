@@ -385,6 +385,7 @@ function desktop({ packaged = false } = {}) {
       './session-reader': { DesktopSessionReader: class {} },
       './image-paste': {},
       './native-window': {
+        CapturePreviews: class {},
         nativeHelperPath: () => '/unused-native-helper',
         NativeWindowBridge: class {
           request() {

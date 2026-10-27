@@ -1222,13 +1222,24 @@ function startCaptureBoundsRefresh() {
   }, 2000);
 }
 
+// Permission and diagnostics checks query the native helper. While a window is
+// captured they are repeated every 30 seconds rather than on every refresh.
+let permissionsCheckedAt = 0;
+
 async function refreshCaptureSources() {
   if (!ipcRenderer || captureLoading.value) return;
   const generation = captureGeneration;
   captureLoading.value = true;
   try {
-    const permissionResult = await invokeCapture(IPC_EVENT.capturePermissions);
-    if (permissionResult?.code === 0) permissions.value = permissionResult.data;
+    if (!captureSessionId.value || Date.now() - permissionsCheckedAt >= 30000) {
+      const permissionResult = await invokeCapture(
+        IPC_EVENT.capturePermissions
+      );
+      if (permissionResult?.code === 0) {
+        permissions.value = permissionResult.data;
+        permissionsCheckedAt = Date.now();
+      }
+    }
     const res = await invokeCapture(IPC_EVENT.getCaptureSources);
     if (generation !== captureGeneration) return;
     if (res?.code !== 0) throw new Error(res?.msg || '读取窗口失败');

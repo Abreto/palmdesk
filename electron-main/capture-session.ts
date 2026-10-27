@@ -119,7 +119,9 @@ export class CaptureSession {
 
   constructor(
     private driver: InputDriver,
-    private list: () => Promise<ICaptureSource[]>,
+    private list: (options?: {
+      previews?: boolean;
+    }) => Promise<ICaptureSource[]>,
     private focus: (source: ICaptureSource) => Promise<ICaptureSource>
   ) {}
 
@@ -169,7 +171,9 @@ export class CaptureSession {
     this.active = undefined;
     return this.enqueue(async () => {
       await this.release();
-      let source = (await this.list()).find((item) => item.id === sourceId);
+      let source = (await this.list({ previews: false })).find(
+        (item) => item.id === sourceId
+      );
       if (generation !== this.generation) throw new Error('捕获请求已取消');
       if (!source || source.boundsSource !== 'window' || !source.bounds)
         throw new Error('选定窗口已不可用');
@@ -186,7 +190,7 @@ export class CaptureSession {
         // Restored windows and desktop transitions can reach Electron's catalog later.
         const deadline = Date.now() + 2000;
         for (;;) {
-          const current = (await this.list()).find(
+          const current = (await this.list({ previews: false })).find(
             (item) => item.id === sourceId
           );
           if (generation !== this.generation) throw new Error('捕获请求已取消');
@@ -221,11 +225,12 @@ export class CaptureSession {
     return this.enqueue(() => this.release());
   }
 
-  async refresh() {
+  async refresh({ previews = true } = {}) {
     const generation = this.generation;
     const active = this.active;
     try {
-      const sources = await this.list();
+      // While a window is captured, skip generating previews for every window.
+      const sources = await this.list({ previews: previews && !active });
       if (active && this.active === active && generation === this.generation) {
         const previous = active.source;
         const retained = sources.find(
