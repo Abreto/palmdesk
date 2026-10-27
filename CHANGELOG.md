@@ -4,6 +4,27 @@ All notable changes to PalmDesk are documented here. The format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.0.8] - 2026-10-27
+
+### Added
+
+- Desktop notifications for newer GitHub releases, with a stronger notice for security updates, a manual check and an option to turn off daily checks. Updates are downloaded and installed manually. ([#66](https://github.com/Abreto/palmdesk/pull/66))
+
+### Changed
+
+- Upgrade Electron from 33.2.1 to 44.9.3 and adapt image paste to the asynchronous clipboard API. macOS now requires version 13 Ventura or later; macOS 12 is no longer supported. ([#62](https://github.com/Abreto/palmdesk/pull/62))
+- Run the self-contained browser smoke suite in CI alongside the existing source, native-helper and dependency checks. ([#70](https://github.com/Abreto/palmdesk/pull/70))
+
+### Fixed
+
+- Remove the per-character delay from macOS remote text input. Stop subsequent text chunks when the target loses focus or control ends, and recheck focus before image paste. Input already delivered to the operating system cannot be undone. ([#63](https://github.com/Abreto/palmdesk/pull/63))
+
+### Security
+
+- Restrict desktop IPC to approved channels and trusted app frames, block navigation away from the bundled app, limit external links to HTTPS GitHub URLs, deny unneeded permissions and enforce a Content Security Policy. Remove server-provided HTML update dialogs, credentials from controller-window URLs and sensitive payloads from logs. ([#61](https://github.com/Abreto/palmdesk/pull/61))
+- Replace the end-of-life Electron runtime and update vulnerable dependencies. Production dependency auditing now runs in CI; documented exceptions and development-tool advisories remain. ([#62](https://github.com/Abreto/palmdesk/pull/62))
+- A successful temporary-password change disconnects existing controllers. The updated backend also revokes session tokens and rejects in-flight connection attempts authenticated with the old password. Update the desktop app, web frontend and backend together; the backend deployment adapter changed even though its pinned upstream source did not. No database migration is required. ([#65](https://github.com/Abreto/palmdesk/pull/65), [#83](https://github.com/Abreto/palmdesk/pull/83))
+
 ## [0.0.7] - 2026-10-03
 
 ### Added
@@ -103,7 +124,8 @@ First public preview of PalmDesk, an AI-native remote control for agent-ready wo
 - Targets are identified by bundle ID or executable identity, process ID and native window ID, never by title; input stops when the target disappears, capture ends or the connection closes.
 - TURN credentials are short-lived and issued by the backend; clients hold no TURN secret.
 
-[Unreleased]: https://github.com/Abreto/palmdesk/compare/v0.0.7...HEAD
+[Unreleased]: https://github.com/Abreto/palmdesk/compare/v0.0.8...HEAD
+[0.0.8]: https://github.com/Abreto/palmdesk/compare/v0.0.7...v0.0.8
 [0.0.7]: https://github.com/Abreto/palmdesk/compare/v0.0.6...v0.0.7
 [0.0.6]: https://github.com/Abreto/palmdesk/compare/v0.0.5...v0.0.6
 [0.0.5]: https://github.com/Abreto/palmdesk/compare/v0.0.4...v0.0.5
