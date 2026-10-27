@@ -1,16 +1,27 @@
-Experimental PalmDesk desktop installers for testing.
+Experimental PalmDesk desktop installers for testing. PalmDesk is an AI-native remote control for agent-ready workflows.
 
-## What's new in v0.0.7
+Security: This release restricts desktop renderer privileges, updates the Electron runtime and vulnerable dependencies, and ends existing remote sessions when the temporary password changes. Update the desktop app, web frontend and backend together.
 
-- Conceal connection credentials by default: hide the temporary password and blur the connection QR code until explicitly revealed, reducing accidental exposure in screenshots and screen recordings. Revealed codes and copied connection links still grant access and must be kept private.
-- Open installed Codex, Claude, ChatGPT, Kimi and ZCode desktop apps from the Agent directory on macOS and Windows. PalmDesk uses the authenticated connection to request an explicit launch, then refreshes the window list: one matching window opens through the existing selection flow, while multiple windows remain your choice. Apps are not installed, prompts are not submitted, and launch requests are not replayed after reconnecting. Supported installation types and platform limits are documented in the usage guide.
-- Start both connection entry points with Balanced quality: up to 2160p, 20 fps and a 3000 kbit/s (3 Mbps) bitrate ceiling. High detail retains the previous 2160p / 30 fps / 8 Mbps settings; Low data offers 1080p / 10 fps / 1 Mbps. Explicit choices and manual overrides are saved locally. Bitrate values are ceilings, not measured usage or hard data budgets; quality changes preserve background and reading-mode video suspension.
+## What's new in v0.0.8
 
-Update the desktop app and refresh the phone web client together for the new features. Self-hosted installations need the matching web frontend; the backend source and deployment adapter are unchanged from v0.0.6, so this release does not require a backend update or database migration.
+- A successful temporary-password change disconnects existing controllers and stops capture. The updated backend also revokes session tokens and rejects connection attempts authenticated with the old password that were still being established. The updated controller explains the disconnection and requires the new password to reconnect. ([#65](https://github.com/Abreto/palmdesk/pull/65), [#83](https://github.com/Abreto/palmdesk/pull/83))
+- Harden the desktop renderer with approved IPC channels, trusted app-frame checks, navigation restrictions, HTTPS GitHub links, permission restrictions and a Content Security Policy. Remove server-provided HTML update dialogs, credentials from controller-window URLs and sensitive payloads from logs. ([#61](https://github.com/Abreto/palmdesk/pull/61))
+- Upgrade Electron 33.2.1 to 44.9.3 and vulnerable dependencies, and adapt image paste to the asynchronous clipboard API. **macOS now requires version 13 Ventura or later; macOS 12 is no longer supported.** ([#62](https://github.com/Abreto/palmdesk/pull/62))
+- Remove the per-character delay from macOS remote text input. Stop subsequent text chunks when focus is lost or control ends, and recheck focus before image paste. The current chunk can finish; input already delivered to the operating system cannot be undone. ([#63](https://github.com/Abreto/palmdesk/pull/63))
+- Show newer-release notices, with a stronger notice for security updates. Check manually from the macOS menu or Advanced settings, or turn off daily checks. Updates are downloaded and installed manually. This notice is new in v0.0.8; v0.0.7 users need to download this release themselves. ([#66](https://github.com/Abreto/palmdesk/pull/66))
 
-Source and synthetic-browser regressions cover the new controls, preferences, authorization and recovery behavior. macOS launch/reopen has native-fixture coverage; actual Windows app launching and complete physical-phone workflows remain unvalidated. The new quality profiles have not been measured on physical phones, native Retina/Windows capture or constrained networks. iOS Safari, Android Chrome, Windows Codex image attachments, permission recovery and cross-network TURN behavior still need device validation. See the [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.7/README.md), [Agent launch validation](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/smoke-artifacts/agent-launch-2026-10-02.md) and [quality validation](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/VIDEO_QUALITY.md) for the exact boundaries.
+## Update the desktop, web frontend and backend
 
-[Changes since v0.0.6](https://github.com/Abreto/palmdesk/compare/v0.0.6...v0.0.7)
+- **Desktop:** install the v0.0.8 package below.
+- **Web frontend:** deploy the matching `ghcr.io/abreto/palmdesk-web` image, then reload the phone page.
+- **Backend:** deploy the matching `ghcr.io/abreto/palmdesk-backend` image and restart the backend for server-side session revocation. The deployment adapter changed even though the upstream commit in `backend.lock.json` did not. With an older backend, disconnection relies on the updated desktop client.
+- **Database:** no schema migration is required. Keep the existing database, Redis, configuration and persistent data.
+
+Use the `sha-<full-commit>` image tags for the commit referenced by `v0.0.8`; the current workflow publishes commit tags and `latest`, not version tags. Publishing a release or image does not deploy the running service. Hosted-service users install the desktop app and reload the phone page; the operator updates the web frontend and backend. See the [container guide](https://github.com/Abreto/palmdesk/blob/v0.0.8/containers/README.md).
+
+Source checks, browser smoke tests and dependency auditing run in CI. Release checks cover both installers, macOS signing identity and packaged native helpers. Complete real-device acceptance of Electron 44 remains pending, including Windows clipboard behavior, real window capture and input, long-text focus changes, permission recovery, mobile browsers and cross-network TURN. See the [Electron upgrade record](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/smoke-artifacts/electron-44-upgrade-2026-10-21.md) and [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.8/README.md).
+
+[Changes since v0.0.7](https://github.com/Abreto/palmdesk/compare/v0.0.7...v0.0.8)
 
 ## Installation
 
@@ -32,23 +43,34 @@ Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
 These builds pass source checks and packaging verification in CI. Real screen capture, input, permission recovery and phone/network behavior still require testing on physical devices.
 
 `SHA256SUMS.txt` contains SHA256 hashes of the two installers.
-This prerelease does not resolve the known dependency and license review items in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/OPEN_SOURCE_READINESS.md).
+Remaining dependency exceptions, development-tool advisories and license review items are documented in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md).
 
 ## 中文说明
 
-供测试使用的 PalmDesk 桌面安装包。
+供测试使用的 PalmDesk 桌面安装包。PalmDesk 是面向 agent-ready workflows（便于衔接 Agent 工作流）的 AI-native（围绕 AI Agent 使用流程设计）远程控制工具。
 
-### v0.0.7 更新内容
+**安全更新：** 本版收紧桌面渲染页面权限，更新 Electron 及存在安全公告的依赖，并在修改临时密码后结束已有远控会话。请同步更新桌面端、网页前端和后端。
 
-- 默认隐藏连接凭据：临时密码保持隐藏，连接二维码保持模糊，需主动显示，减少截图和录屏时意外泄露。已显示的二维码和复制的连接链接仍可用于访问设备，请勿公开分享。
-- 支持从 Agent 目录打开 macOS 和 Windows 上已安装的 Codex、Claude、ChatGPT、Kimi 和 ZCode 桌面应用。通过已认证连接明确发起启动后刷新窗口列表；一个匹配窗口进入现有选窗流程，多个窗口由用户选择。不安装应用、不提交提示词，重连后不重放启动请求。支持的安装类型及平台限制见使用指南。
-- 两个连接入口默认使用「均衡」画质：最高 2160p、20 fps、3000 kbit/s（3 Mbps）码率上限。「高细节」保留原有 2160p / 30 fps / 8 Mbps 设置；「省流量」提供 1080p / 10 fps / 1 Mbps。主动选择及手动调整保存在本地。码率是上限，不代表实测流量或严格流量预算；调整画质仍保留后台和阅读模式下的视频暂停行为。
+### v0.0.8 更新内容
 
-请更新桌面 App 并刷新手机网页，以使用新功能。自部署需更新到对应的网页前端；后端源码与部署适配器相较 v0.0.6 未变，本次无需更新后端或迁移数据库。
+- 成功修改临时密码后，断开已有控制端并停止捕获。新版后端还会撤销会话令牌，拒绝已通过旧密码认证但尚未完成建立的连接。新版控制端提示密码已更改，要求使用新密码重新连接。([#65](https://github.com/Abreto/palmdesk/pull/65)、[#83](https://github.com/Abreto/palmdesk/pull/83))
+- 加固桌面渲染页面：限定 IPC 通道和可信应用页面，限制导航跳转、外部链接及权限，并启用内容安全策略。移除服务端 HTML 更新弹窗、控制窗口 URL 中的凭据及日志中的敏感载荷。([#61](https://github.com/Abreto/palmdesk/pull/61))
+- Electron 从 33.2.1 升级到 44.9.3，并更新存在安全公告的依赖；图片粘贴适配新的异步剪贴板接口。**macOS 最低版本升至 13 Ventura，不再支持 macOS 12。** ([#62](https://github.com/Abreto/palmdesk/pull/62))
+- 去掉 macOS 远程文字输入的逐字延迟；失去焦点或控制结束后停止后续文字块，粘贴图片前再次核验焦点。当前文字块可能完成，已交给操作系统的输入无法撤回。([#63](https://github.com/Abreto/palmdesk/pull/63))
+- 发现新版本时显示通知，安全更新提示更醒目。可在 macOS 菜单或“高级设置”手动检查，也可关闭每日检查；更新仍需手动下载安装。此功能从 v0.0.8 开始提供，v0.0.7 用户需自行下载本次更新。([#66](https://github.com/Abreto/palmdesk/pull/66))
 
-源码和模拟浏览器回归覆盖新增控件、偏好保存、鉴权及恢复行为。macOS 启动／重新打开已有原生测试应用验证；真实 Windows 应用启动及手机完整流程尚未验收。新画质预设尚无真实手机、原生 Retina／Windows 捕获或受限网络的测量结果。iOS Safari、Android Chrome、Windows Codex 图片附件、权限恢复及跨网络 TURN 仍需实机验收。具体边界见[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.7/README.zh-CN.md)、[打开 Agent 验证记录](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/smoke-artifacts/agent-launch-2026-10-02.md)及[画质验证说明](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/VIDEO_QUALITY.md)。
+### 桌面端、网页前端和后端更新
 
-[查看自 v0.0.6 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.6...v0.0.7)
+- **桌面端：** 安装下方 v0.0.8 安装包。
+- **网页前端：** 部署对应的 `ghcr.io/abreto/palmdesk-web` 镜像，再刷新手机页面。
+- **后端：** 部署对应的 `ghcr.io/abreto/palmdesk-backend` 镜像并重启后端，启用服务端会话撤销。虽然 `backend.lock.json` 固定的上游提交未变，后端部署适配器已有改动；使用旧后端时，断连依赖新版桌面端。
+- **数据库：** 无需迁移表结构，保留现有数据库、Redis、配置及持久化数据。
+
+两个镜像均使用 `v0.0.8` 对应完整提交的 `sha-<full-commit>` 标签；当前工作流发布提交标签和 `latest`，不发布版本号标签。发布 Release 或镜像不会自动更新运行中的服务。托管服务用户安装桌面端并刷新手机网页，服务维护者负责更新网页前端和后端。详见[容器说明](https://github.com/Abreto/palmdesk/blob/v0.0.8/containers/README.md)。
+
+CI 运行源码检查、浏览器烟测和依赖审计；发布检查覆盖两平台安装包、macOS 签名身份及包内原生辅助程序。Electron 44 的完整实机验收仍待完成，包括 Windows 剪贴板、真实窗口捕获和输入、长文本输入时焦点变化、权限恢复、手机浏览器和跨网络 TURN。详见 [Electron 升级记录](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/smoke-artifacts/electron-44-upgrade-2026-10-21.md)和[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.8/README.zh-CN.md)。
+
+[查看自 v0.0.7 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.7...v0.0.8)
 
 ### 安装说明
 
@@ -69,4 +91,4 @@ This prerelease does not resolve the known dependency and license review items i
 这些构建已通过 CI 中的源码检查和打包验证。真实的屏幕捕获、输入、权限恢复以及手机和网络行为仍需在实体设备上测试。
 
 `SHA256SUMS.txt` 包含两个安装包的 SHA256 校验和。
-本测试版未解决[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.7/docs/OPEN_SOURCE_READINESS.md)中已知的依赖和许可证审查事项。
+剩余依赖例外、开发工具链安全公告及许可证审查事项见[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md)。
