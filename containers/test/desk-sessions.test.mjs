@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createDeskSessions } from '../backend/runtime/desk-sessions.cjs';
-import { MemoryRedis, TestSocket } from './fixtures.mjs';
+import { passwordChanges } from '../backend/runtime/http.cjs';
+import { flush, MemoryRedis, TestSocket } from './fixtures.mjs';
 
 async function fixture() {
   const redis = new MemoryRedis();
@@ -95,4 +96,97 @@ test('ending or disconnecting a session invalidates both access tokens immediate
       disconnect ? 'disconnect' : 'explicit'
     );
   }
+});
+
+test('a password change ends every session of that device and invalidates its tokens', async () => {
+  const { sessions, socket, host, phone, start } = await fixture();
+  const tablet = await socket('tablet-socket', 'tablet01');
+  const other = await socket('other-socket', 'other001');
+  const laptop = await socket('laptop-socket');
+  await phone.receive('billdDeskStartRemote', start);
+  await tablet.receive('billdDeskStartRemote', {
+    ...start, deskUserUuid: 'tablet01', deskUserPassword: 'pw-tablet01',
+  });
+  await laptop.receive('billdDeskJoin', { deskUserUuid: 'laptop01', deskUserPassword: 'pw-laptop01', live_room_id: 'other001' });
+  await laptop.receive('billdDeskStartRemote', {
+    deskUserUuid: 'laptop01', deskUserPassword: 'pw-laptop01', remoteDeskUserUuid: 'other001',
+    remoteDeskUserPassword: 'pw-other001', roomId: 'other001',
+  });
+  const tokens = [phone, tablet].map((peer) => peer.last('billdDeskStartRemoteResult').session.token);
+  const unrelated = laptop.last('billdDeskStartRemoteResult').session.token;
+  assert.equal(await sessions.endDevice('target01', 'password-changed'), 2);
+  for (const peer of [phone, tablet]) assert.equal(peer.last('billdDeskSessionEnded').reason, 'password-changed');
+  assert.equal(host.sent.filter((message) => message.event === 'billdDeskSessionEnded').length, 2);
+  for (const token of tokens) await assert.rejects(sessions.authorize(token), { status: 401 });
+  assert.equal((await sessions.authorize(unrelated)).device, 'laptop01');
+  assert.equal(other.last('billdDeskSessionEnded'), undefined);
+});
+
+test('a password change also rejects a session that was still being published', async () => {
+  for (const [device, code] of [['target01', 3], ['phone001', 1]]) {
+    const { redis, sessions, host, phone, start } = await fixture();
+    // Hold the token writes: both passwords are checked, the session is not yet active.
+    let release;
+    let reached = false;
+    const held = new Promise((resolve) => { release = resolve; });
+    const set = redis.set.bind(redis);
+    redis.set = async (key, ...rest) => {
+      if (key.startsWith('palmdesk:session:')) {
+        reached = true;
+        await held;
+      }
+      return set(key, ...rest);
+    };
+    await phone.receive('billdDeskStartRemote', start);
+    assert.equal(reached, true);
+    const ctx = { method: 'PUT', path: '/desk_user/update_by_uuid', request: { body: { uuid: device, new_password: 'new' } } };
+    await passwordChanges(sessions)(ctx, async () => {
+      ctx.status = 200;
+      ctx.body = { code: 200 };
+    });
+    release();
+    await flush();
+    const result = phone.last('billdDeskStartRemoteResult');
+    assert.equal(result.code, code, device);
+    assert.equal(result.session, undefined);
+    assert.equal(host.last('billdDeskStartRemoteResult'), undefined);
+    assert.ok(![...redis.rows.keys()].some((key) => key.startsWith('palmdesk:session:')));
+    // A request checked after the change still connects.
+    redis.set = set;
+    await phone.receive('billdDeskStartRemote', start);
+    const fresh = phone.last('billdDeskStartRemoteResult');
+    assert.equal(fresh.code, 0);
+    assert.equal((await sessions.authorize(fresh.session.token)).device, 'phone001');
+  }
+});
+
+test('only a successful password update ends sessions', async () => {
+  const ended = [];
+  const middleware = passwordChanges({ endDevice: async (device, reason) => ended.push([device, reason]) });
+  const request = (overrides = {}, body = { uuid: 'target01', password: 'old', new_password: 'new' }) => ({
+    method: 'PUT', path: '/desk_user/update_by_uuid', request: { body }, status: 404, body: undefined, ...overrides,
+  });
+  const succeed = (ctx) => async () => {
+    ctx.status = 200;
+    ctx.body = { code: 200 };
+  };
+  for (const ctx of [request(), request({ path: '/DESK_USER/update_by_uuid/' })]) {
+    await middleware(ctx, succeed(ctx));
+  }
+  assert.deepEqual(ended, [['target01', 'password-changed'], ['target01', 'password-changed']]);
+  ended.length = 0;
+  await assert.rejects(middleware(request(), async () => { throw new Error('旧密码错误！'); }), /旧密码/);
+  for (const ctx of [
+    request({ method: 'POST' }),
+    request({ path: '/desk_user/login' }),
+    request({}, { uuid: 'target01', status: 2 }),
+  ]) {
+    await middleware(ctx, succeed(ctx));
+  }
+  const failed = request();
+  await middleware(failed, async () => {
+    failed.status = 400;
+    failed.body = { code: 400 };
+  });
+  assert.deepEqual(ended, []);
 });

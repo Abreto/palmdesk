@@ -238,6 +238,7 @@ import {
 import { REMOTE_SESSION_ENDED_EVENT } from '@/utils/network/remote-session';
 import { ControllerRecovery } from '@/utils/remote-presence';
 import type { RemoteVideoQuality } from '@/utils/remote-video';
+import { isFinalSessionEnd, sessionEndMessage } from '@/utils/session-end';
 import { ReaderClient } from '@/utils/session-reader-channel';
 
 import type { ReaderSession } from '../../../session-core/index.mjs';
@@ -598,7 +599,7 @@ function receiveWindowMessage(event: MessageEvent) {
     return;
   }
   if (message.msgType === WsMsgTypeEnum.remoteSessionStopped) {
-    endConnection('电脑已结束本次连接，请手动重新连接');
+    endConnection(sessionEndMessage(data?.reason));
     return;
   }
   if (
@@ -1027,8 +1028,8 @@ function visibilityChanged() {
 function remoteSessionEnded(event: Event) {
   const data = (event as CustomEvent<{ peerId?: string; reason?: string }>)
     .detail;
-  if (data?.peerId === receiverId.value && data.reason === 'explicit')
-    endConnection('电脑已结束本次连接，请手动重新连接');
+  if (data?.peerId === receiverId.value && isFinalSessionEnd(data.reason))
+    endConnection(sessionEndMessage(data.reason));
 }
 
 function pageHidden() {
