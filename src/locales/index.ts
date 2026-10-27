@@ -1,7 +1,5 @@
-import enLocales from '@/locales/en';
-import zhLocales from '@/locales/zh';
-
+// The interface is not translated yet; see #58.
 export const messages = {
-  en: enLocales,
-  zh: zhLocales,
+  zh: {},
+  en: {},
 };

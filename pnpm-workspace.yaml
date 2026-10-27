@@ -5,10 +5,8 @@ allowBuilds:
   # Electron 42+ downloads its binary on first use; nothing runs at install.
   electron: false
   # Legacy icon tools and informational installation hooks.
-  billd-html-webpack-plugin: false
   billd-scss: false
   billd-utils: false
-  core-js: false
   core-js-pure: false
   phantomjs-prebuilt: false
 # Resolve only versions published at least a day ago. The excluded releases
