@@ -36,7 +36,9 @@ The service:
 
 Window video, input, image paste and session reading travel only over the WebRTC connection, encrypted with DTLS between the controller and the desktop; TURN relays forward encrypted packets. The keys behind this encryption are exchanged through the service, so the service is trusted not to interfere with them. Session reading is off by default.
 
-Anyone who obtains your device code and temporary password, or who controls the service, can therefore ask to control the window you share. Keep the password and QR code private, and change the password if they may have been exposed. Changing it blocks new connections but does not yet disconnect controllers that are already connected; stop control on the desktop to end them.
+Anyone who obtains your device code and temporary password, or who controls the service, can therefore ask to control the window you share. Keep the password and QR code private, and change the password if they may have been exposed. A successful password change invalidates the old password and QR code. The updated desktop client also disconnects existing controllers, who must use the new password to reconnect.
+
+The updated backend also revokes session tokens and rejects connection attempts that authenticated with the old password but were still being established when it changed. Self-hosted deployments must rebuild and redeploy the backend image to enable this server-side enforcement. With an older backend, disconnection relies on the updated desktop client.
 
 To avoid the hosted service, deploy the PalmDesk-compatible backend from [containers](containers/README.md) and configure its addresses on both the desktop and the phone. See [service configuration](docs/SERVICE_CONFIGURATION.md).
 
