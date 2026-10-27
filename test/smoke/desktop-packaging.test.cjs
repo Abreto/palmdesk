@@ -351,6 +351,26 @@ for (const installer of [false, true]) {
   });
 }
 
+test('an unsigned macOS release build disables electron-builder signing', async (t) => {
+  const { calls, run } = harness(t, 'darwin', {
+    args: ['--mac', '--installer', '--release', '--unsigned'],
+  });
+  await run('build-desktop.mjs');
+  assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'release');
+  assert.deepEqual(calls[1].args.slice(1), [
+    '--mac',
+    '-c.mac.identity=null',
+    '--publish',
+    'never',
+  ]);
+});
+
+test('unsigned builds are refused on Windows hosts', async (t) => {
+  const { calls, run } = harness(t, 'win32', { args: ['--unsigned'] });
+  await assert.rejects(run('build-desktop.mjs'), /Usage:/);
+  assert.equal(calls.length, 0);
+});
+
 test('local builds ignore an inherited release channel unless --release is passed', async (t) => {
   const previous = process.env.PALMDESK_BUILD_CHANNEL;
   t.after(() => {

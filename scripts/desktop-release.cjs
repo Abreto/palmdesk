@@ -64,17 +64,24 @@ async function prepareReleaseAssets(directory, { version, productName }) {
     expected,
     'Release requires exactly the Apple Silicon and Windows x64 installers for this version.'
   );
+  const sbom = `${productName}-${version}-sbom.cdx.json`;
+  const assets = [...expected, sbom];
   const checksums = [];
-  for (const name of expected) {
+  for (const name of assets) {
     const filename = path.join(directory, name);
     const stat = lstatSync(filename);
-    assert.ok(stat.isFile() && stat.size > 0, `Invalid installer: ${name}`);
+    assert.ok(stat.isFile() && stat.size > 0, `Invalid release asset: ${name}`);
     const hash = createHash('sha256');
     for await (const chunk of createReadStream(filename)) hash.update(chunk);
     checksums.push(`${hash.digest('hex')}  ${name}\n`);
   }
+  assert.equal(
+    JSON.parse(readFileSync(path.join(directory, sbom), 'utf8')).bomFormat,
+    'CycloneDX',
+    `Invalid SBOM: ${sbom}`
+  );
   writeFileSync(path.join(directory, 'SHA256SUMS.txt'), checksums.join(''));
-  return expected;
+  return assets;
 }
 
 async function main() {
@@ -100,7 +107,7 @@ async function main() {
       readFileSync(path.join(root, 'package.json'), 'utf8')
     );
     const assets = await prepareReleaseAssets(directory, manifest);
-    console.log(`Prepared ${assets.length} installers and SHA256SUMS.txt.`);
+    console.log(`Prepared ${assets.length} release assets and SHA256SUMS.txt.`);
   } else {
     throw new Error(
       'Usage: node scripts/desktop-release.cjs validate|assets <directory>'

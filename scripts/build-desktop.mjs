@@ -11,7 +11,7 @@ if (!target) {
   throw new Error('Desktop builds are supported on macOS and Windows hosts.');
 }
 const usage =
-  'Usage: node scripts/build-desktop.mjs [--mac|--win] [--installer] [--release]';
+  'Usage: node scripts/build-desktop.mjs [--mac|--win] [--installer] [--release] [--unsigned]';
 let flags;
 try {
   ({ values: flags } = parseArgs({
@@ -20,12 +20,15 @@ try {
       win: { type: 'boolean' },
       installer: { type: 'boolean' },
       release: { type: 'boolean' },
+      // The release workflow signs the macOS app in a separate job.
+      unsigned: { type: 'boolean' },
     },
   }));
 } catch (error) {
   throw new Error(usage, { cause: error });
 }
-if (flags.mac && flags.win) throw new Error(usage);
+if ((flags.mac && flags.win) || (flags.unsigned && target[0] !== '--mac'))
+  throw new Error(usage);
 const requested = flags.mac ? '--mac' : '--win';
 if ((flags.mac || flags.win) && requested !== target[0]) {
   throw new Error(
@@ -61,6 +64,7 @@ execFileSync(
     builder,
     ...target,
     ...(flags.installer ? [] : ['--dir']),
+    ...(flags.unsigned ? ['-c.mac.identity=null'] : []),
     '--publish',
     'never',
   ],
