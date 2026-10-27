@@ -73,6 +73,7 @@ test("parseClaudeSessionFile extracts the active message and tool timeline", asy
   assert.equal(command.command, "npm test");
   assert.equal(command.output, "tests passed");
   assert.equal(command.exitCode, null);
+  assert.equal(command.status, "complete");
 
   const tool = session.timeline.find((item) => item.type === "tool_call");
   assert.equal(tool.id, "toolu-read");
@@ -132,6 +133,64 @@ test("parseClaudeSessionFile falls back to valid file order when leaf metadata i
   assert.deepEqual(
     session.timeline.filter((item) => item.type === "message").map((item) => item.content),
     ["Prompt", "First branch", "Second branch"]
+  );
+});
+
+test("parseClaudeSessionFile marks Bash commands failed from is_error and pending until a result", async () => {
+  const claudeConfigDir = await mkdtemp(path.join(os.tmpdir(), "glassline-claude-bash-"));
+  const sessionPath = path.join(
+    claudeConfigDir,
+    "projects/-repo-glassline",
+    `${SESSION_UUID}.jsonl`
+  );
+  const bashCall = (id, command, parentUuid, timestamp) =>
+    record({
+      type: "assistant",
+      uuid: `${id}-call`,
+      parentUuid,
+      message: {
+        id: `message-${id}`,
+        role: "assistant",
+        content: [{ type: "tool_use", id, name: "Bash", input: { command } }],
+        stop_reason: "tool_use"
+      },
+      timestamp
+    });
+  const records = [
+    record({
+      type: "user",
+      uuid: "prompt",
+      message: { role: "user", content: "Run the checks" },
+      timestamp: "2026-07-05T09:00:00.000Z"
+    }),
+    bashCall("toolu-lint", "npm run lint", "prompt", "2026-07-05T09:00:01.000Z"),
+    record({
+      type: "user",
+      uuid: "toolu-lint-result",
+      parentUuid: "toolu-lint-call",
+      message: {
+        role: "user",
+        content: [
+          { type: "tool_result", tool_use_id: "toolu-lint", content: "Exit code 1", is_error: true }
+        ]
+      },
+      timestamp: "2026-07-05T09:00:02.000Z"
+    }),
+    bashCall("toolu-test", "npm test", "toolu-lint-result", "2026-07-05T09:00:03.000Z")
+  ];
+
+  await mkdir(path.dirname(sessionPath), { recursive: true });
+  await writeFile(sessionPath, records.join("\n"));
+
+  const session = await parseClaudeSessionFile(sessionPath);
+  assert.deepEqual(
+    session.timeline
+      .filter((item) => item.type === "command")
+      .map((item) => [item.command, item.status, item.exitCode]),
+    [
+      ["npm run lint", "failed", null],
+      ["npm test", "running", null]
+    ]
   );
 });
 

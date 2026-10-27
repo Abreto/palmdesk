@@ -152,88 +152,159 @@
       >
         有新内容 · 查看最新回复 ↓
       </button>
-      <div
-        ref="scrollArea"
-        class="reader-scroll timeline"
-      >
-        <button
-          v-if="hasMore"
-          type="button"
-          class="load-older"
-          :disabled="busy"
-          @click="loadOlder"
+      <div class="timeline-frame">
+        <div
+          ref="scrollArea"
+          class="reader-scroll timeline"
+          @scroll.passive="updateNavigation"
         >
-          加载更早的记录
-        </button>
-        <template
-          v-for="block in blocks"
-          :key="block.id"
-        >
-          <article
-            v-if="block.message"
-            class="message-card"
-            :class="{ 'user-message': block.message.role === 'user' }"
-            :data-message-id="block.id"
+          <button
+            v-if="hasMore"
+            type="button"
+            class="load-older"
+            :disabled="busy"
+            @click="loadOlder"
           >
-            <header>
-              <span>{{ roleLabel(block.message.role) }}</span
-              ><button
-                type="button"
-                @click="copy(block.message)"
-              >
-                {{ copied === block.id ? '已复制' : '复制' }}
-              </button>
-            </header>
-            <!-- renderMarkdown escapes HTML and allows only http(s)/mailto links. -->
-            <div
-              class="message-body"
-              v-html="renderMarkdown(block.message.text)"
-            ></div>
-            <p
-              v-if="block.message.truncated"
-              class="truncation"
-            >
-              内容过长，仅显示前 16,384 字符；完整内容请在原窗口查看。
-            </p>
-          </article>
-          <details
-            v-else
-            class="activity-group"
+            加载更早的记录
+          </button>
+          <template
+            v-for="block in blocks"
+            :key="block.id"
           >
-            <summary>
-              工具活动 <span>{{ block.actions.length }} 项</span>
-            </summary>
-            <section
-              v-for="item in block.actions"
-              :key="item.id"
-              class="activity-item"
+            <article
+              v-if="block.message"
+              class="message-card"
+              :class="{ 'user-message': block.message.role === 'user' }"
+              :data-message-id="block.id"
             >
-              <strong>{{ item.title || '活动' }}</strong>
-              <pre v-if="item.text">{{ item.text }}</pre>
-              <details
-                v-if="item.detail"
-                class="tool-output"
-              >
-                <summary>
-                  {{ item.type === 'file_change' ? '查看差异' : '查看输出' }}
-                </summary>
-                <pre>{{ item.detail }}</pre>
-              </details>
+              <header>
+                <span
+                  >{{ roleLabel(block.message.role) }}
+                  <time
+                    v-if="formatTime(block.message.createdAt)"
+                    :datetime="block.message.createdAt"
+                    >· {{ formatTime(block.message.createdAt) }}</time
+                  ></span
+                ><button
+                  type="button"
+                  @click="copy(block.message)"
+                >
+                  {{ copied === block.id ? '已复制' : '复制' }}
+                </button>
+              </header>
+              <!-- renderMarkdown escapes HTML and allows only http(s)/mailto links. -->
+              <div
+                class="message-body"
+                @click="copyCode"
+                v-html="block.html"
+              ></div>
               <p
-                v-if="item.truncated"
+                v-if="block.message.truncated"
                 class="truncation"
               >
-                长内容已截断，完整内容请在原窗口查看。
+                内容过长，仅显示前 16,384 字符；完整内容请在原窗口查看。
               </p>
-            </section>
-          </details>
-        </template>
-        <p
-          v-if="!busy && !items.length && !error"
-          class="empty-list"
+            </article>
+            <details
+              v-else
+              class="activity-group"
+              :class="{ 'has-failure': failureCount(block.actions) }"
+            >
+              <summary>
+                工具活动
+                <span
+                  >{{ activitySummary(block.actions) }}
+                  <strong v-if="failureCount(block.actions)"
+                    >· {{ failureCount(block.actions) }} 项失败</strong
+                  ></span
+                >
+              </summary>
+              <section
+                v-for="item in block.actions"
+                :key="item.id"
+                class="activity-item"
+                :class="{ failed: isFailed(item) }"
+              >
+                <header>
+                  <component
+                    :is="activityIcons[item.type] || InformationCircleOutline"
+                    class="activity-icon"
+                    aria-hidden="true"
+                  />
+                  <strong>{{ activityTitle(item) }}</strong>
+                  <span
+                    v-if="activityBadge(item)"
+                    class="badge"
+                    >{{ activityBadge(item) }}</span
+                  >
+                </header>
+                <pre v-if="item.text">{{ item.text }}</pre>
+                <details
+                  v-if="item.detail"
+                  class="tool-output"
+                >
+                  <summary>
+                    {{ item.type === 'file_change' ? '查看差异' : '查看输出' }}
+                  </summary>
+                  <!-- Diff lines are text interpolations, so the content stays escaped. -->
+                  <pre
+                    v-if="item.type === 'file_change'"
+                    class="diff"
+                  ><span
+                  v-for="(line, index) in diffLines(item.detail)"
+                  :key="index"
+                  :class="line.kind"
+                >{{ line.text }}</span></pre>
+                  <pre v-else>{{ item.detail }}</pre>
+                </details>
+                <p
+                  v-if="item.truncated"
+                  class="truncation"
+                >
+                  长内容已截断，完整内容请在原窗口查看。
+                </p>
+              </section>
+            </details>
+          </template>
+          <p
+            v-if="!busy && !items.length && !error"
+            class="empty-list"
+          >
+            暂未读取到消息，可稍后刷新或前往窗口查看。
+          </p>
+        </div>
+        <button
+          v-if="navigation.latestHidden"
+          type="button"
+          class="jump-latest"
+          @click="jumpLatest"
         >
-          暂未读取到消息，可稍后刷新或前往窗口查看。
-        </p>
+          <ArrowDownOutline aria-hidden="true" />回到最新
+        </button>
+        <nav
+          v-if="hasPrompts"
+          class="prompt-nav"
+          aria-label="提问导航"
+        >
+          <button
+            type="button"
+            title="上一条提问"
+            aria-label="上一条提问"
+            :disabled="!navigation.previous"
+            @click="jumpPrompt(-1)"
+          >
+            <ChevronUpOutline aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            title="下一条提问"
+            aria-label="下一条提问"
+            :disabled="!navigation.next"
+            @click="jumpPrompt(1)"
+          >
+            <ChevronDownOutline aria-hidden="true" />
+          </button>
+        </nav>
       </div>
     </template>
     <p
@@ -269,6 +340,15 @@
 </template>
 
 <script setup lang="ts">
+import {
+  ArrowDownOutline,
+  BuildOutline,
+  ChevronDownOutline,
+  ChevronUpOutline,
+  DocumentTextOutline,
+  InformationCircleOutline,
+  TerminalOutline,
+} from '@vicons/ionicons5';
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
 
 import type { ReaderClient } from '@/utils/session-reader-channel';
@@ -313,11 +393,21 @@ let generation = 0;
 let latestSignature = '';
 
 const blocks = computed(() => {
-  const result: { id: string; message?: ReaderItem; actions: ReaderItem[] }[] =
-    [];
+  const result: {
+    id: string;
+    message?: ReaderItem;
+    html?: string;
+    actions: ReaderItem[];
+  }[] = [];
   items.value.forEach((item) => {
     if (item.type === 'message')
-      result.push({ id: item.id, message: item, actions: [] });
+      result.push({
+        id: item.id,
+        message: item,
+        // Render once per page; polling re-renders the component every 8 s.
+        html: renderMarkdown(item.text, { copyLabel: '复制' }),
+        actions: [],
+      });
     else {
       const previous = result[result.length - 1];
       if (previous && !previous.message) previous.actions.push(item);
@@ -326,6 +416,13 @@ const blocks = computed(() => {
   });
   return result;
 });
+const hasPrompts = computed(() =>
+  items.value.some((item) => item.type === 'message' && item.role === 'user')
+);
+const navigation = ref({ previous: false, next: false, latestHidden: false });
+// Scrolling to a message leaves this gap above it, so it is not a neighbour.
+const navigationSlack = 16;
+let navigationFrame = 0;
 
 const turnLabel = (state: string) =>
   ({ running: '正在执行', idle: '本轮已结束', unknown: '状态未知' })[state] ||
@@ -345,6 +442,56 @@ const roleLabel = (role?: string) =>
   })[role || ''] || '消息';
 const projectName = (value: string) =>
   value.split(/[\\/]/).filter(Boolean).pop() || '未提供项目';
+const activityIcons: Record<string, typeof TerminalOutline> = {
+  command: TerminalOutline,
+  tool_call: BuildOutline,
+  file_change: DocumentTextOutline,
+};
+// Hosts released before the typed fields only send display titles.
+const isLegacy = (item: ReaderItem) => item.status === undefined;
+const isFailed = (item: ReaderItem) =>
+  item.status === 'failed' ||
+  (typeof item.exitCode === 'number' && item.exitCode !== 0);
+const failureCount = (actions: ReaderItem[]) => actions.filter(isFailed).length;
+function activityTitle(item: ReaderItem) {
+  if (isLegacy(item)) return item.title || '活动';
+  if (item.type === 'command') return '命令';
+  if (item.type === 'tool_call') return `工具 · ${item.toolName}`;
+  if (item.type === 'file_change') return item.path;
+  return '状态';
+}
+function activityBadge(item: ReaderItem) {
+  if (typeof item.exitCode === 'number' && item.exitCode !== 0)
+    return `退出码 ${item.exitCode}`;
+  return { failed: '失败', running: '暂无结果' }[item.status || ''] || '';
+}
+function activitySummary(actions: ReaderItem[]) {
+  const count = (type: string) =>
+    actions.filter((item) => item.type === type).length;
+  const parts: [number, string][] = [
+    [count('command'), '条命令'],
+    [count('tool_call'), '次工具调用'],
+    [count('file_change'), '个文件改动'],
+    [count('status'), '条状态'],
+  ];
+  return parts
+    .filter(([value]) => value)
+    .map(([value, unit]) => `${value} ${unit}`)
+    .join(' · ');
+}
+function diffKind(line: string) {
+  if (line.startsWith('@@')) return 'hunk';
+  if (line.startsWith('+')) return 'added';
+  if (line.startsWith('-')) return 'removed';
+  return '';
+}
+function diffLines(diff: string) {
+  const lines = diff.split('\n');
+  return lines.map((line, index) => ({
+    text: index < lines.length - 1 ? `${line}\n` : line,
+    kind: diffKind(line),
+  }));
+}
 function formatTime(value: string) {
   const date = new Date(value);
   return Number.isFinite(date.getTime())
@@ -419,6 +566,7 @@ async function openSession(session: ReaderSession) {
   if (busy.value) return;
   selected.value = session;
   items.value = [];
+  navigation.value = { previous: false, next: false, latestHidden: false };
   hasMore.value = false;
   hasUpdate.value = false;
   copyError.value = '';
@@ -439,12 +587,7 @@ async function loadLatest() {
       hasUpdate.value = false;
       emit('select', page.session);
       await nextTick();
-      const messages =
-        scrollArea.value?.querySelectorAll<HTMLElement>('[data-message-id]');
-      const latest = messages?.[messages.length - 1];
-      if (latest && scrollArea.value)
-        scrollArea.value.scrollTop =
-          latest.offsetTop - scrollArea.value.offsetTop;
+      jumpLatest();
     }
   );
 }
@@ -467,8 +610,55 @@ async function loadOlder() {
       if (scrollArea.value)
         scrollArea.value.scrollTop =
           top + scrollArea.value.scrollHeight - height;
+      updateNavigation();
     }
   );
+}
+
+const offsetInTimeline = (area: HTMLElement, element: Element) =>
+  element.getBoundingClientRect().top - area.getBoundingClientRect().top;
+
+function scrollToMessage(element: Element) {
+  const area = scrollArea.value;
+  if (!area) return;
+  area.scrollTop += offsetInTimeline(area, element) - navigationSlack / 2;
+  updateNavigation();
+}
+
+function jumpLatest() {
+  const messages =
+    scrollArea.value?.querySelectorAll<HTMLElement>('[data-message-id]');
+  const latest = messages?.[messages.length - 1];
+  if (latest) scrollToMessage(latest);
+}
+
+function jumpPrompt(direction: -1 | 1) {
+  const area = scrollArea.value;
+  if (!area) return;
+  const prompts = [...area.querySelectorAll('.user-message')].filter(
+    (element) => direction * offsetInTimeline(area, element) > navigationSlack
+  );
+  const target = direction < 0 ? prompts[prompts.length - 1] : prompts[0];
+  if (target) scrollToMessage(target);
+}
+
+function updateNavigation() {
+  cancelAnimationFrame(navigationFrame);
+  navigationFrame = requestAnimationFrame(() => {
+    const area = scrollArea.value;
+    if (!area) return;
+    const prompts = [...area.querySelectorAll('.user-message')].map((element) =>
+      offsetInTimeline(area, element)
+    );
+    const messages = area.querySelectorAll('[data-message-id]');
+    const latest = messages[messages.length - 1];
+    navigation.value = {
+      previous: prompts.some((offset) => offset < -navigationSlack),
+      next: prompts.some((offset) => offset > navigationSlack),
+      latestHidden:
+        !!latest && offsetInTimeline(area, latest) > area.clientHeight,
+    };
+  });
 }
 
 function back() {
@@ -486,6 +676,20 @@ async function copy(item: ReaderItem) {
   try {
     await navigator.clipboard.writeText(item.text);
     copied.value = item.id;
+  } catch {
+    copyError.value = '无法访问剪贴板，请长按选择文字复制。';
+  }
+}
+
+// Code-block buttons come from rendered Markdown, so one listener serves them.
+async function copyCode(event: MouseEvent) {
+  const button = (event.target as Element).closest('[data-copy-code]');
+  const code = button?.closest('.code-block')?.querySelector('code');
+  if (!button || !code) return;
+  copyError.value = '';
+  try {
+    await navigator.clipboard.writeText(code.textContent || '');
+    button.textContent = '已复制';
   } catch {
     copyError.value = '无法访问剪贴板，请长按选择文字复制。';
   }
@@ -529,6 +733,7 @@ const pollTimer = setInterval(() => {
 onUnmounted(() => {
   generation += 1;
   clearInterval(pollTimer);
+  cancelAnimationFrame(navigationFrame);
 });
 </script>
 
@@ -701,9 +906,64 @@ h2 {
 .session-context .window-link {
   color: var(--pd-accent);
 }
+.timeline-frame {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
 .timeline {
   position: relative;
-  padding: 16px max(16px, calc((100% - 860px) / 2)) 32px;
+  /* The bottom padding keeps the last reply clear of the floating buttons. */
+  padding: 16px max(16px, calc((100% - 860px) / 2)) 72px;
+}
+.jump-latest {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-color: var(--pd-accent);
+  border-radius: 999px;
+  color: var(--pd-on-accent);
+  background: var(--pd-accent);
+  box-shadow: var(--pd-shadow);
+  font-size: 13px;
+  transform: translateX(-50%);
+}
+.jump-latest svg {
+  width: 15px;
+  height: 15px;
+}
+.prompt-nav {
+  position: absolute;
+  right: 12px;
+  bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Host pages may style nav bars; this is only a column of buttons. */
+  padding: 0;
+  border: 0;
+  background: none;
+}
+.prompt-nav button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: var(--pd-shadow);
+}
+.prompt-nav svg {
+  width: 18px;
+  height: 18px;
 }
 .message-card {
   margin-bottom: 14px;
@@ -741,7 +1001,8 @@ h2 {
 }
 .message-body :deep(h3),
 .message-body :deep(h4),
-.message-body :deep(h5) {
+.message-body :deep(h5),
+.message-body :deep(h6) {
   line-height: 1.5;
   margin: 18px 0 8px;
 }
@@ -775,6 +1036,68 @@ pre {
 .message-body :deep(ol) {
   padding-left: 24px;
 }
+.message-body :deep(.task-item) {
+  list-style: none;
+}
+.message-body :deep(.task-item input) {
+  margin: 0 6px 0 -20px;
+}
+.message-body :deep(hr) {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--pd-border);
+}
+.message-body :deep(.table-scroll) {
+  max-width: 100%;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+.message-body :deep(table) {
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.message-body :deep(th),
+.message-body :deep(td) {
+  min-width: 6em;
+  padding: 6px 10px;
+  border: 1px solid var(--pd-border);
+  text-align: left;
+  vertical-align: top;
+}
+.message-body :deep(th) {
+  background: var(--pd-surface-soft);
+}
+.message-body :deep(.code-block) {
+  margin: 12px 0;
+  overflow: hidden;
+  border-radius: var(--pd-radius-sm);
+  background: #0a100c;
+}
+.message-body :deep(.code-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 4px 2px 12px;
+  border-bottom: 1px solid rgb(185 232 190 / 12%);
+  color: #9aa79f;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+.message-body :deep(.code-header button) {
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 0;
+  background: transparent;
+  color: #b9e8be;
+  font-size: 11px;
+  cursor: pointer;
+}
+.message-body :deep(.code-block pre) {
+  margin: 0;
+  border-radius: 0;
+}
 .activity-group {
   margin-bottom: 14px;
   padding: 12px 16px;
@@ -783,25 +1106,77 @@ pre {
   background: var(--pd-surface-soft);
   font-size: 13px;
 }
+.activity-group.has-failure {
+  border-color: var(--pd-danger);
+}
 summary {
   cursor: pointer;
   line-height: 1.7;
 }
-summary span {
+summary > span {
   float: right;
   color: var(--pd-muted);
   font-size: 11px;
+}
+/* Long counts wrap below the label on phones; keep them inside the box. */
+summary::after {
+  content: '';
+  display: block;
+  clear: both;
+}
+summary strong {
+  color: var(--pd-danger);
 }
 .activity-item {
   padding-top: 14px;
   min-width: 0;
 }
-.activity-item > strong {
-  display: block;
+.activity-item header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.activity-item header strong {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+.activity-icon {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--pd-muted);
+}
+.badge {
+  flex-shrink: 0;
+  margin-left: auto;
+  border: 1px solid var(--pd-border);
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--pd-muted);
+  font-size: 11px;
+}
+.failed .activity-icon,
+.failed .badge {
+  color: var(--pd-danger);
+}
+.failed .badge {
+  border-color: transparent;
+  background: var(--pd-danger-soft);
 }
 .tool-output {
   margin: 8px 0;
+}
+.diff {
+  color: #9aa79f;
+}
+.diff .added {
+  color: #7ee787;
+}
+.diff .removed {
+  color: #ffa198;
+}
+.diff .hunk {
+  color: #79c0ff;
 }
 .load-older {
   display: block;

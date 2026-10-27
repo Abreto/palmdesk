@@ -1,5 +1,9 @@
-// Modified for PalmDesk: guarantee progress for incomplete Markdown markers.
+// Modified for PalmDesk: render Markdown with markdown-it behind a link allowlist.
 // Original Glassline code is Apache-2.0.
+import MarkdownIt from "markdown-it";
+
+const markdown = createMarkdown();
+
 export function groupTimelineItems(items) {
   const grouped = [];
   let pendingActions = [];
@@ -57,91 +61,70 @@ export function renderMessageBody(item) {
   return `<div class="message-markdown">${renderMarkdown(textForTimelineItem(item))}</div>`;
 }
 
-export function renderMarkdown(value) {
-  const lines = String(value ?? "").replace(/\r\n?/g, "\n").split("\n");
-  const blocks = [];
-  let index = 0;
+export function renderMarkdown(value, { copyLabel = "Copy" } = {}) {
+  return markdown.render(String(value ?? ""), { copyLabel });
+}
 
-  while (index < lines.length) {
-    if (isBlank(lines[index])) {
-      index += 1;
-      continue;
-    }
-
-    const codeFence = lines[index].match(/^```\w*[\t ]*$/);
-    if (codeFence) {
-      const codeLines = [];
-      index += 1;
-
-      while (index < lines.length && !/^```[\t ]*$/.test(lines[index])) {
-        codeLines.push(lines[index]);
-        index += 1;
+function createMarkdown() {
+  // Raw HTML stays escaped, and single newlines keep their line breaks.
+  const md = new MarkdownIt({ html: false, breaks: true });
+  // Images would make the controller fetch arbitrary URLs from agent output.
+  md.disable("image");
+  md.validateLink = isSafeHref;
+  md.core.ruler.push("palmdesk_heading_levels", (state) => {
+    // Messages sit inside cards, so "#" starts at <h3>.
+    for (const token of state.tokens) {
+      if (token.type === "heading_open" || token.type === "heading_close") {
+        token.tag = `h${Math.min(Number(token.tag.slice(1)) + 2, 6)}`;
       }
+    }
+  });
+  md.core.ruler.push("palmdesk_task_items", markTaskItems);
+  md.renderer.rules.task_checkbox = (tokens, index) =>
+    `<input type="checkbox" disabled${tokens[index].meta.checked ? " checked" : ""}> `;
+  md.renderer.rules.link_open = (tokens, index, options, env, self) => {
+    tokens[index].attrSet("target", "_blank");
+    tokens[index].attrSet("rel", "noreferrer");
+    return self.renderToken(tokens, index, options);
+  };
+  md.renderer.rules.table_open = () => '<div class="table-scroll"><table>\n';
+  md.renderer.rules.table_close = () => "</table></div>\n";
+  md.renderer.rules.fence = (tokens, index, options, env) =>
+    renderCodeBlock(tokens[index].content, tokens[index].info.trim().split(/\s+/)[0], env);
+  md.renderer.rules.code_block = (tokens, index, options, env) =>
+    renderCodeBlock(tokens[index].content, "", env);
+  return md;
+}
 
-      if (index < lines.length) {
-        index += 1;
-      }
-
-      blocks.push(`<pre><code>${escapeHtml(codeLines.join("\n"))}${codeLines.length ? "\n" : ""}</code></pre>`);
+// GitHub-style "- [ ] task" items; markdown-it core has no task lists.
+function markTaskItems(state) {
+  const { tokens } = state;
+  for (let index = 2; index < tokens.length; index += 1) {
+    const first = tokens[index].children?.[0];
+    const match = first?.type === "text" ? /^\[([ xX])\]\s+/.exec(first.content) : null;
+    if (
+      !match ||
+      tokens[index - 1].type !== "paragraph_open" ||
+      tokens[index - 2].type !== "list_item_open"
+    ) {
       continue;
     }
 
-    const heading = lines[index].match(/^(#{1,3})[\t ]+(.+?)\s*#*$/);
-    if (heading) {
-      const level = heading[1].length + 2;
-      blocks.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
-      index += 1;
-      continue;
-    }
-
-    if (/^\s*>/.test(lines[index])) {
-      const quoteLines = [];
-      while (index < lines.length && /^\s*>/.test(lines[index])) {
-        quoteLines.push(lines[index].replace(/^\s*>\s?/, ""));
-        index += 1;
-      }
-      blocks.push(`<blockquote>${renderParagraph(quoteLines)}</blockquote>`);
-      continue;
-    }
-
-    const unorderedList = lines[index].match(/^\s*[-*]\s+(.+)$/);
-    if (unorderedList) {
-      const items = [];
-      while (index < lines.length) {
-        const item = lines[index].match(/^\s*[-*]\s+(.+)$/);
-        if (!item) break;
-        items.push(`<li>${renderInlineMarkdown(item[1])}</li>`);
-        index += 1;
-      }
-      blocks.push(`<ul>${items.join("")}</ul>`);
-      continue;
-    }
-
-    const orderedList = lines[index].match(/^\s*\d+[.)]\s+(.+)$/);
-    if (orderedList) {
-      const items = [];
-      while (index < lines.length) {
-        const item = lines[index].match(/^\s*\d+[.)]\s+(.+)$/);
-        if (!item) break;
-        items.push(`<li>${renderInlineMarkdown(item[1])}</li>`);
-        index += 1;
-      }
-      blocks.push(`<ol>${items.join("")}</ol>`);
-      continue;
-    }
-
-    const paragraphLines = [];
-    // An incomplete marker (for example a streamed "- ") may look like a
-    // block boundary without matching a complete block above. Always consume
-    // that first line so truncated agent output cannot stall the renderer.
-    do {
-      paragraphLines.push(lines[index]);
-      index += 1;
-    } while (index < lines.length && !isBlank(lines[index]) && !startsMarkdownBlock(lines[index]));
-    blocks.push(renderParagraph(paragraphLines));
+    first.content = first.content.slice(match[0].length);
+    const checkbox = new state.Token("task_checkbox", "input", 0);
+    checkbox.meta = { checked: match[1] !== " " };
+    tokens[index].children.unshift(checkbox);
+    tokens[index - 2].attrJoin("class", "task-item");
   }
+}
 
-  return blocks.join("");
+function renderCodeBlock(code, language, { copyLabel }) {
+  const languageClass = language ? ` class="language-${escapeHtml(language)}"` : "";
+  return (
+    `<div class="code-block"><div class="code-header"><span>${escapeHtml(language)}</span>` +
+    `<button type="button" data-copy-code>${escapeHtml(copyLabel)}</button></div>` +
+    `<pre><code${languageClass}>${escapeHtml(code)}</code></pre></div>\n`
+  );
 }
 
 export function renderActivityGroup(group) {
@@ -323,51 +306,6 @@ function disclosureId(item, suffix) {
   return item.id ? `${item.id}:${suffix}` : "";
 }
 
-function renderParagraph(lines) {
-  return `<p>${lines.map(renderInlineMarkdown).join("<br>")}</p>`;
-}
-
-function renderInlineMarkdown(value) {
-  const tokens = [];
-  let text = String(value ?? "");
-
-  text = tokenize(text, /`([^`\n]+)`/g, (match) => `<code>${escapeHtml(match[1])}</code>`, tokens);
-  text = tokenize(
-    text,
-    /\[([^\]\n]+)\]\(([^)\s]+)\)/g,
-    (match) => {
-      const label = escapeHtml(match[1]);
-      const href = match[2];
-
-      return isSafeHref(href)
-        ? `<a href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${label}</a>`
-        : escapeHtml(match[0]);
-    },
-    tokens
-  );
-  text = tokenize(text, /\*\*([^*\n]+)\*\*/g, (match) => `<strong>${escapeHtml(match[1])}</strong>`, tokens);
-  text = tokenize(text, /\*([^*\n]+)\*/g, (match) => `<em>${escapeHtml(match[1])}</em>`, tokens);
-
-  return restoreTokens(escapeHtml(text), tokens);
-}
-
-function tokenize(text, pattern, renderToken, tokens) {
-  return text.replace(pattern, (...args) => {
-    const match = args[0];
-    const token = `\u0000GLASSLINE_MD_${tokens.length}\u0000`;
-    tokens.push([token, renderToken(args.slice(0, -2), match)]);
-    return token;
-  });
-}
-
-function restoreTokens(text, tokens) {
-  let result = text;
-  for (const [token, html] of tokens) {
-    result = result.replaceAll(token, html);
-  }
-  return result;
-}
-
 function isSafeHref(href) {
   try {
     const url = new URL(href);
@@ -375,20 +313,6 @@ function isSafeHref(href) {
   } catch {
     return false;
   }
-}
-
-function isBlank(line) {
-  return !line.trim();
-}
-
-function startsMarkdownBlock(line) {
-  return (
-    /^```\w*[\t ]*$/.test(line) ||
-    /^(#{1,3})[\t ]+/.test(line) ||
-    /^\s*>/.test(line) ||
-    /^\s*[-*]\s+/.test(line) ||
-    /^\s*\d+[.)]\s+/.test(line)
-  );
 }
 
 function isFailedAction(item) {

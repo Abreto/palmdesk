@@ -102,3 +102,21 @@ test('reading projections explicitly mark long content and search beyond the ini
   assert.equal(page.items[0].text.length, 16384);
   assert.equal(page.items[0].truncated, true);
 });
+
+test('reading projections add typed activity fields while keeping titles for older controllers', async () => {
+  const reader = createSessionReader({ providers: [{
+    id: 'codex',
+    listSessions: async () => [{ id, title: '活动', projectPath: '/repo/example', lastUpdatedAt: '2026-09-15' }],
+    getSessionTimelinePage: async () => ({ items: [
+      { id: 'command', type: 'command', command: 'pnpm lint', output: 'Process exited with code 1', exitCode: 1 },
+      { id: 'tool', type: 'tool_call', name: 'Read', input: { file_path: 'a.ts' }, output: 'denied', status: 'failed' },
+      { id: 'file', type: 'file_change', path: 'src/a.ts', summary: 'update src/a.ts', diff: '-a\n+b', status: 'complete' },
+      { id: 'message', type: 'message', role: 'assistant', content: '完成' },
+    ], hasMore: false }),
+  }] });
+  const [command, tool, file, message] = (await reader.read(id)).items;
+  assert.deepEqual([command.exitCode, command.status, command.title], [1, '', '命令 · 退出码 1']);
+  assert.deepEqual([tool.toolName, tool.status, tool.title], ['Read', 'failed', '工具 · Read']);
+  assert.deepEqual([file.path, file.status, file.title], ['src/a.ts', 'complete', 'src/a.ts']);
+  assert.deepEqual([message.exitCode, message.status, message.toolName, message.path], [null, '', '', '']);
+});

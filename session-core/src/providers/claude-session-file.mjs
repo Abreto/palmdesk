@@ -508,6 +508,7 @@ function addAssistantContent(timeline, callsById, record, createdAt, sourceRef, 
         cwd: validString(input.cwd) ?? validString(record.cwd),
         exitCode: null,
         output: "",
+        status: "running",
         sourceRefs: [sourceRef]
       };
     } else {
@@ -563,16 +564,9 @@ function applyToolResult(item, block, structuredResult) {
     return;
   }
 
-  const output = toolResultText(block.content, structuredResult);
-  if (item.type === "command") {
-    item.output = output;
-    return;
-  }
-
-  if (item.type === "tool_call") {
-    item.output = output;
-    item.status = block.is_error === true ? "failed" : "complete";
-  }
+  // Bash results carry no exit code, so is_error is the only failure signal.
+  item.output = toolResultText(block.content, structuredResult);
+  item.status = block.is_error === true ? "failed" : "complete";
 }
 
 function textMessagesFromRecord(record) {
