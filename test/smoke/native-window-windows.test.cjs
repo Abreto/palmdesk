@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Native window operations must execute in order, including rejection cases. */
 const assert = require('node:assert/strict');
 const { spawn, spawnSync } = require('node:child_process');
 const { existsSync } = require('node:fs');

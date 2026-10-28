@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Shared browser fixture control. */
 import { markRaw, ref } from 'vue';
 
 import { useNetworkStore } from '../../../../src/store/network';

@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax, require-await */
 // Run after pnpm build:prod. Uses real Vue pages, Socket.IO session auth and
 // WebRTC; only native capture/input, device persistence and transcripts are fake.
 import assert from 'node:assert/strict';

@@ -131,7 +131,7 @@ test('startup validates identity before singleton handoff or loading the permiss
     };
     Object.defineProperty(overrides, '@nut-tree-fork/nut-js', {
       get() {
-        assert.fail(
+        return assert.fail(
           'Input module must not load before identity and singleton checks pass'
         );
       },

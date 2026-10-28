@@ -1,4 +1,3 @@
-/* eslint-disable no-underscore-dangle -- Shared browser fixture control. */
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { createRequire } from 'node:module';
