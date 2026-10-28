@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax, require-await */
 // Run after pnpm build:prod. The signaling server here admits every
 // controller, whatever password it sends, as a compromised or malicious one
 // would. The real host and controller pages run over real WebRTC; only native
