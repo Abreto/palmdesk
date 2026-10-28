@@ -203,6 +203,7 @@ node scripts/dev.mjs --prepare-only
 | [会话阅读](docs/GLASSLINE_INTEGRATION.md)      | 支持来源、读取限制、窗口关联和验证入口           |
 | [容器镜像](containers/README.md)               | 网页与后端镜像、固定后端源码及部署适配层         |
 | [TURN 验证](docs/TURN_TESTING.md)              | 强制中继与凭据续期验证                           |
+| [开发服务预览](docs/DEV_SERVER_PREVIEW.md)     | 规划中：手机打开主机开发服务的设计与原型         |
 | [验证记录](docs/smoke-artifacts/)              | 按日期记录的测试结果及待验收项目                 |
 | [开源准备记录](docs/OPEN_SOURCE_READINESS.md)  | 历史依赖审计和稳定分发前提                       |
 

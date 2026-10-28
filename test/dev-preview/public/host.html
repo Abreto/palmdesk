@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Preview prototype host</title>
+    <script src="/socket.io/socket.io.min.js"></script>
+    <script
+      type="module"
+      src="/host.js"
+    ></script>
+  </head>
+  <body>
+    <p>
+      Prototype host: forwards PalmDeskPreview DataChannel frames to the Node
+      gateway, as the PalmDesk host renderer would forward them to the Electron
+      main process.
+    </p>
+    <p id="peers">0 controllers</p>
+  </body>
+</html>

@@ -253,6 +253,7 @@ The detailed guides are currently in Chinese.
 | [Session reading](docs/GLASSLINE_INTEGRATION.md)       | Supported sources, reading limits, window associations and test setup                          |
 | [Container images](containers/README.md)               | Web and backend images, pinned backend source and deployment adapter                           |
 | [TURN testing](docs/TURN_TESTING.md)                   | Forced-relay and credential-renewal verification                                               |
+| [Dev server preview](docs/DEV_SERVER_PREVIEW.md)       | Planned: open host development servers on the phone; design decision and prototype results     |
 | [Validation records](docs/smoke-artifacts/)            | Dated test results and remaining acceptance work                                               |
 | [Open-source readiness](docs/OPEN_SOURCE_READINESS.md) | Historical dependency audit and release prerequisites                                          |
 
