@@ -358,9 +358,35 @@ export function remoteKey(
   return name ? keys[name] : undefined;
 }
 
+// The controller's own close and quit shortcuts stay with it, in a browser or
+// the desktop app, so they never close or quit an app on the computer.
+export function localShortcut(event: KeyInput, mac: boolean) {
+  if (!mac && event.altKey && event.code === 'F4') return true;
+  const letter = (
+    /^[a-z]$/i.test(event.key)
+      ? event.key
+      : /^Key([A-Z])$/.exec(event.code)?.[1] || ''
+  ).toLowerCase();
+  if (letter !== 'w' && letter !== 'q') return false;
+  // Windows reports AltGr as Control+Alt; those combinations type characters.
+  return mac ? Boolean(event.metaKey) : Boolean(event.ctrlKey && !event.altKey);
+}
+
 // Holding Escape without modifiers hands the keyboard back to PalmDesk; a
 // short press still reaches the computer when it is released.
 export const ESCAPE_HOLD_MS = 800;
+// Lock keys toggle on the computer instead of staying down.
+const LOCK_KEYS = ['CapsLock', 'NumLock', 'ScrollLock'];
+const COMMAND_KEYS = ['MetaLeft', 'MetaRight'];
+const MODIFIER_KEYS = [
+  ...COMMAND_KEYS,
+  'ShiftLeft',
+  'ShiftRight',
+  'ControlLeft',
+  'ControlRight',
+  'AltLeft',
+  'AltRight',
+];
 
 export function createKeyboardController(options: {
   send: Send;
@@ -368,9 +394,15 @@ export function createKeyboardController(options: {
   key: (event: KeyInput) => number | undefined;
   escape: number;
   exit: () => void;
+  local?: (event: KeyInput) => boolean;
+  // macOS reports locking Caps Lock as a keydown and unlocking it as a keyup.
+  locksToggleOnKeyup?: boolean;
 }) {
   // Track presses by physical key so each release matches its press.
   const held = new Map<string, number>();
+  // macOS sends no keyup for a key released while Command is down, so those
+  // keys are released together with Command.
+  const withCommand = new Set<string>();
   let escape:
     | { code: string; timer: ReturnType<typeof setTimeout> }
     | undefined;
@@ -380,10 +412,15 @@ export function createKeyboardController(options: {
   };
   const lift = (code: string) => {
     const key = held.get(code);
+    withCommand.delete(code);
     if (key === undefined) return false;
     held.delete(code);
     options.send({ type: Behavior.keyboardReleaseKey, key: [key] });
     return true;
+  };
+  const tap = (code: string, key: number) => {
+    press(code, key);
+    lift(code);
   };
   const takeEscape = () => {
     const pending = escape;
@@ -396,16 +433,22 @@ export function createKeyboardController(options: {
     reset() {
       takeEscape();
       held.clear();
+      withCommand.clear();
     },
     down(event: KeyInput) {
-      if (!options.enabled() || event.isComposing || event.key === 'Process')
+      if (
+        !options.enabled() ||
+        event.isComposing ||
+        event.key === 'Process' ||
+        options.local?.(event)
+      )
         return false;
       const key = options.key(event);
       if (key === undefined) return false;
       const code = event.code || event.key;
+      // Only the modifiers held now matter, never a press whose keyup was lost.
       if (
         key === options.escape &&
-        !held.size &&
         !(event.altKey || event.ctrlKey || event.metaKey || event.shiftKey)
       ) {
         if (!escape && !event.repeat)
@@ -420,15 +463,32 @@ export function createKeyboardController(options: {
       }
       const pending = takeEscape();
       if (pending) press(pending.code, options.escape);
+      if (LOCK_KEYS.includes(code)) {
+        tap(code, key);
+        return true;
+      }
       press(code, key);
+      if (event.metaKey && !MODIFIER_KEYS.includes(code)) withCommand.add(code);
       return true;
     },
     up(event: KeyInput) {
       const code = event.code || event.key;
+      if (LOCK_KEYS.includes(code)) {
+        const key = options.key(event);
+        if (
+          !options.locksToggleOnKeyup ||
+          !options.enabled() ||
+          key === undefined
+        )
+          return false;
+        tap(code, key);
+        return true;
+      }
       if (escape?.code === code) {
         takeEscape();
         if (options.enabled()) press(code, options.escape);
       }
+      if (COMMAND_KEYS.includes(code)) [...withCommand].forEach(lift);
       return lift(code);
     },
   };

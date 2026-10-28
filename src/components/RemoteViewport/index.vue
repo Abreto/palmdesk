@@ -207,6 +207,7 @@ import {
   createKeyboardController,
   createMouseController,
   createPointerController,
+  localShortcut,
   remoteKey,
 } from '@/utils/controller-input';
 import { videoPoint } from '@/utils/remote-input';
@@ -288,8 +289,13 @@ function point(event: { clientX: number; clientY: number }, clamp = false) {
   const rect = props.video?.getBoundingClientRect();
   return rect ? videoPoint(rect, event.clientX, event.clientY, clamp) : null;
 }
+// A cancelled press releases everything on the host, keys included.
+function sendPointer(data: Partial<WsBilldDeskBehaviorType['data']>) {
+  if (data.type === Behavior.releaseAll) keyboard.reset();
+  send(data);
+}
 const pointer = createPointerController({
-  send,
+  send: sendPointer,
   enabled: () =>
     canControl.value &&
     !imageBusy.value &&
@@ -299,7 +305,7 @@ const pointer = createPointerController({
   point,
 });
 const mouse = createMouseController({
-  send,
+  send: sendPointer,
   enabled: () => canControl.value && !imageBusy.value && !localPan(),
   point,
 });
@@ -309,6 +315,8 @@ const keyboard = createKeyboardController({
   key: (event) => remoteKey(event, NUT_KEY_MAP),
   escape: NUT_KEY_MAP.Escape,
   exit: leaveRemoteKeyboard,
+  local: (event) => localShortcut(event, macController),
+  locksToggleOnKeyup: macController,
 });
 const gestures = createViewportGestures({
   view: () => {
@@ -342,7 +350,18 @@ function takeKeyboard(event: PointerEvent) {
     return;
   element.focus({ preventScroll: true });
 }
+// Presses on the zoomed view's own scrollbars scroll it locally.
+function onScrollbar(event: PointerEvent) {
+  const element = stage.value;
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  return (
+    event.clientX - rect.left - element.clientLeft >= element.clientWidth ||
+    event.clientY - rect.top - element.clientTop >= element.clientHeight
+  );
+}
 function pointerDown(event: PointerEvent) {
+  if (onScrollbar(event)) return;
   takeKeyboard(event);
   // Keep local zooming and panning available during host input errors.
   if (!hasFrame.value || !props.connected) return;

@@ -360,6 +360,72 @@ try {
     'PASS keyboard focus enters remote input; the toolbar toggle leaves and re-enters it'
   );
 
+  // The controller's close and quit shortcuts are never sent to the computer.
+  await page.mouse.click(prompt.x, prompt.y);
+  await clear(page);
+  const modifier = mac ? keys.MetaLeft : keys.ControlLeft;
+  await page.keyboard.press(mac ? 'Meta+KeyW' : 'Control+KeyW');
+  await page.keyboard.press(mac ? 'Meta+KeyQ' : 'Control+KeyQ');
+  if (!mac) await page.keyboard.press('Alt+F4');
+  assert.deepEqual(await keyEvents(page), [
+    ['down', modifier],
+    ['up', modifier],
+    ['down', modifier],
+    ['up', modifier],
+    ...(mac
+      ? []
+      : [
+          ['down', keys.AltLeft],
+          ['up', keys.AltLeft],
+        ]),
+  ]);
+  if (mac) {
+    // Control+W deletes a word in a terminal; only Command+W is local.
+    await clear(page);
+    await page.keyboard.press('Control+KeyW');
+    assert.deepEqual(await keyEvents(page), [
+      ['down', keys.ControlLeft],
+      ['down', keys.W],
+      ['up', keys.W],
+      ['up', keys.ControlLeft],
+    ]);
+  }
+  // macOS sends no keyup for V released before Command; a held Esc still
+  // leaves afterwards.
+  await clear(page);
+  await page.evaluate(() => {
+    const stage = document.querySelector('.video-stage');
+    const fire = (type, code, key, metaKey) =>
+      stage.dispatchEvent(
+        new KeyboardEvent(type, {
+          code,
+          key,
+          metaKey,
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+    fire('keydown', 'MetaLeft', 'Meta', true);
+    fire('keydown', 'KeyV', 'v', true);
+    fire('keyup', 'MetaLeft', 'Meta', false);
+  });
+  assert.deepEqual(await keyEvents(page), [
+    ['down', keys.MetaLeft],
+    ['down', keys.V],
+    ['up', keys.V],
+    ['up', keys.MetaLeft],
+  ]);
+  await clear(page);
+  await page.keyboard.down('Escape');
+  await page.waitForFunction(() =>
+    document.activeElement?.classList.contains('keyboard-toggle')
+  );
+  await page.keyboard.up('Escape');
+  assert.deepEqual(await keyEvents(page), []);
+  console.log(
+    'PASS close and quit shortcuts stay local; keys pressed with Command are released with it'
+  );
+
   // Held keys and buttons are released when remote input stops.
   const holdKey = async () => {
     await page.mouse.click(prompt.x, prompt.y);
@@ -392,6 +458,26 @@ try {
   const released = await names(page);
   assert.ok(released.length && released.every((name) => name === 'releaseAll'));
   await page.getByLabel('仅观看').uncheck();
+  // A cancelled press releases everything on the host, so a still-held Shift
+  // must not send a second release later.
+  await page.mouse.click(prompt.x, prompt.y);
+  await page.keyboard.down('Shift');
+  await page.mouse.down();
+  await clear(page);
+  await page.evaluate(() =>
+    document.querySelector('.video-stage').dispatchEvent(
+      new PointerEvent('pointercancel', {
+        pointerId: 1,
+        pointerType: 'mouse',
+        bubbles: true,
+      })
+    )
+  );
+  assert.deepEqual(await names(page), ['releaseAll']);
+  await clear(page);
+  await page.keyboard.up('Shift');
+  await page.mouse.up();
+  assert.deepEqual(await names(page), [], 'cancel also forgot the held key');
   await holdKey();
   await page
     .getByRole('button', { name: '切到阅读', exact: true })
@@ -420,7 +506,7 @@ try {
     ['up', keys.E],
   ]);
   console.log(
-    'PASS held keys and buttons release on focus loss, window blur, watch-only, Read and connection end'
+    'PASS held keys and buttons release on focus loss, window blur, watch-only, pointer cancel, Read and connection end'
   );
 
   // The composer keeps IME/multiline typing local and sends it as text.
@@ -480,6 +566,63 @@ try {
     'PASS override switches immediately, persists across reloads, and narrow desktop windows keep desktop input'
   );
   await context.close();
+
+  // Scrollbars of the zoomed view scroll it locally and never click the app.
+  const scrollbars = await chromium.launch({
+    executablePath:
+      process.env.SMOKE_BROWSER_EXECUTABLE ||
+      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    headless: true,
+    ignoreDefaultArgs: ['--hide-scrollbars'],
+  });
+  try {
+    const classic = await scrollbars.newPage({
+      viewport: { width: 1440, height: 900 },
+    });
+    classic.on('pageerror', (error) => errors.push(error.message));
+    await classic.goto(url);
+    await ready(classic);
+    await classic.addStyleTag({
+      content:
+        '.video-stage::-webkit-scrollbar{width:16px;height:16px;background:#ddd}.video-stage::-webkit-scrollbar-thumb{background:#888}',
+    });
+    await classic.getByLabel('画面缩放').selectOption('2');
+    const bar = await classic.evaluate(() => {
+      const stage = document.querySelector('.video-stage');
+      const rect = stage.getBoundingClientRect();
+      return {
+        width: stage.offsetWidth - stage.clientWidth,
+        right: rect.right,
+        bottom: rect.bottom,
+        top: rect.top,
+        left: rect.left,
+        scrollTop: stage.scrollTop,
+      };
+    });
+    assert.ok(bar.width >= 10, `classic scrollbar ${bar.width}`);
+    await clear(classic);
+    await classic.mouse.move(bar.right - 8, bar.top + 30);
+    await classic.mouse.down();
+    await classic.mouse.move(bar.right - 8, bar.top + 150, { steps: 5 });
+    await classic.mouse.up();
+    await classic.mouse.click(bar.right - 8, bar.bottom - 60);
+    await classic.waitForTimeout(300);
+    await classic.mouse.click(bar.right - 8, bar.bottom - 60);
+    await classic.mouse.click(bar.left + 200, bar.bottom - 8);
+    assert.deepEqual(await names(classic), []);
+    assert.ok(
+      (await classic.evaluate(
+        () => document.querySelector('.video-stage').scrollTop
+      )) >
+        bar.scrollTop + 50,
+      'the scrollbar still scrolls the view'
+    );
+    console.log(
+      'PASS scrollbar drags and track clicks scroll the zoomed view without clicking the app'
+    );
+  } finally {
+    await scrollbars.close();
+  }
 
   // Phones keep the touch workflow in portrait and landscape.
   const phone = await open({

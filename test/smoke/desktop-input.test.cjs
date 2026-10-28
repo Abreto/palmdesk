@@ -8,6 +8,7 @@ const {
   createKeyboardController,
   createMouseController,
   interactionProfile,
+  localShortcut,
   parseInteractionMode,
   remoteKey,
 } = load('src/utils/controller-input.ts');
@@ -159,15 +160,20 @@ test('disabled input and letterbox presses send and capture nothing', () => {
   assert.deepEqual(h.sent(), ['pressButtonLeft 500 500', 'releaseAll  ']);
 });
 
+// @nut-tree-fork/shared Key values for the keys these tests use.
 const keys = {
   Escape: 0,
   Tab: 49,
   ShiftLeft: 86,
   ControlLeft: 103,
+  MetaLeft: 106,
+  CapsLock: 70,
   Home: 43,
   Enter: 102,
   NumpadEnter: 102,
   A: 71,
+  V: 90,
+  W: 51,
   1: 29,
   ',': 94,
 };
@@ -187,7 +193,7 @@ test('keys map by code, then character, then physical position', () => {
   assert.equal(map('', 'constructor'), undefined);
 });
 
-function keyboard(t) {
+function keyboard(t, options = {}) {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const state = { enabled: true, messages: [], exits: 0 };
   state.keyboard = createKeyboardController({
@@ -198,6 +204,7 @@ function keyboard(t) {
     exit: () => {
       state.exits += 1;
     },
+    ...options,
   });
   state.sent = () =>
     state.messages.map((m) => [
@@ -268,25 +275,109 @@ test('a short Escape is sent on release; holding it leaves without sending', (t)
   assert.equal(h.keyboard.up(key('Escape')), false);
   assert.deepEqual(h.messages, []);
 });
-test('modified Escape, or Escape with keys held, is sent at once', (t) => {
+test('a modified Escape is sent at once', (t) => {
   const h = keyboard(t);
   h.keyboard.down(key('ShiftLeft', 'Shift'));
   h.keyboard.down(key('Escape', 'Escape', { shiftKey: true }));
+  t.mock.timers.tick(ESCAPE_HOLD_MS * 2);
   h.keyboard.up(key('Escape'));
   h.keyboard.up(key('ShiftLeft', 'Shift'));
-  h.keyboard.down(key('KeyA', 'a'));
-  h.keyboard.down(key('Escape'));
-  t.mock.timers.tick(ESCAPE_HOLD_MS * 2);
   assert.equal(h.exits, 0);
-  assert.deepEqual(h.sent().slice(0, 4), [
+  assert.deepEqual(h.sent(), [
     ['down', keys.ShiftLeft],
     ['down', keys.Escape],
     ['up', keys.Escape],
     ['up', keys.ShiftLeft],
   ]);
-  assert.deepEqual(h.sent().slice(4), [
-    ['down', keys.A],
-    ['down', keys.Escape],
+});
+test('a held Escape leaves even when an earlier keyup was lost', (t) => {
+  const h = keyboard(t);
+  h.keyboard.down(key('KeyA', 'a'));
+  h.keyboard.down(key('Escape'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS);
+  assert.equal(h.exits, 1);
+  assert.deepEqual(h.sent(), [['down', keys.A]]);
+});
+test('keys pressed with Command are released with it', (t) => {
+  // macOS sends no keyup for V when it is released before Command (Cmd+V).
+  const h = keyboard(t);
+  h.keyboard.down(key('MetaLeft', 'Meta', { metaKey: true }));
+  h.keyboard.down(key('KeyV', 'v', { metaKey: true }));
+  assert.equal(h.keyboard.up(key('MetaLeft', 'Meta')), true);
+  h.keyboard.down(key('Escape'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS);
+  assert.equal(h.exits, 1);
+  assert.deepEqual(h.sent(), [
+    ['down', keys.MetaLeft],
+    ['down', keys.V],
+    ['up', keys.V],
+    ['up', keys.MetaLeft],
+  ]);
+  // Command pressed before the window view had focus still releases them.
+  h.messages.length = 0;
+  h.keyboard.down(key('KeyV', 'v', { metaKey: true }));
+  assert.equal(h.keyboard.up(key('MetaLeft', 'Meta')), false);
+  assert.deepEqual(h.sent(), [
+    ['down', keys.V],
+    ['up', keys.V],
+  ]);
+});
+test('macOS Caps Lock toggles on keydown and on keyup, never held', (t) => {
+  // macOS: keydown when Caps Lock locks, keyup only when it unlocks.
+  const mac = keyboard(t, { locksToggleOnKeyup: true });
+  mac.keyboard.down(key('CapsLock'));
+  assert.equal(mac.keyboard.holds(keys.CapsLock), false);
+  mac.keyboard.down(key('Escape'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS);
+  assert.equal(mac.exits, 1);
+  assert.equal(mac.keyboard.up(key('CapsLock')), true);
+  assert.deepEqual(mac.sent(), [
+    ['down', keys.CapsLock],
+    ['up', keys.CapsLock],
+    ['down', keys.CapsLock],
+    ['up', keys.CapsLock],
+  ]);
+});
+test('elsewhere a lock key toggles once per press', (t) => {
+  // Each press sends a keydown and a keyup; only the keydown toggles.
+  const other = keyboard(t);
+  other.keyboard.down(key('CapsLock'));
+  assert.equal(other.keyboard.up(key('CapsLock')), false);
+  assert.deepEqual(other.sent(), [
+    ['down', keys.CapsLock],
+    ['up', keys.CapsLock],
+  ]);
+});
+test('the controller keeps its own close and quit shortcuts', (t) => {
+  const shortcut = (code, value, modifiers, mac) =>
+    localShortcut({ code, key: value, ...modifiers }, mac);
+  const meta = { metaKey: true };
+  const ctrl = { ctrlKey: true };
+  assert.equal(shortcut('KeyW', 'w', meta, true), true);
+  assert.equal(shortcut('KeyQ', 'q', meta, true), true);
+  assert.equal(shortcut('KeyW', 'W', { ...meta, shiftKey: true }, true), true);
+  assert.equal(shortcut('KeyZ', 'w', meta, true), true, 'AZERTY Cmd+W');
+  assert.equal(shortcut('KeyW', 'z', meta, true), false, 'AZERTY Cmd+Z');
+  assert.equal(shortcut('KeyW', 'ц', meta, true), true, 'Russian layout');
+  assert.equal(shortcut('KeyW', 'w', ctrl, true), false, 'terminal Ctrl+W');
+  assert.equal(shortcut('KeyW', 'w', ctrl, false), true);
+  assert.equal(shortcut('KeyQ', 'q', ctrl, false), true);
+  assert.equal(shortcut('F4', 'F4', { altKey: true }, false), true);
+  assert.equal(
+    shortcut('KeyQ', '@', { ctrlKey: true, altKey: true }, false),
+    false,
+    'AltGr+Q types @'
+  );
+  assert.equal(shortcut('KeyW', 'w', meta, false), false);
+  assert.equal(shortcut('KeyE', 'e', ctrl, false), false);
+  const h = keyboard(t, { local: (event) => localShortcut(event, true) });
+  h.keyboard.down(key('MetaLeft', 'Meta', { metaKey: true }));
+  assert.equal(h.keyboard.down(key('KeyW', 'w', { metaKey: true })), false);
+  assert.equal(h.keyboard.up(key('KeyW', 'w', { metaKey: true })), false);
+  h.keyboard.up(key('MetaLeft', 'Meta'));
+  assert.deepEqual(h.sent(), [
+    ['down', keys.MetaLeft],
+    ['up', keys.MetaLeft],
   ]);
 });
 test('another key during a pending Escape sends the Escape first', (t) => {
