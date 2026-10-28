@@ -12,9 +12,8 @@ const {
   replayMarkup,
   snapRect,
 } = load('src/utils/image-markup.ts');
-const { MAX_IMAGE_BYTES, fitsImageBounds, formatImageBytes } = load(
-  'src/utils/image-payload.ts'
-);
+const { MAX_IMAGE_BYTES, exifOrientation, fitsImageBounds, formatImageBytes } =
+  load('src/utils/image-payload.ts');
 
 const size = { width: 400, height: 300 };
 const crop = (x, y, width, height) => ({
@@ -317,4 +316,43 @@ test('payload bounds and displayed sizes match the paste limits', () => {
   assert.equal(formatImageBytes(1536), '1.5 KB');
   assert.equal(formatImageBytes(MAX_IMAGE_BYTES), '10 MB');
   assert.equal(formatImageBytes(MAX_IMAGE_BYTES + 1), '10.1 MB');
+});
+
+// SOI, an optional JFIF APP0, an APP1 Exif segment whose IFD0 holds one
+// Orientation entry, then EOI.
+function jpegWithExif(orientation, { little = false, app0 = false, ifd } = {}) {
+  const tiff = new DataView(new ArrayBuffer(26));
+  tiff.setUint16(0, little ? 0x4949 : 0x4d4d);
+  tiff.setUint16(2, 42, little);
+  tiff.setUint32(4, ifd ?? 8, little);
+  tiff.setUint16(8, 1, little);
+  tiff.setUint16(10, 0x0112, little);
+  tiff.setUint16(12, 3, little);
+  tiff.setUint32(14, 1, little);
+  tiff.setUint16(18, orientation, little);
+  const exif = [0x45, 0x78, 0x69, 0x66, 0, 0, ...new Uint8Array(tiff.buffer)];
+  return new Uint8Array([
+    0xff,
+    0xd8,
+    ...(app0 ? [0xff, 0xe0, 0x00, 0x04, 0x4a, 0x46] : []),
+    0xff,
+    0xe1,
+    0x00,
+    exif.length + 2,
+    ...exif,
+    0xff,
+    0xd9,
+  ]);
+}
+
+test('EXIF orientation is read from either byte order and ignored when malformed', () => {
+  assert.equal(exifOrientation(jpegWithExif(6)), 6);
+  assert.equal(exifOrientation(jpegWithExif(8, { little: true })), 8);
+  assert.equal(exifOrientation(jpegWithExif(5, { app0: true })), 5);
+  assert.equal(exifOrientation(jpegWithExif(3)), 3);
+  assert.equal(exifOrientation(jpegWithExif(9)), 1);
+  assert.equal(exifOrientation(jpegWithExif(6, { ifd: 0xfffffff0 })), 1);
+  assert.equal(exifOrientation(jpegWithExif(6).slice(0, 30)), 1);
+  assert.equal(exifOrientation(pngHeader(10, 10)), 1);
+  assert.equal(exifOrientation(new Uint8Array([0xff, 0xd8, 0xff, 0xd9])), 1);
 });

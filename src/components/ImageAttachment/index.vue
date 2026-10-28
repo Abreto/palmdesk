@@ -54,7 +54,7 @@
         type="button"
         class="image-thumb"
         aria-label="查看待粘贴的图片"
-        @click="viewing = true"
+        @click="openViewer"
       >
         <img
           :src="shown.url"
@@ -82,7 +82,6 @@
           </button>
           <template v-else>
             <button
-              ref="editButton"
               type="button"
               @click="openEditor"
             >
@@ -128,8 +127,6 @@
       aria-modal="true"
       aria-label="待粘贴的图片"
       tabindex="-1"
-      @keydown.stop="viewerKeydown"
-      @keyup.stop
     >
       <div class="viewer-image">
         <img
@@ -176,10 +173,12 @@ import type { MarkupExport, MarkupStep } from '@/utils/image-markup';
 import {
   type ImagePayload,
   MAX_IMAGE_BYTES,
+  exifOrientation,
   formatImageBytes,
   inspectImage,
 } from '@/utils/image-payload';
 import { ImageTransferClient } from '@/utils/image-transfer-channel';
+import { holdKeyboard } from '@/utils/modal-keyboard';
 
 type Version = {
   image: ImagePayload;
@@ -204,7 +203,6 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ busy: [value: boolean] }>();
 const picker = ref<HTMLInputElement>();
-const editButton = ref<HTMLButtonElement>();
 const viewer = ref<HTMLDivElement>();
 const attachment = shallowRef<Attachment>();
 // Untouched images keep the lossless path: their original bytes are pasted.
@@ -222,6 +220,8 @@ const message = ref('');
 const failed = ref(false);
 let selection = 0;
 let disposed = false;
+let returnFocus: HTMLElement | undefined;
+let releaseViewerKeyboard: (() => void) | undefined;
 const channelReady = ref(false);
 const connecting = ref(false);
 function updateChannelReady() {
@@ -276,13 +276,35 @@ function clearAttachment() {
   attachment.value = undefined;
   message.value = '';
 }
+// Return focus to the composer or remote window that had it, never to the
+// button that opened the dialog: a focused button would swallow typing.
+function rememberFocus() {
+  if (editing.value || viewing.value) return;
+  const active = document.activeElement;
+  returnFocus =
+    active instanceof HTMLElement &&
+    active !== document.body &&
+    !active.closest('button')
+      ? active
+      : undefined;
+}
+function restoreFocus() {
+  const target = returnFocus;
+  returnFocus = undefined;
+  nextTick(() => {
+    if (target?.isConnected && !target.matches(':disabled'))
+      target.focus({ preventScroll: true });
+  });
+}
 function openEditor() {
   if (!attachment.value || busy.value) return;
+  rememberFocus();
   viewing.value = false;
   editing.value = true;
 }
-function restoreFocus() {
-  nextTick(() => editButton.value?.focus());
+function openViewer() {
+  rememberFocus();
+  viewing.value = true;
 }
 function closeEditor() {
   editing.value = false;
@@ -311,9 +333,11 @@ function viewerKeydown(event: KeyboardEvent) {
   event.preventDefault();
   closeViewer();
 }
-// Keep keyboard input inside the dialog, away from the remote window.
-watch(viewing, (open) => {
-  if (open) nextTick(() => viewer.value?.focus());
+watch(viewer, (element) => {
+  releaseViewerKeyboard?.();
+  releaseViewerKeyboard = element
+    ? holdKeyboard(element, viewerKeydown)
+    : undefined;
 });
 function beginSelection() {
   clearAttachment();
@@ -325,9 +349,15 @@ async function loadImage(file: Blob, name: string, version: number) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   if (version !== selection || !props.enabled || busy.value || disposed) return;
   const { mime, width, height } = inspectImage(bytes);
+  // Label the size as displayed: EXIF orientations 5–8 turn the frame 90°.
+  const turned = exifOrientation(bytes) >= 5;
   attachment.value = {
     name,
-    original: imageVersion({ mime, bytes }, width, height),
+    original: imageVersion(
+      { mime, bytes },
+      turned ? height : width,
+      turned ? width : height
+    ),
     steps: [],
   };
   failed.value = false;
@@ -486,6 +516,8 @@ watch(
 );
 onBeforeUnmount(() => {
   disposed = true;
+  // Watchers stop before the viewer is removed, so release its keys here.
+  releaseViewerKeyboard?.();
   props.channel?.removeEventListener('open', updateChannelReady);
   props.channel?.removeEventListener('close', updateChannelReady);
   client.value?.dispose();

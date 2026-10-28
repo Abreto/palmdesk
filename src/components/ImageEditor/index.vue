@@ -6,8 +6,6 @@
     aria-modal="true"
     aria-label="编辑图片"
     tabindex="-1"
-    @keydown.stop="keydown"
-    @keyup.stop
   >
     <header class="editor-header">
       <button
@@ -159,6 +157,7 @@ import {
   sameRect,
   snapRect,
 } from '@/utils/image-markup';
+import { holdKeyboard } from '@/utils/modal-keyboard';
 
 // Stroke and touch sizes are CSS pixels, whatever the image scale; small
 // images are enlarged at most MAX_ZOOM times.
@@ -200,6 +199,7 @@ let gesture:
   | { id: number; origin: Point; start: Rect; handle?: CropHandle | 'new' }
   | undefined;
 let backdrop: { key: string; canvas: HTMLCanvasElement } | undefined;
+let releaseKeyboard: (() => void) | undefined;
 const pointers = new Set<number>();
 
 const markup = computed(
@@ -253,12 +253,14 @@ const caption = computed(() => {
   const { width, height } = snapRect(rect, size.value);
   return `${width} × ${height}`;
 });
+// The discard prompt answers the user's last tap, so it shows over an older
+// export error until it times out.
 const status = computed(() => {
-  const error = loadError.value || exportError.value;
-  if (error) return { text: error, error: true };
-  if (exporting.value) return { text: '正在生成 PNG…', error: false };
+  if (loadError.value) return { text: loadError.value, error: true };
   if (confirmingDiscard.value)
     return { text: '再点一次「放弃修改」将丢弃本次编辑', error: false };
+  if (exportError.value) return { text: exportError.value, error: true };
+  if (exporting.value) return { text: '正在生成 PNG…', error: false };
   if (!source.value) return { text: '正在加载图片…', error: false };
   return undefined;
 });
@@ -342,6 +344,8 @@ function cancelGesture() {
   schedule();
 }
 function pointerDown(event: PointerEvent) {
+  // preventDefault below keeps the browser from moving focus; keep it here.
+  dialog.value?.focus({ preventScroll: true });
   // A new touch starts afresh, even if an earlier pointer's end was missed.
   if (event.isPrimary) pointers.clear();
   pointers.add(event.pointerId);
@@ -557,8 +561,7 @@ function keydown(event: KeyboardEvent) {
 }
 
 onMounted(async () => {
-  // Keep keyboard input inside the dialog, away from the remote window.
-  dialog.value?.focus();
+  releaseKeyboard = holdKeyboard(dialog.value!, keydown);
   const image = new Image();
   image.src = props.src;
   try {
@@ -583,6 +586,7 @@ onMounted(async () => {
 });
 onBeforeUnmount(() => {
   disposed = true;
+  releaseKeyboard?.();
   cancelAnimationFrame(frame);
   clearTimeout(discardTimer);
   // Free canvas memory promptly; mobile browsers limit the total.

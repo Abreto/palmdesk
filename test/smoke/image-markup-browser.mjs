@@ -260,6 +260,18 @@ async function tool(page, name) {
   await page.getByRole('button', { name, exact: true }).click();
   await page.evaluate(() => new Promise(requestAnimationFrame));
 }
+// Keyboard input that reached the host fixture's remote window.
+const remoteKeys = (page) =>
+  page.evaluate(
+    () =>
+      window.__imageSmoke.events.filter((name) =>
+        ['keyboardPressKey', 'keyboardReleaseKey', 'keyboardType'].includes(
+          name
+        )
+      ).length
+  );
+const focusIn = (page, selector) =>
+  page.evaluate((within) => !!document.activeElement.closest(within), selector);
 
 try {
   {
@@ -438,7 +450,8 @@ try {
       buffer: withOrientation(jpeg, 6),
     });
     await page.getByAltText('待粘贴的图片预览').waitFor();
-    assert.match(await meta(page), /^原图 · JPEG · 120×80 · /);
+    // The label shows the displayed size, like the thumbnail and editor.
+    assert.match(await meta(page), /^原图 · JPEG · 80×120 · /);
     // Some Safari versions reject decode() for images that still load.
     await page.evaluate(() => {
       HTMLImageElement.prototype.decode = () =>
@@ -515,6 +528,13 @@ try {
       })
       .waitFor();
     assert.equal(await editor(page).isVisible(), true);
+    // 完成 had focus and was disabled during the export; Esc stays local.
+    assert.ok(await focusIn(page, '.image-editor'));
+    await page.keyboard.press('Escape');
+    await page
+      .getByText('再点一次「放弃修改」将丢弃本次编辑', { exact: true })
+      .waitFor();
+    assert.equal(await remoteKeys(page), 0);
     await page.screenshot({
       path: path.join(artifacts, 'oversized-export.png'),
     });
@@ -724,6 +744,84 @@ try {
     assert.deepEqual(errors, []);
     console.log(
       'PASS reading mode, a closed target and a dropped image channel cancel edited pastes; nothing is resent without a tap'
+    );
+    await context.close();
+  }
+
+  {
+    const { context, page, drag } = await openFixture(portrait);
+    const draft = page.getByLabel('发送到电脑的文字');
+    await draft.fill('键盘不能漏到电脑');
+    await page.getByLabel('选择图片文件').setInputFiles(pngPath);
+    await page.getByAltText('待粘贴的图片预览').waitFor();
+    await openEditor(page);
+    await tool(page, '画笔');
+    const box = await page.locator('.editor-surface canvas').boundingBox();
+    await drag(
+      line(
+        { x: box.x + 10, y: box.y + box.height / 2 },
+        { x: box.x + box.width - 10, y: box.y + box.height / 2 }
+      )
+    );
+    // The clicked 重置 button takes focus and then disables itself.
+    const reset = page.getByRole('button', { name: '重置', exact: true });
+    await reset.click();
+    assert.equal(await reset.isDisabled(), true);
+    assert.ok(
+      await focusIn(page, '.image-editor'),
+      'focus stays in the editor'
+    );
+    await page.keyboard.press('Meta+z');
+    assert.equal(await reset.isDisabled(), false, 'Cmd+Z undid the reset');
+    await page.keyboard.press('a');
+    // Tab cycles inside the editor; Shift+Tab from 取消 cannot reach 移除.
+    await page.getByRole('button', { name: '取消', exact: true }).focus();
+    await page.keyboard.press('Shift+Tab');
+    assert.ok(await focusIn(page, '.image-editor'));
+    await page.keyboard.press('Enter');
+    await page.keyboard.press('Tab');
+    assert.equal(
+      await page.evaluate(() => document.activeElement.textContent.trim()),
+      '取消'
+    );
+    await page.keyboard.press('Escape');
+    await page
+      .getByText('再点一次「放弃修改」将丢弃本次编辑', { exact: true })
+      .waitFor();
+    await page.keyboard.press('Escape');
+    await editor(page).waitFor({ state: 'detached' });
+    assert.match(await meta(page), /^原图 /);
+    // Focus does not stay on 编辑, where it would swallow typing.
+    assert.equal(
+      await page.evaluate(() => document.activeElement === document.body),
+      true
+    );
+
+    // The full-screen preview holds keys the same way, then gives focus back.
+    await draft.focus();
+    await page.evaluate(() => document.querySelector('.image-thumb').click());
+    const viewer = page.getByRole('dialog', { name: '待粘贴的图片' });
+    await viewer.waitFor();
+    assert.ok(await focusIn(page, '.image-viewer'));
+    await page.keyboard.press('a');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+    await page.keyboard.press('Shift+Tab');
+    assert.ok(await focusIn(page, '.image-viewer'));
+    await page.keyboard.press('Escape');
+    await viewer.waitFor({ state: 'detached' });
+    assert.equal(
+      await page.evaluate(() =>
+        document.activeElement.getAttribute('aria-label')
+      ),
+      '发送到电脑的文字'
+    );
+    assert.equal(await draft.inputValue(), '键盘不能漏到电脑');
+    assert.equal(await page.getByAltText('待粘贴的图片预览').count(), 1);
+    assert.equal(await remoteKeys(page), 0);
+    assert.deepEqual(errors, []);
+    console.log(
+      'PASS no key reaches the remote window while the editor or preview is open; focus stays inside and returns afterwards'
     );
     await context.close();
   }
