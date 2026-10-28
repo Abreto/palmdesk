@@ -77,11 +77,13 @@ export function useWebsocket() {
         rtt: 0,
         dataChannel: channel,
         cbDataChannel: channel,
-        peerConnection: {
-          get connectionState() {
-            return connectionState.value;
-          },
-        },
+        // A host released before controller verification: it never opens
+        // the verification channel and answers the presence probe.
+        peerConnection: markRaw(
+          Object.defineProperty(new EventTarget(), 'connectionState', {
+            get: () => connectionState.value,
+          })
+        ),
         videoEl: markRaw(document.createElement('video')),
         close() {
           channel.readyState = 'closed';

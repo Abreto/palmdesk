@@ -63,9 +63,11 @@ test('a rejected password change keeps every session', async () => {
 test('controllers explain why the session ended and do not reconnect', () => {
   assert.equal(isFinalSessionEnd('password-changed'), true);
   assert.equal(isFinalSessionEnd('explicit'), true);
+  assert.equal(isFinalSessionEnd('unverified'), true);
   assert.equal(isFinalSessionEnd('disconnect'), false);
   assert.equal(isFinalSessionEnd(undefined), false);
   assert.match(sessionEndMessage('password-changed'), /临时密码/);
   assert.match(sessionEndMessage('explicit'), /电脑已结束/);
+  assert.match(sessionEndMessage('unverified'), /未能验证/);
   assert.match(sessionEndMessage(), /电脑已结束/);
 });

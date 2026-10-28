@@ -105,6 +105,8 @@ export enum WsMsgTypeEnum {
   remoteSessionStopped = 'remoteSessionStopped',
   remoteInputResult = 'remoteInputResult',
   remoteImagePaste = 'remoteImagePaste',
+  /** A controller's first DataChannel message: it can prove the password. */
+  remoteAuthHello = 'remoteAuthHello',
   billdDeskOffer = 'billdDeskOffer',
   billdDeskAnswer = 'billdDeskAnswer',
   billdDeskCandidate = 'billdDeskCandidate',
