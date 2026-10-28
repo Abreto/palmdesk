@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Failure cases run in sequence. */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 

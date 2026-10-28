@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Touch steps and cases run in sequence. */
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
