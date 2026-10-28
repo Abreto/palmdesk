@@ -13,6 +13,7 @@ import {
   nativeImage,
   net,
   powerMonitor,
+  powerSaveBlocker,
   screen,
   session,
   shell,
@@ -34,6 +35,7 @@ import {
   pasteWindowsClipboardImage,
   supportsImagePaste,
 } from './image-paste';
+import { KeepAwake } from './keep-awake';
 import {
   NativeWindowBridge,
   NativeWindowError,
@@ -242,6 +244,14 @@ const captureSession = new CaptureSession(
   }
 );
 
+// The saved choice is restored in main(), by the instance that holds the
+// single-instance lock. Capture, connections and windows never change it.
+const keepAwake = new KeepAwake(
+  app.getPath('userData'),
+  powerSaveBlocker,
+  platform
+);
+
 // Typing and image paste stop at their next check once the session ends;
 // still, never let a stuck input request keep the app from quitting.
 const QUIT_INPUT_TIMEOUT_MS = 3000;
@@ -250,6 +260,7 @@ app.on('before-quit', (event) => {
   if (quitting) return;
   event.preventDefault();
   quitting = true;
+  keepAwake.close();
   void Promise.race([
     captureSession.end(),
     new Promise((resolve) => {
@@ -597,6 +608,12 @@ function main() {
   handle(IPC_EVENT.releaseCheck, 'main', () => releaseChecker.check(true));
   handle(IPC_EVENT.releaseConfigure, 'main', (data) =>
     releaseChecker.configure(data.enabled)
+  );
+
+  void keepAwake.restore();
+  handle(IPC_EVENT.keepAwakeStatus, 'main', () => keepAwake.status());
+  handle(IPC_EVENT.keepAwakeConfigure, 'main', (data) =>
+    keepAwake.configure(data.enabled)
   );
 
   handle(IPC_EVENT.shellOpenExternal, 'any', async (data) => {
