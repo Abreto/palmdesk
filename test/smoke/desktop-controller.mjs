@@ -6,6 +6,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { text as readBody } from 'node:stream/consumers';
 
 import { MemoryRedis } from '../../containers/test/fixtures.mjs';
 
@@ -26,10 +27,8 @@ const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://localhost');
     if (url.pathname.startsWith('/api/')) {
-      let text = '';
-      // eslint-disable-next-line no-restricted-syntax
-      for await (const part of req) text += part;
-      const body = text ? JSON.parse(text) : {};
+      const raw = await readBody(req);
+      const body = raw ? JSON.parse(raw) : {};
       let data = {};
       if (url.pathname.endsWith('/desk_user/create')) {
         devices += 1;
