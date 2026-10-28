@@ -3,7 +3,6 @@
 // WebRTC DataChannel. It never fetches anything from the network itself.
 const PREFIX = '/__palmdesk_preview/';
 const LOOPBACK = new Set(['localhost', '127.0.0.1', '[::1]']);
-const CACHE = 'palmdesk-preview-v1';
 const HEAD_TIMEOUT_MS = 60_000;
 const WINDOW_BYTES = 1024 * 1024;
 
@@ -48,6 +47,9 @@ const MESSAGES = {
   'outside-prefix': [403, 'This path is outside the approved preview path.'],
   'bad-path': [400, 'The request path is not allowed.'],
   'bad-method': [405, 'This request method is not supported in previews.'],
+  'bad-header': [400, 'A request header could not be sent to the computer.'],
+  'bad-request': [400, 'The request could not be sent to the computer.'],
+  internal: [500, 'The computer refused this request.'],
   'too-large': [413, 'The request body is too large for a preview.'],
   busy: [503, 'Too many preview requests are open.'],
   'upstream-unavailable': [
@@ -67,14 +69,27 @@ function failure(request, code) {
   return problem(request, status, code, message);
 }
 
+function fragment(client) {
+  return new URLSearchParams(new URL(client.url).hash.slice(1));
+}
+
 async function relayClient() {
   const list = await self.clients.matchAll({
     type: 'window',
     includeUncontrolled: true,
   });
   return list.find(
-    (client) => new URL(client.url).pathname === `${PREFIX}relay.html`
+    (client) =>
+      new URL(client.url).pathname === `${PREFIX}relay.html` &&
+      fragment(client).get('mode') !== 'inspect'
   );
+}
+
+// One cache per connection, named after the relay's nonce: a cache left by
+// a teardown that never finished is not read by the next connection.
+function cacheName(relay) {
+  const nonce = fragment(relay).get('nonce');
+  return nonce ? `palmdesk-preview-${nonce}` : undefined;
 }
 
 function cacheable(request) {
@@ -86,10 +101,10 @@ function cacheable(request) {
   );
 }
 
-async function cached(request) {
-  if (!cacheable(request)) return undefined;
+async function cached(request, name) {
+  if (!name || !cacheable(request)) return undefined;
   try {
-    const match = await (await caches.open(CACHE)).match(request.url);
+    const match = await (await caches.open(name)).match(request.url);
     const etag = match?.headers.get('etag');
     return etag ? { response: match, etag } : undefined;
   } catch {
@@ -176,7 +191,8 @@ async function forward(request) {
       ? null
       : await request.arrayBuffer();
   const headers = [...request.headers];
-  const entry = await cached(request);
+  const namespace = cacheName(relay);
+  const entry = await cached(request, namespace);
   const cacheChecked = performance.now();
   if (entry) headers.push(['if-none-match', entry.etag]);
   const { port1, port2 } = new MessageChannel();
@@ -242,6 +258,7 @@ async function forward(request) {
   }
   const response = new Response(stream, init);
   if (
+    namespace &&
     cacheable(request) &&
     head.status === 200 &&
     response.headers.has('etag') &&
@@ -251,7 +268,7 @@ async function forward(request) {
     // made here, so without this every reload re-downloads every module.
     const copy = response.clone();
     caches
-      .open(CACHE)
+      .open(namespace)
       .then((cache) => cache.put(request.url, copy))
       .catch(() => {});
   }

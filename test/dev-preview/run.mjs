@@ -482,7 +482,16 @@ try {
         after.route === '/about' && after.title === 'About',
         JSON.stringify(after)
       );
-      return `reload ${metrics.previewReloadMs} ms, ${metrics.previewReloadTransfer.requests} requests (${metrics.previewReloadNotModified} answered 304 from the worker cache), ${kib(metrics.previewReloadTransfer.wireBytes)} over the DataChannel`;
+      expect(metrics.previewReloadNotModified > 0, 'nothing was revalidated');
+      const { caches, nonce } = await phone.evaluate(async () => ({
+        caches: (await window.preview.bridge.inspect()).caches,
+        nonce: window.preview.bridge.nonce,
+      }));
+      expect(
+        caches.length === 1 && caches[0] === `palmdesk-preview-${nonce}`,
+        `caches: ${caches.join(', ')}`
+      );
+      return `reload ${metrics.previewReloadMs} ms, ${metrics.previewReloadTransfer.requests} requests (${metrics.previewReloadNotModified} answered 304 from this connection's worker cache), ${kib(metrics.previewReloadTransfer.wireBytes)} over the DataChannel`;
     }
   );
 
@@ -742,7 +751,7 @@ try {
   );
 
   await check(
-    'the host rejects crafted frames that try to leave the list',
+    'crafted frames are refused and the gateway keeps serving',
     async () => {
       const replies = await phone.evaluate(
         async ({ canary: other }) => {
@@ -769,6 +778,20 @@ try {
                 ['host', `127.0.0.1:${other}`],
                 ['x-forwarded-host', 'example.com'],
               ],
+            },
+            // Node's HTTP client throws on this value.
+            {
+              id: 9009,
+              target: 'web',
+              path: '/',
+              headers: [['x-a', `a${String.fromCharCode(1)}b`]],
+            },
+            {
+              id: 9010,
+              t: 'ws-open',
+              target: 'web',
+              path: '/',
+              protocols: ['vite-hmr', 'vite-hmr'],
             },
           ];
           const seen = {};
@@ -810,6 +833,8 @@ try {
         9006: 'not-approved',
         9007: 'outside-prefix',
         9008: 200,
+        9009: 'bad-header',
+        9010: 'bad-protocol',
       };
       Object.entries(expected).forEach(([id, value]) =>
         expect(
@@ -817,11 +842,34 @@ try {
           `${id}: ${replies[id]} instead of ${value}`
         )
       );
+      // The same header from a page, through the worker and the bridge.
+      const fromPage = await app.evaluate(async () => {
+        const response = await fetch('/api/hello', {
+          headers: { 'x-a': `a${String.fromCharCode(1)}b` },
+        });
+        return {
+          status: response.status,
+          error: response.headers.get('x-palmdesk-preview-error'),
+        };
+      });
+      expect(
+        fromPage.status === 400 && fromPage.error === 'bad-header',
+        JSON.stringify(fromPage)
+      );
+      const serving = await Promise.race([
+        gatewayStats().then(() => true),
+        delay(3000).then(() => false),
+      ]);
+      expect(serving, 'the gateway thread stopped answering');
+      // A regression guard only: the gateway dials ports from the approved
+      // list, never from a frame, so these could not reach the canary anyway.
       expect(canaryHits.length === 0, canaryHits.join());
       expect(!apiHits.includes('/admin'), apiHits.join());
-      return Object.entries(replies)
+      return `${Object.entries(replies)
         .map(([id, value]) => `${id}=${value}`)
-        .join(' ');
+        .join(
+          ' '
+        )}; a page's fetch with that header got ${fromPage.status} ${fromPage.error}`;
     }
   );
 
@@ -1030,6 +1078,7 @@ try {
       (id) => window.hostDebug.timings.get(id),
       stream
     );
+    metrics.hostBacklogMaxBytes = (await gatewayStats()).maxUnsent;
     metrics.smallRequestDuringDownload = {
       ...busy.smallDetail,
       atHostMs: host.out - host.in,
@@ -1050,7 +1099,13 @@ try {
       smallRequestIdleMs: busy.idle,
       smallRequestDuringDownloadMs: busy.small,
     };
-    return `8 MiB random ${metrics.throughput.binaryMbps} Mbit/s (direct ${metrics.throughput.directBinaryMbps}), 8 MiB text ${metrics.throughput.textMbps} Mbit/s at ${(metrics.throughput.textWireRatio * 100).toFixed(1)}% on the wire, small request ${busy.idle} ms idle / ${busy.small} ms during a download`;
+    // The host stops reading upstream at 2 MiB of unsent frames; allow one
+    // upstream read beyond it.
+    expect(
+      metrics.hostBacklogMaxBytes <= 2.25 * 1024 * 1024,
+      `host backlog peaked at ${metrics.hostBacklogMaxBytes} bytes`
+    );
+    return `8 MiB random ${metrics.throughput.binaryMbps} Mbit/s (direct ${metrics.throughput.directBinaryMbps}), 8 MiB text ${metrics.throughput.textMbps} Mbit/s at ${(metrics.throughput.textWireRatio * 100).toFixed(1)}% on the wire, small request ${busy.idle} ms idle / ${busy.small} ms during a download, host backlog peaked at ${kib(metrics.hostBacklogMaxBytes)}`;
   });
 
   await check(
@@ -1120,6 +1175,61 @@ try {
     }
   );
 
+  // Leaves something in every kind of storage the app can use.
+  const fillStorage = (frame) =>
+    frame.evaluate(
+      () =>
+        new Promise((resolve, reject) => {
+          localStorage.setItem('app-state', 'kept until teardown');
+          const request = indexedDB.open('fixture-db', 1);
+          request.onupgradeneeded = () =>
+            request.result.createObjectStore('notes');
+          request.onsuccess = () => {
+            request.result.close();
+            resolve();
+          };
+          request.onerror = () => reject(request.error);
+        })
+    );
+
+  await check(
+    'a new preview starts clean when the last teardown never ran',
+    async () => {
+      await phone.evaluate(() => window.preview.bridge.open('web'));
+      app = await appFrame(phone);
+      await until(() => app.evaluate(() => window.fixture?.ready), {
+        label: 'ready',
+      });
+      await fillStorage(app);
+      const oldNonce = await phone.evaluate(() => {
+        // The preview frame dies without being told: no teardown runs.
+        document.querySelector('#preview iframe').remove();
+        return window.preview.bridge.nonce;
+      });
+      started = Date.now();
+      await phone.evaluate(() => window.preview.bridge.open('web'));
+      app = await appFrame(phone);
+      await until(() => app.evaluate(() => window.fixture?.ready), {
+        label: 'ready again',
+      });
+      const fresh = await app.evaluate(async () => ({
+        appState: localStorage.getItem('app-state'),
+        databases: (await indexedDB.databases()).map(({ name }) => name),
+        caches: await caches.keys(),
+      }));
+      const nonce = await phone.evaluate(() => window.preview.bridge.nonce);
+      expect(fresh.appState === null, 'localStorage survived');
+      expect(!fresh.databases.includes('fixture-db'), 'IndexedDB survived');
+      expect(
+        fresh.caches.length === 1 &&
+          fresh.caches[0] === `palmdesk-preview-${nonce}` &&
+          nonce !== oldNonce,
+        `caches: ${fresh.caches.join(', ')}`
+      );
+      return `reopened after ${Date.now() - started} ms (2 s waiting for the dead frame); storage, IndexedDB and the old cache were gone`;
+    }
+  );
+
   await check(
     'a dropped connection aborts upstream work and clears the preview',
     async () => {
@@ -1128,8 +1238,8 @@ try {
       await until(() => app.evaluate(() => window.fixture?.ready), {
         label: 'ready',
       });
+      await fillStorage(app);
       await app.evaluate(() => {
-        localStorage.setItem('app-state', 'kept until teardown');
         fetch('/api/slow?ms=10000').catch(() => {});
       });
       await delay(300);
@@ -1152,14 +1262,19 @@ try {
         () => document.querySelectorAll('#preview iframe').length
       );
       const left = await phone.evaluate(() => window.preview.bridge.inspect());
+      const teardown = await phone.evaluate(
+        () => window.preview.bridge.lastTeardown
+      );
       expect(frames === 0, `${frames} preview frames left`);
       expect(
         left.registrations === 0 &&
           left.localStorage === 0 &&
-          left.caches === 0,
-        JSON.stringify(left)
+          left.caches.length === 0 &&
+          left.indexedDB.length === 0 &&
+          teardown?.indexedDB === 'cleared',
+        JSON.stringify({ left, teardown })
       );
-      return `phone torn down in ${metrics.controllerTeardownMs} ms; host aborted the dev-server request after ${metrics.hostAbortAfterDropMs} ms; worker, storage and cache cleared`;
+      return `phone torn down in ${metrics.controllerTeardownMs} ms; host aborted the dev-server request after ${metrics.hostAbortAfterDropMs} ms; worker, localStorage, IndexedDB and cache cleared`;
     }
   );
 

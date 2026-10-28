@@ -4,7 +4,7 @@ Status: proposed, 2026-10-28. Research spike for [#26](https://github.com/Abreto
 
 **Decision.** Build an authenticated HTTP preview transport over the existing WebRTC connection, rendered in a separate, sandboxed preview origin on the phone (option B). Keep window capture of a host browser (option A) as the fallback that already works today, but do not build further on it for #35. The first implementation is bounded to HTTP/1.1 development servers on host-approved loopback ports, verified controllers only, and controllers opened over HTTPS.
 
-**中文摘要。** 推荐方案 B：在现有 WebRTC 连接上新增经认证的 HTTP 预览通道，手机端在独立、沙箱化的预览来源（preview origin）中用 Service Worker 呈现主机开发服务，WebSocket/HMR 由注入脚本经同一通道转发。主机只连接用户显式批准的回环端口（可限定路径前缀），只服务已通过临时密码验证（#88）的控制端，并在主机侧改写 Host/Origin/Cookie、拒绝越界重定向。预览内容与 PalmDesk 的来源、存储和远控输入完全隔离；断开、撤销或改密后立即拆除，并清空预览来源的存储。窗口捕获方案（A）不满足 #35「验收入口不要求启动窗口捕获」和真实手机视口的要求，仅作为现有备选。原型在无头 Chromium 中用真实 Vite 应用验证了静态资源、客户端路由与刷新、同源请求、流式响应、Cookie、重定向限制、HMR、撤销和断开；iOS Safari 与 Android 实机结果仍待采集。自部署需要额外提供一个 HTTPS 预览域名（最好与 PalmDesk 网页不同站点），后端无需改动。
+**中文摘要。** 推荐方案 B：在现有 WebRTC 连接上新增经认证的 HTTP 预览通道，手机端在独立、沙箱化的预览来源（preview origin）中用 Service Worker 呈现主机开发服务，WebSocket/HMR 由注入脚本经同一通道转发。主机只连接用户显式批准的回环端口（可限定路径前缀），只服务已通过临时密码验证（#88）的控制端，并在主机侧改写 Host/Origin/Cookie、拒绝越界重定向；主机按自身发送缓冲限流，畸形帧和未完成的上传只影响对应请求。预览内容与 PalmDesk 的来源、存储和远控输入完全隔离；断开、撤销或改密后立即拆除并清空预览来源的存储；每次新开预览也会先清空，即使上次拆除没有完成。窗口捕获方案（A）不满足 #35「验收入口不要求启动窗口捕获」和真实手机视口的要求，仅作为现有备选。原型在无头 Chromium 中用真实 Vite 应用验证了静态资源、客户端路由与刷新、同源请求、流式响应、Cookie、重定向限制、HMR、撤销和断开；iOS Safari 与 Android 实机结果仍待采集。自部署需要额外提供一个 HTTPS 预览域名（最好与 PalmDesk 网页不同站点），后端无需改动。
 
 ## Context
 
@@ -72,28 +72,40 @@ Phone                                                         Host computer
 2. Choosing a target embeds `https://<preview origin>/__palmdesk_preview/relay.html` in a sandboxed frame. The relay greets PalmDesk with a nonce from its URL fragment; the bridge checks the message's origin and source window, then transfers a `MessagePort`.
 3. The relay registers `sw.js` with scope `/` (the server sends `Service-Worker-Allowed: /`) and loads the app path in a nested frame. Every request from that frame, including navigations and absolute `http://localhost:<port>` URLs, reaches the worker, which sends it to the relay with a reply port. The relay passes it to the bridge.
 4. The bridge accepts only preview-origin URLs (mapped to the open target) and loopback URLs whose port and path match an approved target. It assigns a stream id and sends `req` with the target id and an origin-form path, never a URL.
-5. The host gateway checks the request again, connects to `127.0.0.1` or `::1` on the approved port, and returns `res`, body frames and `end` on one data channel per stream. Text responses are gzip-compressed with a sync flush per write; the worker decompresses with `DecompressionStream`. The worker returns credits as the page consumes data, so a stalled reader stops the host instead of filling memory.
+5. The host gateway checks the request again, connects to `127.0.0.1` or `::1` on the approved port, and returns `res`, body frames and `end` on one data channel per stream. Text responses are gzip-compressed with a sync flush per write; the worker decompresses with `DecompressionStream`.
+   - **Host memory** is bounded by the host's own transport. The host renderer keeps each DataChannel's send buffer under 256 KiB and reports how many bytes it moved into the channels. The gateway stops reading from the dev server while more than 2 MiB per controller waits, whatever the phone does.
+   - **Phone memory** is bounded by credits. The worker returns them as the page consumes data, in a 1 MiB window per response. Credits come from the phone, so the host treats them only as an extra limit: a phone that fakes them gets data as fast as the channel carries it, no faster.
 6. Before returning an HTML document, the worker injects `/__palmdesk_preview/client.js` after `<head>`. The shim replaces `WebSocket` for same-origin and loopback URLs with one carried by the relay over the same channels; other WebSockets (internet services) connect directly. It also refuses `navigator.serviceWorker.register`.
-7. The worker keeps validated responses with an `ETag` in Cache Storage and revalidates them with `If-None-Match`, because the browser's HTTP cache never sees constructed responses.
+7. The worker keeps validated responses with an `ETag` in Cache Storage, in a cache named after this connection's relay, and revalidates them with `If-None-Match`, because the browser's HTTP cache never sees constructed responses.
 
 Frames are JSON control messages (`hello`, `grant`/`denied`, `req`, `res`, `end`, `fail`, `credit`, `cancel`, `ws-open`, `ws-opened`, `ws-closed`, `ws-close`) plus binary frames with a one-byte kind, a 32-bit stream id and the payload. The host sizes frames from the phone's `RTCSctpTransport.maxMessageSize` (64 KiB at most; 16 KiB when the browser does not report it). One WebSocket message must fit in one frame in this version.
 
 #### Authentication and authorization
 
 - **Who:** only controllers the host has verified. With #88, that means the controller proved the temporary password over `PalmDeskAuth`; hosts without #88 (`hostAuth === 'legacy'`) must not offer preview. Unverified controllers get `denied/unverified`, and requests sent anyway are refused (measured).
-- **What:** the host user turns preview on and approves targets explicitly, each a loopback port with an optional path prefix and a label. Ports on the Fetch "bad port" list are refused. Preview is off and the list empty by default. The list lives in the main process, like other host settings, and the renderer cannot widen it.
+- **What:** the host user turns preview on and approves targets explicitly, each a loopback port with an optional path prefix and a label. Ports on the Fetch "bad port" list are refused. Preview is off and the list empty by default. The list lives in the main process, like other host settings, and the renderer cannot widen it. A path prefix only narrows what one approved server is asked for. It cannot protect against that server's own path handling (for example a framework that normalizes Unicode or decodes twice), so the port is the security boundary.
 - **Where to:** the gateway only ever connects to `127.0.0.1` or `::1` on an approved port. It never resolves host names, so DNS rebinding does not apply, and it tries both addresses because Vite's default `localhost` bound only `::1` on the test Mac while other servers bind only IPv4.
 - **Revocation:** removing a target or turning preview off ends that target's requests and sockets at once (`revoked`, WebSocket close 4403) and publishes the shorter list. A password change already disconnects every controller (#65), which closes the channels.
 - **Consent caveat:** approval covers a port, not a process. Whatever listens there at request time answers, including the dev server's own proxy rules. The host UI should show whether something is listening and warn that controllers can use the service as the host user.
+- **Malformed frames:** every frame is checked before anything reaches Node's HTTP or WebSocket client, and a frame that still cannot be served refuses its own stream instead of throwing. Checks cover header values Node accepts (tab, visible ASCII, `0x80`–`0xff`; anything else refuses the request with `bad-header`), single-frame WebSocket messages and unique subprotocols. In the Electron main process an uncaught exception would end the app, so the product gateway needs the same guard.
+- **Timeouts and caps:**
+  - 60 s for response headers;
+  - 120 s for a whole request body, and 15 s without new body bytes;
+  - 120 s for a response the phone has stopped reading;
+  - 64 streams per controller;
+  - 8 MiB per request body, and 16 MiB of request bodies still arriving across streams. A phone cannot hold host memory or stream slots by never finishing an upload.
 
-How requests stay inside the approved destinations:
+How requests stay inside the approved destinations: the gateway takes the port from the host's approved list and never from a frame, and no frame field names a host. The checks below decide only which path, headers and method an approved server receives.
 
 | Attempt                                                                                     | Result                                                                                                           |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Absolute or scheme-relative path in a frame (`http://127.0.0.1:22/`, `//127.0.0.1:22/`)     | Refused (`bad-path`): only origin-form paths starting with a single `/`                                          |
 | Dot segments or encoded separators (`/api/%2e%2e/admin`, `/api/..%2fadmin`)                 | Normalized with the URL parser, then checked against the prefix; encoded `/` and `\` are refused                 |
+| Under a prefix: `..;` segments, double encoding (`%252e`), empty segments                   | Refused (`bad-path`), since some servers read these differently from the URL standard                            |
 | Unknown target id                                                                           | Refused (`not-approved`)                                                                                         |
 | Choosing `Host`, `Origin`, `Referer`, `Cookie`, `X-Forwarded-*`, `Sec-*`, `Upgrade` headers | Dropped; the host sets `Host: localhost:<port>`, `Origin`/`Referer` to that origin and `Cookie` from its own jar |
+| URL, host or method overrides (`X-Original-URL`, `X-Rewrite-URL`, `X-HTTP-Method-Override`) | Dropped                                                                                                          |
+| Header values Node cannot send (control characters, characters above U+00FF)                | Refused (`bad-header`) before any upstream request is made                                                       |
 | Methods such as `CONNECT` or `TRACE`                                                        | Refused (`bad-method`); `Upgrade` and `Connection` are dropped, so WebSockets open only through `ws-open`        |
 | Redirect inside the target (`/login`, `http://localhost:<port>/x`)                          | Returned to the browser with `Location` rewritten to a preview-origin path, then checked again when followed     |
 | Redirect to another port, a LAN address or another site                                     | Not followed; answered with a blocked page (`redirect-blocked`)                                                  |
@@ -109,7 +121,7 @@ How requests stay inside the approved destinations:
 | Origin isolation and storage                        | PalmDesk storage and cookies invisible; top storage access throws; preview storage cleared on teardown              | Third-party storage is partitioned and may be session-only; acceptable because it is cleared anyway | As measured                                     |
 | Cookies                                             | Upstream cookies work through the host jar; `document.cookie` sees none; script-set cookies are not sent upstream   | Same by design (no browser cookies involved)                                                        | Same                                            |
 | CSP                                                 | Upstream CSP kept except `frame-ancestors`; `X-Frame-Options` dropped; the shim loads as same-origin `<script src>` | Same; nonce-only CSPs with `strict-dynamic` would block the shim (not handled yet)                  | Same                                            |
-| Streaming responses                                 | `ReadableStream` bodies and `DecompressionStream`; first chunk after 5–19 ms; SSE works                             | `DecompressionStream` needs iOS 16.4+; otherwise unsupported                                        | Supported                                       |
+| Streaming responses                                 | `ReadableStream` bodies and `DecompressionStream`; first chunk after 5–28 ms; SSE works                             | `DecompressionStream` needs iOS 16.4+; otherwise unsupported                                        | Supported                                       |
 | WebSocket and HMR                                   | Shim plus tunnel; Vite 6 token and `vite-ping` work; reconnect reload after re-approval works                       | Unverified                                                                                          | Unverified                                      |
 | DataChannel message size                            | `maxMessageSize` 262144; 64 KiB frames                                                                              | Unknown; negotiated at runtime                                                                      | As measured                                     |
 | Background tabs                                     | Not measured                                                                                                        | WebRTC may stop when Safari is backgrounded; the preview tears down and must reload                 | Background tabs may freeze                      |
@@ -122,7 +134,9 @@ Other limits: an app whose own service worker matters (PWA work) cannot install 
 - The frame is sandboxed with `allow-scripts allow-same-origin allow-forms allow-popups allow-modals allow-downloads`, without top navigation, with no permission delegation (camera and clipboard reads report not allowed) and `referrerpolicy="no-referrer"`.
 - The bridge accepts only the preview protocol over its port and counts everything else as ignored; the preview has no path to the input, reader, image or authentication channels. On the host, the gateway is an HTTP and WebSocket client for approved loopback ports and nothing else: no capture, input, clipboard or file access.
 - Upstream cookies live in host memory per controller connection and target, and are discarded on revocation and disconnect.
-- Teardown unregisters the worker and clears the preview origin's `localStorage`, `sessionStorage`, Cache Storage and IndexedDB, so the next host or project starts clean. The relay's port grants nothing beyond what preview pages can already do; anything on the preview origin, including the app, is treated as untrusted.
+- Teardown unregisters the worker and clears the preview origin's `localStorage`, `sessionStorage`, Cache Storage and IndexedDB. Every new preview clears the origin again before registering its worker, so the next host or project starts clean even when the last teardown never ran.
+- IndexedDB can be cleared only where the browser lists databases (`indexedDB.databases()`, present in current Chromium and Safari); elsewhere teardown reports it as not cleared.
+- The relay's port grants nothing beyond what preview pages can already do; anything on the preview origin, including the app, is treated as untrusted.
 
 #### Teardown
 
@@ -132,7 +146,8 @@ Other limits: an app whose own service worker matters (PWA work) cannot install 
 | Host ends the session (password change, quit, removal) | Same, initiated by the host closing the peer connection                                                        |
 | Host removes a target or turns preview off             | Upstream requests and sockets for that target end at once; new requests are answered `403 revoked`             |
 | Controller stops the preview or switches target        | The relay unregisters the worker and clears storage before a new one starts                                    |
-| Network silently drops                                 | Detected only by PalmDesk's existing connection recovery; the gateway should also time out idle streams        |
+| Network silently drops                                 | Detected only by PalmDesk's existing connection recovery; the stall and body timeouts free host resources      |
+| Teardown never finishes (frame crashed, tab closed)    | Bridge gives up after 2 s; the next preview clears storage first and never reads this connection's cache       |
 
 #### States the controller shows
 
@@ -156,7 +171,7 @@ Measured payloads (through the prototype; details below):
 | Load                                              | Requests | From the dev server | Over the DataChannel |
 | ------------------------------------------------- | -------- | ------------------- | -------------------- |
 | Fixture Vite app, first load                      | 8        | 194.7 KiB           | 42.2 KiB             |
-| Fixture, reload (6 answered 304)                  | 8        | 0.6 KiB             | 2.4 KiB              |
+| Fixture, reload (6 answered 304)                  | 8        | 0.7 KiB             | 2.4 KiB              |
 | Fixture, one HMR module update                    | 1        | 0.4 KiB             | 1.4 KiB              |
 | PalmDesk's own web client in dev mode, first load | 119      | 9.43 MiB            | 1.98 MiB             |
 | PalmDesk's own web client, reload                 | 102      | 0.6 KiB             | 26 KiB               |
@@ -184,9 +199,9 @@ The prototype in [`test/dev-preview/`](../test/dev-preview/) implements option B
 | `preview-origin/`                          | The preview origin's relay, service worker and WebSocket shim                                                                                       |
 | `server.mjs`, `prototype-worker.mjs`       | Local signaling and static servers, run on their own thread                                                                                         |
 | `fixture-app/`                             | A small Vite app: imported and public assets, CSS, history routing, API endpoints, an HMR-accepted module                                           |
-| `run.mjs`                                  | 25 headless checks and measurements                                                                                                                 |
+| `run.mjs`                                  | 26 headless checks and measurements                                                                                                                 |
 | `measure.mjs`, `channel-bench.mjs`         | Loading any local dev server through the preview; raw DataChannel behaviour                                                                         |
-| `policy.test.mjs`                          | Unit tests for the host policy                                                                                                                      |
+| `policy.test.mjs`, `gateway.test.mjs`      | Unit tests for the host policy, and for the gateway against malformed frames, faked credits and stalled uploads                                     |
 
 Run, under the shared browser lock, after `pnpm install`:
 
@@ -202,40 +217,50 @@ lockf -k "$(git rev-parse --git-common-dir)/browser-smoke.lock" node test/dev-pr
 
 ### Results
 
-Checked on 2026-10-28 on an Apple Silicon Mac (macOS 26.6), Node 26.5.0, Playwright's Chromium 156.0.8078.4 headless, Vite 6.4.5, phone viewport 390×844 with touch. All 25 checks passed in five consecutive runs with `*.localhost` origins, and the 24 that apply passed with `--https` both cross-site and same-site:
+Checked on 2026-10-28 on an Apple Silicon Mac (macOS 26.6), Node 26.5.0, Playwright's Chromium 156.0.8078.4 headless, Vite 6.4.5, phone viewport 390×844 with touch, with the fixes from review. All 26 checks passed in five consecutive runs with `*.localhost` origins, and the 25 that apply passed with `--https` both cross-site and same-site. The 12 unit tests pass; the four gateway tests fail on the code before review.
 
 - an unverified controller is denied and its requests are refused; a verified one receives the approved list;
 - cold load with worker installation; public, imported and CSS assets; history routing, then a refresh on the deep route; a navigation redirect inside the target;
 - same-origin GET and POST with a JSON body (the dev server saw `Host: localhost:<port>`); streamed text and server-sent events;
 - cookies kept in the host jar and invisible to scripts; redirects rewritten inside the target and blocked otherwise, as navigations and fetches;
-- cross-port calls to a second approved server (IPv4 only, limited to `/api/`), while `/admin` and an unapproved canary port were refused; eight crafted frames that try to leave the list (the canary server never received a request);
+- cross-port calls to a second approved server (IPv4 only, limited to `/api/`), while `/admin` and an unapproved port were refused;
+- ten crafted frames, each refused with its own code (absolute and scheme-relative paths, dot segments, unknown targets, a header value Node rejects, duplicate subprotocols); a page's `fetch` with such a header got `400 bad-header`, and the gateway kept serving. The canary port that never received a request only guards against regressions, because the gateway dials ports from the approved list, never from a frame;
 - module and CSS HMR over the tunneled `vite-hmr` WebSocket without a reload;
 - isolation: PalmDesk storage and cookies unreadable, top navigation and app service workers refused, camera and clipboard reads not allowed, foreign `postMessage`s ignored;
 - revocation closes HMR and answers new requests `403 revoked`; approving the port again lets Vite's client reconnect and reload; a stopped server shows `upstream-unavailable`;
-- a dropped connection aborts the upstream request and clears the worker, storage and cache; the host ending the session tears the preview down; a controller on LAN HTTP reports `insecure-context`.
+- a new preview starts clean when the previous preview frame died without a teardown: no `localStorage`, IndexedDB or old cache survived;
+- a dropped connection aborts the upstream request and clears the worker, `localStorage`, IndexedDB and cache; the host ending the session tears the preview down; a controller on LAN HTTP reports `insecure-context`.
 
-Medians of the five runs on loopback (range in parentheses), with machine load averages of 3–7 from other work:
+Medians of the five runs on loopback (range in parentheses). Other sessions kept the machine's load average at 9–13:
 
-| Measure                                       | Direct from Vite        | Through the preview                                                        |
-| --------------------------------------------- | ----------------------- | -------------------------------------------------------------------------- |
-| Fixture first load                            | 87 ms (71–137)          | 249 ms (194–370), including 63 ms (35–88) to install the worker            |
-| Fixture reload                                | 33 ms (27–113)          | 85 ms (60–154)                                                             |
-| One small request                             | 1.5 ms (0.9–2.2)        | 9.2 ms (6.1–11.7): 0.2 worker routing, 0.4 cache lookup, 4.0 until headers |
-| HMR module update after a file write          | 124 ms (120–130)        | 133 ms (126–138)                                                           |
-| 8 MiB incompressible download                 | 1428 Mbit/s (1157–2237) | 41 Mbit/s (28–55)                                                          |
-| 8 MiB JavaScript-like text                    | —                       | 266 Mbit/s effective (186–331), 0.4% of it on the wire                     |
-| Small request during that download            | —                       | 102 ms (18–177); 9 ms (7–18) when idle                                     |
-| Teardown after the phone drops the connection | —                       | Phone 19 ms (15–21); host aborted the upstream request after 17 ms (14–21) |
-| Teardown after the host ends the session      | —                       | 42 ms (32–53)                                                              |
+| Measure                                       | Direct from Vite      | Through the preview                                                                               |
+| --------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------- |
+| Fixture first load                            | 155 ms (105–177)      | 369 ms (255–401), including 69 ms (54–185) to install the worker                                  |
+| Fixture reload                                | 52 ms (45–131)        | 103 ms (64–127)                                                                                   |
+| One small request                             | 2.3 ms (1.2–2.4)      | 11.5 ms (10.6–21.2): 0.2 worker routing, 0.6 cache lookup, 5.0 until headers                      |
+| HMR module update after a file write          | 133 ms (84–148)       | 142 ms (87–186)                                                                                   |
+| 8 MiB incompressible download                 | 790 Mbit/s (589–1220) | 33 Mbit/s (16–39)                                                                                 |
+| 8 MiB JavaScript-like text                    | —                     | 148 Mbit/s effective (100–205), 0.4% of it on the wire                                            |
+| Small request during that download            | —                     | 444 ms (149–839); 15 ms (10–19) when idle                                                         |
+| Host backlog not yet in a DataChannel         | —                     | Peaked at 1.06 MiB in every run: the 1 MiB credit window plus one read; the 2 MiB limit never hit |
+| Teardown after the phone drops the connection | —                     | Phone 31 ms (20–45); host aborted the upstream request after 28 ms (24–40)                        |
+| Teardown after the host ends the session      | —                     | 42 ms (24–56)                                                                                     |
+| Reopening after the preview frame died        | —                     | 2.2–2.4 s, of which 2 s is the bridge waiting for the dead frame                                  |
 
-PalmDesk's own web client in dev mode (Vue and Naive UI, 119 module requests, Vite already warm, backend proxies removed): first load 2.3–3.5 s through the preview against 0.65–1.2 s direct, reload 0.5–1.2 s against 0.2–0.45 s, in five runs at load averages around 6–7.
+An earlier batch of the same checks, before the review fixes and at load averages of 3–7, was faster across the board: for example a 249 ms first load, 41 Mbit/s for the incompressible download and 102 ms for the small request during it. Absolute times here mostly track machine load.
+
+PalmDesk's own web client in dev mode (Vue and Naive UI, 119 module requests, Vite already warm, backend proxies removed):
+
+- with the fixes, at load averages of 12–23: first load 2.7–4.1 s through the preview against 0.9–1.4 s direct, and reload 0.9–1.1 s against 0.3–0.5 s, over five runs;
+- before them, at load averages of 6–7: first load 2.3–3.5 s against 0.65–1.2 s.
 
 ### Findings that shaped the design
 
 - **One ordered channel causes head-of-line blocking.** With a 4 MiB send buffer, small messages sent on the same channel during an 8 MiB transfer waited 280–420 ms (up to 1.5 s under heavy load); on a second channel they took 11–82 ms (`channel-bench.mjs`). A 256 KiB buffer kept the same channel at 13–73 ms on a quiet machine, but the full-stack runs with a single channel still took 0.34–0.59 s for a small request during a download. The design therefore uses a control channel plus four data channels, assigns each stream to the channel with the fewest open streams, and caps each channel's send buffer at 256 KiB.
-- **No shared FIFO anywhere on the host path.** Timing the small request at the host page showed that most of the remaining delay under load came from the prototype's host plumbing (socket.io standing in for IPC, and the gateway thread), not from the DataChannels: 6–66 ms of the total was spent on the phone and the channels. In PalmDesk the main-to-renderer path needs per-stream fairness too, for example one `MessagePort` per data channel.
+- **No shared FIFO anywhere on the host path.** Timing the small request at the host page showed that most of the remaining delay under load came from the prototype's host plumbing (socket.io standing in for IPC, and the gateway thread), not from the DataChannels: across all batches, 6–66 ms of the total was spent on the phone and the channels. In PalmDesk the main-to-renderer path needs per-stream fairness too, for example one `MessagePort` per data channel.
 - **DataChannel throughput is the bulk limit.** Raw Chromium DataChannels moved 52–86 Mbit/s on a quiet machine and 19–51 Mbit/s under heavy load, where larger messages helped. Development payloads are compressible, so effective throughput for JavaScript is several times higher.
 - **The worker cache matters.** Without it, every reload would re-download every module; with `ETag` revalidation the fixture reload costs 2.4 KiB and PalmDesk's client 26 KiB.
+- **Credits do not bound host memory.** A review drove the gateway with faked credits, and it read 708 MiB from the dev server in 2 s. The host now stops reading while 2 MiB waits for its own DataChannels: the same attack moves 2 MiB, and the unit test holds the backlog to that. With honest credits the full runs never reached the limit.
 - **Loopback is not one address.** Vite's default host bound only `::1`, while other servers bind only `127.0.0.1`; the gateway tries both and remembers which answered.
 - **Vite 6 HMR works through the tunnel** because its WebSocket token is embedded in the client the preview already served, and the gateway sends an `Origin` matching the target. Node's WebSocket client cannot set `Host`, so Vite saw an IP host, which it accepts; the product gateway should use a client that sets `Host: localhost:<port>` for stricter servers.
 
@@ -249,12 +274,17 @@ Adopt option B for #35, bounded as below. Option A stays available as it is toda
 
 ### First implementation
 
-1. **Host gateway** (`electron-main/`): the policy and gateway from the prototype, ported to TypeScript with the unit tests in `test/smoke/`; settings for preview on/off and the approved targets in the main process; a `MessagePort` per controller between renderer and main instead of per-frame `invoke`, registered with the IPC allowlist and refused by smoke runs; per-stream fairness and a 1 MiB credit window; idle and header timeouts.
+1. **Host gateway** (`electron-main/`): the policy and gateway from the prototype, ported to TypeScript with the unit tests in `test/smoke/`.
+   - Settings for preview on/off and the approved targets live in the main process.
+   - Renderer and main talk over a `MessagePort` per controller instead of per-frame `invoke`, registered with the IPC allowlist and refused by smoke runs.
+   - Frames are validated before they reach Node, and no frame handling can throw.
+   - Backpressure comes from the renderer's DataChannel buffers, with phone credits as an extra limit, and streams are served fairly.
+   - Header, body and stall timeouts, plus a cap on request bodies still arriving.
 2. **Host UI**: turn preview on, add or remove ports with an optional path prefix and label, show whether each port is listening, warn what approval means, list which controllers are previewing, and stop all previews.
 3. **Host renderer**: accept `PalmDeskPreview` and `PalmDeskPreviewData0`–`3` only from controllers that `controllerVerified()` accepts (#88), forward frames, and keep each channel's send buffer below 256 KiB.
 4. **Controller**: the bridge as a module beside the session reader; a Preview view next to Read and Window that stays mounted the same way, so returning keeps the reading position and drafts; window video suspended while previewing; toolbar with reload, back and stop; the states above.
 5. **Preview origin**: the relay, worker and shim built as static files, the preview origin configurable like the other service addresses, the web CSP's `frame-src` set to it, and self-hosting documentation.
-6. **Limits for this version**: HTTP/1.1 upstreams on loopback ports; GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS; request bodies up to 8 MiB; WebSocket messages up to one frame; 64 streams per controller; one preview at a time per browser.
+6. **Limits for this version**: HTTP/1.1 upstreams on loopback ports; GET, HEAD, POST, PUT, PATCH, DELETE and OPTIONS; request bodies up to 8 MiB each and 16 MiB still arriving in total; WebSocket messages up to one frame; 64 streams per controller; one preview at a time per browser.
 
 ### Not in the first implementation
 

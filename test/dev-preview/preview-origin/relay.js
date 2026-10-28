@@ -37,14 +37,30 @@ function activated(registration) {
   });
 }
 
+function deleteDatabase(name) {
+  return new Promise((resolve) => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = resolve;
+    request.onerror = resolve;
+    // Blocked while a removed frame's connection closes; it completes later.
+    setTimeout(resolve, 1000);
+  });
+}
+
+// Clears everything the previewed app could have stored on this origin.
+// IndexedDB can only be cleared where the browser can list databases.
 async function clearStorage() {
   const registrations = await navigator.serviceWorker.getRegistrations();
   await Promise.all(registrations.map((item) => item.unregister()));
   localStorage.clear();
   sessionStorage.clear();
   await Promise.all((await caches.keys()).map((key) => caches.delete(key)));
-  const databases = (await indexedDB.databases?.()) || [];
-  databases.forEach(({ name }) => name && indexedDB.deleteDatabase(name));
+  if (typeof indexedDB.databases !== 'function') return 'not-enumerable';
+  const databases = await indexedDB.databases();
+  await Promise.all(
+    databases.map(({ name }) => (name ? deleteDatabase(name) : undefined))
+  );
+  return 'cleared';
 }
 
 async function inspect() {
@@ -52,7 +68,11 @@ async function inspect() {
   return {
     registrations: registrations.length,
     localStorage: localStorage.length,
-    caches: (await caches.keys()).length,
+    caches: await caches.keys(),
+    indexedDB:
+      typeof indexedDB.databases === 'function'
+        ? (await indexedDB.databases()).map(({ name }) => name)
+        : 'not-enumerable',
   };
 }
 
@@ -65,6 +85,12 @@ function onWorkerMessage(event) {
 }
 
 async function start(path) {
+  // Start from nothing, whether or not the previous preview's teardown ran:
+  // a crashed frame or a closed tab never gets to clear up.
+  await clearStorage();
+  // The worker keys its cache by this relay's nonce, so entries from another
+  // connection are never read even if one survived.
+  await caches.open(`palmdesk-preview-${nonce}`);
   const registration = await navigator.serviceWorker.register(
     '/__palmdesk_preview/sw.js',
     { scope: '/', updateViaCache: 'none' }
@@ -91,10 +117,11 @@ async function onBridgeMessage({ data }) {
   if (data?.type === 'teardown') {
     app?.remove();
     app = undefined;
+    let indexedDBState = 'failed';
     try {
-      await clearStorage();
+      indexedDBState = await clearStorage();
     } finally {
-      tellBridge({ type: 'teardown-done' });
+      tellBridge({ type: 'teardown-done', indexedDB: indexedDBState });
       bridge.close();
       bridge = undefined;
     }

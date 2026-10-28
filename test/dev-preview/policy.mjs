@@ -47,6 +47,15 @@ const DROPPED_REQUEST_HEADERS = new Set([
   'accept-encoding',
   'service-worker',
   'service-worker-navigation-preload',
+  // Some servers and proxies take the URL, host or method from these.
+  'x-original-url',
+  'x-rewrite-url',
+  'x-host',
+  'x-forwarded',
+  'x-real-ip',
+  'x-http-method-override',
+  'x-http-method',
+  'x-method-override',
 ]);
 
 // Response headers that must not reach the preview document: hop-by-hop
@@ -116,7 +125,7 @@ export function resolvePath(target, raw) {
   if (!raw.startsWith('/') || raw[1] === '/' || raw[1] === '\\')
     return { ok: false, code: 'bad-path' };
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000- \u007f\\#]/.test(raw) || /%2f|%5c/i.test(raw))
+  if (/[\x00-\x20\x7f\\#]/.test(raw) || /%2f|%5c/i.test(raw))
     return { ok: false, code: 'bad-path' };
   let url;
   try {
@@ -124,10 +133,28 @@ export function resolvePath(target, raw) {
   } catch {
     return { ok: false, code: 'bad-path' };
   }
-  if (url.host !== 'preview.invalid') return { ok: false, code: 'bad-path' };
+  if (url.host !== 'preview.invalid' || url.pathname.startsWith('//'))
+    return { ok: false, code: 'bad-path' };
   if (!inPrefix(url.pathname, target.prefix))
     return { ok: false, code: 'outside-prefix' };
+  if (target.prefix !== '/' && !plainSegments(url.pathname))
+    return { ok: false, code: 'bad-path' };
   return { ok: true, path: `${url.pathname}${url.search}` };
+}
+
+// Under a path prefix, refuse spellings that some servers decode or normalize
+// differently from the URL standard: path parameters on dot segments (Tomcat
+// and Spring read /..;/ as /../), double-encoded characters (%252e decodes to
+// a dot on servers that decode twice) and empty segments. A prefix still only
+// narrows what one approved server is asked for; the port is the boundary.
+function plainSegments(pathname) {
+  const segments = pathname.split('/').slice(1);
+  return !segments.some(
+    (segment, index) =>
+      /^(\.|%2e){1,2};/i.test(segment) ||
+      /%25/i.test(segment) ||
+      (segment === '' && index < segments.length - 1)
+  );
 }
 
 export function isLoopbackName(hostname) {
@@ -162,34 +189,43 @@ export function rewriteLocation(target, requestPath, location) {
   return { ok: true, location: `${resolved.path}${url.hash}` };
 }
 
-function validHeader(name, value) {
+// Values Node's HTTP client accepts: tab, visible ASCII, space and obs-text.
+// Anything else makes http.request() throw, so it must never get that far.
+function validHeader(entry) {
+  if (!Array.isArray(entry) || entry.length !== 2) return false;
+  const [name, value] = entry;
   return (
     typeof name === 'string' &&
     typeof value === 'string' &&
     /^[!#$%&'*+.^_`|~0-9a-z-]{1,128}$/i.test(name) &&
     value.length <= 8192 &&
-    // eslint-disable-next-line no-control-regex
-    !/[\r\n\u0000]/.test(value)
+    /^[\t\x20-\x7e\x80-\xff]*$/.test(value)
   );
 }
 
+// Returns the headers the host sends upstream, or refuses the request when
+// any entry is malformed. Disallowed names are dropped, not refused: the
+// browser adds some of them itself.
 export function requestHeaders(target, entries, cookie) {
+  if (
+    entries !== undefined &&
+    (!Array.isArray(entries) ||
+      entries.length > 100 ||
+      !entries.every(validHeader))
+  )
+    return { ok: false, code: 'bad-header' };
   const headers = {};
-  if (Array.isArray(entries))
-    entries.slice(0, 100).forEach((entry) => {
-      if (!Array.isArray(entry)) return;
-      const [name, value] = entry;
-      if (!validHeader(name, value)) return;
-      const key = name.toLowerCase();
-      if (
-        DROPPED_REQUEST_HEADERS.has(key) ||
-        key.startsWith('sec-') ||
-        key.startsWith('proxy-') ||
-        key.startsWith('x-forwarded-')
-      )
-        return;
-      headers[key] = value;
-    });
+  (entries ?? []).forEach(([name, value]) => {
+    const key = name.toLowerCase();
+    if (
+      DROPPED_REQUEST_HEADERS.has(key) ||
+      key.startsWith('sec-') ||
+      key.startsWith('proxy-') ||
+      key.startsWith('x-forwarded-')
+    )
+      return;
+    headers[key] = value;
+  });
   const origin = `http://localhost:${target.port}`;
   headers.host = `localhost:${target.port}`;
   // Dev servers compare Origin with Host for CSRF and WebSocket checks.
@@ -197,7 +233,7 @@ export function requestHeaders(target, entries, cookie) {
   headers.referer = `${origin}/`;
   headers['accept-encoding'] = 'identity';
   if (cookie) headers.cookie = cookie;
-  return headers;
+  return { ok: true, headers };
 }
 
 export function responseHeaders(rawHeaders) {
@@ -215,7 +251,12 @@ export function responseHeaders(rawHeaders) {
         .join(';')
         .trim();
       if (kept) headers.push([name, kept]);
-    } else if (!DROPPED_RESPONSE_HEADERS.has(name)) headers.push([name, value]);
+    } else if (
+      !DROPPED_RESPONSE_HEADERS.has(name) &&
+      // The preview's own diagnostics; a dev server must not spoof them.
+      !name.startsWith('x-palmdesk-')
+    )
+      headers.push([name, value]);
   }
   return { headers, cookies };
 }

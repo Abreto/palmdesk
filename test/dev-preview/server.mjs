@@ -142,6 +142,9 @@ export async function startPrototype({
       hostSocket = socket;
       socket.on('signal', (id, message) => io.to(id).emit('signal', message));
       socket.on('preview-in', (id, data) => gatewayFor(id).receive(data));
+      socket.on('preview-drained', (id, bytes) =>
+        gateways.get(id)?.drained(bytes)
+      );
       socket.on('preview-close', (id) => {
         gateways.get(id)?.close('disconnected');
         gateways.delete(id);

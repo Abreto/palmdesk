@@ -71,6 +71,27 @@ test('paths are normalized and must stay under the prefix', () => {
   ].forEach((path) =>
     assert.equal(resolvePath(web, path).code, 'bad-path', path)
   );
+  // A path that normalizes to //host would look scheme-relative upstream.
+  assert.equal(resolvePath(web, '/.//evil.example/x').code, 'bad-path');
+  assert.deepEqual(resolvePath(web, '/a//b;c'), { ok: true, path: '/a//b;c' });
+});
+
+test('under a prefix, spellings that servers decode differently are refused', () => {
+  [
+    '/api/..;/admin',
+    '/api/%2e%2e;/admin',
+    '/api/.;/x',
+    '/api/x/..;/..;/admin',
+    '/api/%252e%252e/admin',
+    '/api/%255c..%255cadmin',
+    '/api/.//x',
+    '/api/a//b',
+  ].forEach((path) =>
+    assert.equal(resolvePath(api, path).code, 'bad-path', path)
+  );
+  ['/api/', '/api/items;jsessionid=1', '/api/v1/x?q=a%25b'].forEach((path) =>
+    assert.equal(resolvePath(api, path).ok, true, path)
+  );
 });
 
 test('redirects are rewritten within the target or refused', () => {
@@ -110,7 +131,7 @@ test('redirects are rewritten within the target or refused', () => {
 });
 
 test('the host chooses Host, Origin, Referer and Cookie', () => {
-  const headers = requestHeaders(
+  const { headers } = requestHeaders(
     web,
     [
       ['Accept', 'text/html'],
@@ -118,22 +139,43 @@ test('the host chooses Host, Origin, Referer and Cookie', () => {
       ['Origin', 'https://preview.example'],
       ['Cookie', 'palmdesk=secret'],
       ['X-Forwarded-For', '1.2.3.4'],
+      ['X-Forwarded', 'for=1.2.3.4'],
+      ['X-Original-URL', '/admin'],
+      ['X-HTTP-Method-Override', 'TRACE'],
       ['Sec-Fetch-Site', 'same-origin'],
       ['If-None-Match', '"abc"'],
-      ['X-Bad', 'line\r\nInjected: 1'],
-      ['Bad Name', 'x'],
+      ['X-Latin', `caf${String.fromCharCode(0xe9)}`],
     ],
     'session=1'
   );
   assert.deepEqual(headers, {
     accept: 'text/html',
     'if-none-match': '"abc"',
+    'x-latin': `caf${String.fromCharCode(0xe9)}`,
     host: 'localhost:5173',
     origin: 'http://localhost:5173',
     referer: 'http://localhost:5173/',
     'accept-encoding': 'identity',
     cookie: 'session=1',
   });
+});
+
+test('a header Node could not send refuses the whole request', () => {
+  [
+    [['X-Bad', 'line\r\nInjected: 1']],
+    [['X-Bad', `a${String.fromCharCode(1)}b`]],
+    [['X-Bad', `a${String.fromCharCode(0x7f)}b`]],
+    [['X-Bad', `a${String.fromCharCode(0x20ac)}b`]],
+    [['Bad Name', 'x']],
+    [['x-a', 'b', 'c']],
+    'not a list',
+    Array.from({ length: 101 }, () => ['x-a', 'b']),
+  ].forEach((entries) =>
+    assert.deepEqual(requestHeaders(web, entries), {
+      ok: false,
+      code: 'bad-header',
+    })
+  );
 });
 
 test('response headers drop cookies, framing and origin-wide fields', () => {
@@ -152,6 +194,8 @@ test('response headers drop cookies, framing and origin-wide fields', () => {
     '"*"',
     'ETag',
     '"v1"',
+    'X-PalmDesk-Preview-Error',
+    'revoked',
   ]);
   assert.deepEqual(cookies, ['a=1; Path=/']);
   assert.deepEqual(headers, [

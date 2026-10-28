@@ -209,8 +209,11 @@ export class PreviewBridge {
       this.path = data.path;
       this.onState(this.state, this.reason);
     } else if (data?.type === 'error') this.setState('error', data.code);
-    else if (data?.type === 'teardown-done') this.teardownDone?.();
-    else this.stats.ignoredMessages += 1;
+    else if (data?.type === 'teardown-done') {
+      // 'not-enumerable' means IndexedDB could not be cleared here.
+      this.lastTeardown = { indexedDB: data.indexedDB };
+      this.teardownDone?.();
+    } else this.stats.ignoredMessages += 1;
   }
 
   route(raw, socket) {
@@ -533,7 +536,8 @@ export class PreviewBridge {
       frame.style.display = 'none';
       const token = nonce();
       this.inspector = { frame, nonce: token, resolve };
-      frame.src = `${this.previewOrigin}/__palmdesk_preview/relay.html#nonce=${token}&parent=${encodeURIComponent(location.origin)}`;
+      // mode=inspect: the worker never routes requests to this relay.
+      frame.src = `${this.previewOrigin}/__palmdesk_preview/relay.html#nonce=${token}&mode=inspect&parent=${encodeURIComponent(location.origin)}`;
       document.body.append(frame);
     });
   }

@@ -16,13 +16,18 @@ function stats() {
     sentFrameBytes: 0,
     refused: {},
     open: 0,
+    maxUnsent: 0,
     socketProtocols: [],
   };
   prototype.gateways.forEach((gateway) => {
     Object.keys(total).forEach((key) => {
-      if (typeof total[key] === 'number' && key !== 'open')
+      if (
+        typeof total[key] === 'number' &&
+        !['open', 'maxUnsent'].includes(key)
+      )
         total[key] += gateway.stats[key];
     });
+    total.maxUnsent = Math.max(total.maxUnsent, gateway.stats.maxUnsent);
     Object.entries(gateway.stats.refused).forEach(([code, count]) => {
       total.refused[code] = (total.refused[code] || 0) + count;
     });

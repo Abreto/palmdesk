@@ -36,15 +36,21 @@ function channelQueue(id, channel) {
   channel.bufferedAmountLowThreshold = LOW_WATER;
   const queue = { channel, items: [], bytes: 0, streams: 0 };
   const flush = () => {
+    let moved = 0;
     while (
       queue.items.length &&
       channel.readyState === 'open' &&
       channel.bufferedAmount < HIGH_WATER
     ) {
       const item = queue.items.shift();
-      queue.bytes -= item.byteLength ?? item.length;
+      const size = item.byteLength ?? item.length;
+      queue.bytes -= size;
+      moved += size;
       channel.send(item);
     }
+    // The gateway stops reading from the dev server while too much waits
+    // here; this report, not the phone's credits, is what lets it go on.
+    if (moved) socket.emit('preview-drained', id, moved);
   };
   queue.push = (data) => {
     queue.items.push(data);
