@@ -1,8 +1,24 @@
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_IMAGE_PIXELS = 24 * 1024 * 1024;
+export const MAX_IMAGE_PIXELS = 24 * 1024 * 1024;
+export const MAX_IMAGE_SIDE = 16384;
 
 export type ImageMime = 'image/png' | 'image/jpeg';
 export type ImagePayload = { mime: ImageMime; bytes: Uint8Array };
+
+export function fitsImageBounds(width: number, height: number) {
+  return (
+    width <= MAX_IMAGE_SIDE &&
+    height <= MAX_IMAGE_SIDE &&
+    width * height <= MAX_IMAGE_PIXELS
+  );
+}
+
+// Round up so a size just over the limit never reads as the limit itself.
+export function formatImageBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil((bytes / 1024) * 10) / 10} KB`;
+  return `${Math.ceil((bytes / 1024 / 1024) * 10) / 10} MB`;
+}
 
 // Inspect dimensions before native decoding so compressed images cannot allocate
 // an unbounded bitmap. The desktop decoder still validates the complete image.
@@ -52,7 +68,7 @@ export function inspectImage(bytes: Uint8Array) {
     }
   } else throw new Error('请选择 PNG 或 JPEG 图片');
   if (!width || !height) throw new Error('无法读取图片，请重新选择');
-  if (width > 16384 || height > 16384 || width * height > MAX_IMAGE_PIXELS)
+  if (!fitsImageBounds(width, height))
     throw new Error('图片尺寸过大，请缩小后重试');
   return { mime, width, height };
 }

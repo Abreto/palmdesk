@@ -34,6 +34,8 @@ createApp(
       const painting = setInterval(paint, 100);
       const blocked = ref(false);
       const connected = ref(false);
+      // Closing the target ends its image-paste session, as the host does.
+      const session = ref<string | undefined>('fixture-session');
       const state = {
         images: [] as { mime: string; bytes: number[] }[],
         behaviors: [] as unknown[],
@@ -46,6 +48,12 @@ createApp(
         receivedUploads: 0,
         imageConnections: 0,
         closeImages: () => {},
+        closeTarget: () => {
+          session.value = undefined;
+        },
+        reopenTarget: () => {
+          session.value = 'fixture-session';
+        },
         cancelled: new Set<number>(),
       };
       (window as any).__imageSmoke = state;
@@ -81,7 +89,7 @@ createApp(
         state.imageConnections += 1;
         host = new ImageTransferHost(
           event.channel,
-          (id) => id === 'fixture-session',
+          (id) => id === session.value,
           async (_id, request, image) => {
             if (state.delay) {
               state.pendingPaste = true;
@@ -180,7 +188,7 @@ createApp(
               connected: connected.value,
               inputBlocked: blocked.value,
               imageChannel: channel.value,
-              imagePasteSession: 'fixture-session',
+              imagePasteSession: session.value,
               commitImagePaste: (sessionId: string, id: number) =>
                 control.send(
                   JSON.stringify({
