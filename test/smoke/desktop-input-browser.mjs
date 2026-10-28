@@ -192,6 +192,21 @@ try {
   await clear(page);
   await page.mouse.click(prompt.x, prompt.y, { button: 'middle' });
   assert.deepEqual(await names(page), []);
+  // Control pressed outside the window view is not sent, so on a Mac
+  // controller Control-click becomes the right click it is locally.
+  await page.getByLabel('本地搜索').focus();
+  const stageBox = await page.locator('.video-stage').boundingBox();
+  await page.waitForTimeout(550);
+  await clear(page);
+  await page.locator('.video-stage').click({
+    modifiers: ['Control'],
+    position: { x: prompt.x - stageBox.x, y: prompt.y - stageBox.y },
+  });
+  const mac = await page.evaluate(() => navigator.userAgent.includes('Mac'));
+  assert.deepEqual(
+    await names(page),
+    mac ? ['rightClick'] : ['pressButtonLeft', 'releaseButtonLeft']
+  );
   await clear(page);
   await page.mouse.move(prompt.x - 200, prompt.y);
   await page.mouse.down();
@@ -220,7 +235,7 @@ try {
     ]
   );
   console.log(
-    'PASS right click, ignored middle button, clamped drag, vertical and horizontal wheel'
+    'PASS right click, Control-click, ignored middle button, clamped drag, vertical and horizontal wheel'
   );
 
   // Pinching a trackpad (Ctrl+wheel) zooms locally around the pointer.
