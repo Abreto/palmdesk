@@ -1,0 +1,320 @@
+const assert = require('node:assert/strict');
+const test = require('node:test');
+
+const load = require('./load-source.cjs');
+
+const {
+  ESCAPE_HOLD_MS,
+  createKeyboardController,
+  createMouseController,
+  interactionProfile,
+  parseInteractionMode,
+  remoteKey,
+} = load('src/utils/controller-input.ts');
+const { videoPoint } = load('src/utils/remote-input.ts');
+const { BilldDeskBehaviorEnum: Behavior } = load('src/types/websocket.ts');
+
+test('auto mode follows the primary pointer, and overrides win', () => {
+  const laptop = { finePointer: true, hover: true };
+  const phone = { finePointer: false, hover: false };
+  // A pen-only tablet has a fine pointer that cannot hover.
+  const pen = { finePointer: true, hover: false };
+  assert.equal(interactionProfile('auto', laptop), 'desktop');
+  assert.equal(interactionProfile('auto', phone), 'touch');
+  assert.equal(interactionProfile('auto', pen), 'touch');
+  assert.equal(interactionProfile('touch', laptop), 'touch');
+  assert.equal(interactionProfile('desktop', phone), 'desktop');
+});
+test('saved interaction modes are validated', () => {
+  assert.equal(parseInteractionMode('desktop'), 'desktop');
+  assert.equal(parseInteractionMode('touch'), 'touch');
+  [null, undefined, '', 'mouse', 'DESKTOP', 1, {}].forEach((value) =>
+    assert.equal(parseInteractionMode(value), 'auto')
+  );
+});
+
+function mouse() {
+  const state = { enabled: true, messages: [] };
+  state.mouse = createMouseController({
+    send: (message) => state.messages.push(message),
+    enabled: () => state.enabled,
+    point: (event, clamp) =>
+      videoPoint(
+        { left: 20, top: 40, width: 400, height: 200 },
+        event.clientX,
+        event.clientY,
+        clamp
+      ),
+  });
+  state.sent = () =>
+    state.messages.map((m) => [Behavior[m.type], m.x, m.y].join(' '));
+  return state;
+}
+const at = (clientX, clientY, timeStamp = 0, button = 0) => ({
+  pointerId: 1,
+  pointerType: 'mouse',
+  button,
+  clientX,
+  clientY,
+  timeStamp,
+});
+function click(h, x, y, time) {
+  h.mouse.down(at(x, y, time));
+  h.mouse.up(at(x, y, time + 60));
+}
+
+test('a mouse click presses and releases at once, at the pressed point', () => {
+  const h = mouse();
+  assert.equal(h.mouse.down(at(220, 140)), true);
+  h.mouse.move(at(221, 141, 10));
+  h.mouse.up(at(222, 141, 40));
+  assert.deepEqual(h.sent(), [
+    'pressButtonLeft 500 500',
+    'releaseButtonLeft 500 500',
+  ]);
+});
+test('a nearby second press within the double-click time repeats the position', () => {
+  const h = mouse();
+  click(h, 220, 140, 0);
+  click(h, 222, 141, 300);
+  assert.deepEqual(h.sent(), [
+    'pressButtonLeft 500 500',
+    'releaseButtonLeft 500 500',
+    'pressButtonLeft 500 500',
+    'releaseButtonLeft 500 500',
+  ]);
+  h.messages.length = 0;
+  // Too late, then too far: each press keeps its own position.
+  click(h, 222, 141, 900);
+  click(h, 230, 141, 1000);
+  assert.deepEqual(h.sent(), [
+    'pressButtonLeft 505 505',
+    'releaseButtonLeft 505 505',
+    'pressButtonLeft 525 505',
+    'releaseButtonLeft 525 505',
+  ]);
+});
+test('dragging moves past the threshold and releases at the clamped end', () => {
+  const h = mouse();
+  h.mouse.down(at(220, 140));
+  h.mouse.move(at(222, 140, 10));
+  assert.equal(h.messages.length, 1);
+  h.mouse.move(at(260, 140, 20));
+  h.mouse.move(at(600, 400, 30));
+  h.mouse.up(at(600, 400, 40));
+  assert.deepEqual(h.sent(), [
+    'pressButtonLeft 500 500',
+    'mouseMove 600 500',
+    'mouseMove 1000 1000',
+    'releaseButtonLeft 1000 1000',
+  ]);
+  h.messages.length = 0;
+  // A drag is not the first half of a double click.
+  click(h, 222, 140, 100);
+  assert.equal(h.sent()[0], 'pressButtonLeft 505 500');
+});
+test('the right button sends one right click without holding a button', () => {
+  const h = mouse();
+  assert.equal(h.mouse.down(at(220, 140, 0, 2)), false);
+  h.mouse.up(at(220, 140, 50, 2));
+  h.mouse.down(at(220, 140, 100, 1));
+  assert.deepEqual(h.sent(), ['rightClick 500 500']);
+  assert.equal(h.mouse.pressed(), false);
+});
+test('hover skips letterbox points and unchanged positions', () => {
+  const h = mouse();
+  h.mouse.move(at(220, 140));
+  h.mouse.move(at(220.1, 140));
+  h.mouse.move(at(10, 80));
+  h.mouse.move(at(240, 140));
+  assert.deepEqual(h.sent(), ['mouseMove 500 500', 'mouseMove 550 500']);
+});
+test('cancel releases a held button and forgets the double-click position', () => {
+  const h = mouse();
+  click(h, 220, 140, 0);
+  h.mouse.cancel();
+  assert.equal(h.messages.length, 2, 'nothing to release after a click');
+  h.mouse.down(at(222, 141, 100));
+  h.mouse.cancel();
+  assert.deepEqual(h.sent().slice(2), [
+    'pressButtonLeft 505 505',
+    'releaseAll  ',
+  ]);
+  h.messages.length = 0;
+  h.mouse.up(at(222, 141, 150));
+  assert.deepEqual(h.messages, []);
+});
+test('disabled input and letterbox presses send and capture nothing', () => {
+  const h = mouse();
+  h.enabled = false;
+  assert.equal(h.mouse.down(at(220, 140)), false);
+  h.mouse.move(at(230, 140));
+  h.enabled = true;
+  assert.equal(h.mouse.down(at(10, 80)), false);
+  h.mouse.up(at(10, 80));
+  assert.deepEqual(h.messages, []);
+  // A second pointer while one is pressed abandons both.
+  h.mouse.down(at(220, 140));
+  assert.equal(h.mouse.down({ ...at(230, 140), pointerId: 2 }), false);
+  assert.deepEqual(h.sent(), ['pressButtonLeft 500 500', 'releaseAll  ']);
+});
+
+const keys = {
+  Escape: 0,
+  Tab: 49,
+  ShiftLeft: 86,
+  ControlLeft: 103,
+  Home: 43,
+  Enter: 102,
+  NumpadEnter: 102,
+  A: 71,
+  1: 29,
+  ',': 94,
+};
+test('keys map by code, then character, then physical position', () => {
+  const map = (code, key) => remoteKey({ code, key }, keys);
+  assert.equal(map('Escape', 'Escape'), keys.Escape);
+  assert.equal(map('KeyA', 'a'), keys.A);
+  assert.equal(map('KeyA', 'A'), keys.A);
+  assert.equal(map('Digit1', '!'), keys[1], 'shifted digit');
+  assert.equal(map('Comma', '<'), keys[','], 'shifted punctuation');
+  assert.equal(map('KeyA', 'ф'), keys.A, 'non-Latin layout');
+  assert.equal(map('KeyA', 'Dead'), keys.A, 'dead key');
+  assert.equal(map('KeyM', ','), keys[','], 'AZERTY comma keeps its meaning');
+  assert.equal(map('NumpadEnter', 'Enter'), keys.Enter);
+  assert.equal(map('Numpad7', 'Home'), keys.Home, 'numpad without Num Lock');
+  assert.equal(map('ContextMenu', 'ContextMenu'), undefined);
+  assert.equal(map('', 'constructor'), undefined);
+});
+
+function keyboard(t) {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const state = { enabled: true, messages: [], exits: 0 };
+  state.keyboard = createKeyboardController({
+    send: (message) => state.messages.push(message),
+    enabled: () => state.enabled,
+    key: (event) => remoteKey(event, keys),
+    escape: keys.Escape,
+    exit: () => {
+      state.exits += 1;
+    },
+  });
+  state.sent = () =>
+    state.messages.map((m) => [
+      Behavior[m.type] === 'keyboardPressKey' ? 'down' : 'up',
+      m.key[0],
+    ]);
+  return state;
+}
+const key = (code, value = code, extra = {}) => ({
+  code,
+  key: value,
+  ...extra,
+});
+
+test('releases match their physical key even when the character changed', (t) => {
+  const h = keyboard(t);
+  assert.equal(h.keyboard.down(key('ShiftLeft', 'Shift')), true);
+  h.keyboard.down(key('Digit1', '!', { shiftKey: true }));
+  assert.equal(h.keyboard.holds(keys.ShiftLeft), true);
+  h.keyboard.up(key('ShiftLeft', 'Shift'));
+  assert.equal(h.keyboard.up(key('Digit1', '1')), true);
+  assert.deepEqual(h.sent(), [
+    ['down', keys.ShiftLeft],
+    ['down', keys[1]],
+    ['up', keys.ShiftLeft],
+    ['up', keys[1]],
+  ]);
+});
+test('auto-repeat is forwarded; unmapped, composing and disabled keys are not', (t) => {
+  const h = keyboard(t);
+  h.keyboard.down(key('KeyA', 'a'));
+  h.keyboard.down(key('KeyA', 'a', { repeat: true }));
+  h.keyboard.up(key('KeyA', 'a'));
+  assert.deepEqual(h.sent(), [
+    ['down', keys.A],
+    ['down', keys.A],
+    ['up', keys.A],
+  ]);
+  h.messages.length = 0;
+  assert.equal(h.keyboard.down(key('KeyA', 'Process')), false);
+  assert.equal(h.keyboard.down(key('KeyA', 'a', { isComposing: true })), false);
+  assert.equal(h.keyboard.down(key('ContextMenu')), false);
+  assert.equal(h.keyboard.up(key('KeyA', 'a')), false);
+  h.enabled = false;
+  assert.equal(h.keyboard.down(key('KeyA', 'a')), false);
+  assert.deepEqual(h.messages, []);
+});
+test('a short Escape is sent on release; holding it leaves without sending', (t) => {
+  const h = keyboard(t);
+  assert.equal(h.keyboard.down(key('Escape')), true);
+  assert.deepEqual(h.messages, []);
+  t.mock.timers.tick(100);
+  h.keyboard.up(key('Escape'));
+  assert.deepEqual(h.sent(), [
+    ['down', keys.Escape],
+    ['up', keys.Escape],
+  ]);
+  h.messages.length = 0;
+  h.keyboard.down(key('Escape'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS - 1);
+  assert.equal(
+    h.keyboard.down(key('Escape', 'Escape', { repeat: true })),
+    true
+  );
+  assert.equal(h.exits, 0);
+  t.mock.timers.tick(1);
+  assert.equal(h.exits, 1);
+  assert.equal(h.keyboard.up(key('Escape')), false);
+  assert.deepEqual(h.messages, []);
+});
+test('modified Escape, or Escape with keys held, is sent at once', (t) => {
+  const h = keyboard(t);
+  h.keyboard.down(key('ShiftLeft', 'Shift'));
+  h.keyboard.down(key('Escape', 'Escape', { shiftKey: true }));
+  h.keyboard.up(key('Escape'));
+  h.keyboard.up(key('ShiftLeft', 'Shift'));
+  h.keyboard.down(key('KeyA', 'a'));
+  h.keyboard.down(key('Escape'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS * 2);
+  assert.equal(h.exits, 0);
+  assert.deepEqual(h.sent().slice(0, 4), [
+    ['down', keys.ShiftLeft],
+    ['down', keys.Escape],
+    ['up', keys.Escape],
+    ['up', keys.ShiftLeft],
+  ]);
+  assert.deepEqual(h.sent().slice(4), [
+    ['down', keys.A],
+    ['down', keys.Escape],
+  ]);
+});
+test('another key during a pending Escape sends the Escape first', (t) => {
+  const h = keyboard(t);
+  h.keyboard.down(key('Escape'));
+  h.keyboard.down(key('KeyA', 'a'));
+  t.mock.timers.tick(ESCAPE_HOLD_MS * 2);
+  h.keyboard.up(key('Escape'));
+  h.keyboard.up(key('KeyA', 'a'));
+  assert.equal(h.exits, 0);
+  assert.deepEqual(h.sent(), [
+    ['down', keys.Escape],
+    ['down', keys.A],
+    ['up', keys.Escape],
+    ['up', keys.A],
+  ]);
+});
+test('reset forgets held keys and a pending Escape', (t) => {
+  const h = keyboard(t);
+  h.keyboard.down(key('ControlLeft', 'Control'));
+  assert.equal(h.keyboard.holds(keys.ControlLeft), true);
+  h.keyboard.reset();
+  assert.equal(h.keyboard.holds(keys.ControlLeft), false);
+  h.keyboard.down(key('Escape'));
+  h.keyboard.reset();
+  t.mock.timers.tick(ESCAPE_HOLD_MS * 2);
+  h.keyboard.up(key('Escape'));
+  h.keyboard.up(key('ControlLeft', 'Control'));
+  assert.equal(h.exits, 0);
+  assert.deepEqual(h.sent(), [['down', keys.ControlLeft]]);
+});
