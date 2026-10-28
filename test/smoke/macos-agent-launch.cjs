@@ -145,11 +145,15 @@ application.run()
     if (fixturePid) {
       try {
         process.kill(fixturePid, 'SIGTERM');
-      } catch {}
+      } catch {
+        // Already exited.
+      }
     }
     try {
       execFileSync(lsregister, ['-u', application]);
-    } catch {}
+    } catch {
+      // Never registered.
+    }
     await rm(root, { recursive: true, force: true });
   }
 })().catch((error) => {

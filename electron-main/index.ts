@@ -50,6 +50,7 @@ import {
   parseControllerSession,
 } from './renderer-security';
 import { DesktopSessionReader } from './session-reader';
+import { isSmokeRun, SmokeRun } from './smoke-run';
 
 import type { ApplicationIdentity } from './app-identity';
 import type { NativeApplication, NativeWindow } from './native-window';
@@ -58,6 +59,8 @@ import type { nutjsTs } from './types';
 import type { ICaptureSource, IIpcRendererData } from '../src/pure-interface';
 
 let nutjs: nutjsTs;
+
+const smokeRun = isSmokeRun(process.argv) ? new SmokeRun(app) : undefined;
 
 const windowsCaptureEnabled =
   platform !== 'win32' || enableWindowsCapture(app.commandLine);
@@ -88,7 +91,8 @@ const appName = app.isPackaged
   ? app.getName()
   : process.env.PALMDESK_APP_NAME || 'PalmDesk Dev';
 app.setName(appName);
-const userData = path.join(app.getPath('appData'), appName);
+const userData =
+  smokeRun?.profile ?? path.join(app.getPath('appData'), appName);
 mkdirSync(userData, { recursive: true });
 app.setPath('userData', userData);
 app.setPath('sessionData', userData);
@@ -485,6 +489,7 @@ function main() {
     frame: false,
   });
   mainWindow = win;
+  smokeRun?.watch(win);
   void loadApp(win);
 
   // Notify about new releases; never download or install anything.
@@ -505,7 +510,7 @@ function main() {
     onChange: (status) =>
       sendToWindow(mainWindow, IPC_EVENT.response_releaseStatus, status),
   });
-  releaseChecker.start();
+  if (!smokeRun) releaseChecker.start();
 
   win.webContents.on('render-process-gone', () => {
     void captureSession.end();
@@ -636,6 +641,8 @@ function main() {
       try {
         if (!senderWindow(event, 'main'))
           throw new Error('无权访问本机捕获会话');
+        // Nothing in a smoke run may prompt for screen or input permissions.
+        if (smokeRun) throw new Error('Smoke runs never capture or control');
         return {
           code: 0,
           requestId: request?.requestId,
@@ -792,6 +799,7 @@ function main() {
 }
 
 app.on('ready', async () => {
+  smokeRun?.blockNetwork(session.defaultSession);
   try {
     if (platform === 'darwin') {
       const identity =
@@ -805,10 +813,13 @@ app.on('ready', async () => {
     }
   } catch (error) {
     nativeWindows.close();
-    dialog.showErrorBox(
-      'PalmDesk 应用身份冲突',
-      error instanceof Error ? error.message : String(error)
-    );
+    // A dialog would hold a smoke run open until CI times out.
+    if (smokeRun) smokeRun.fail(error);
+    else
+      dialog.showErrorBox(
+        'PalmDesk 应用身份冲突',
+        error instanceof Error ? error.message : String(error)
+      );
     app.exit(1);
     return;
   }

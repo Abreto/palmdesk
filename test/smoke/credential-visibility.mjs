@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax, require-await */
 // Run after pnpm build:prod. Real Vue, persisted state, Socket.IO and QR decoder;
 // device APIs and the desktop IPC bridge use disposable fixtures.
 import assert from 'node:assert/strict';

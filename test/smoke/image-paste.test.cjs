@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax, require-await -- Cases run in sequence; async input-driver doubles match the production contract. */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
