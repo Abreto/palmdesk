@@ -183,6 +183,7 @@ When migrating from the former Codex Remote development build, the application i
 Run the source checks and web build:
 
 ```bash
+pnpm lint
 pnpm test:smoke
 pnpm typecheck
 pnpm build:prod
