@@ -202,6 +202,14 @@ node scripts/dev.mjs --prepare-only
 
 Windows 可执行 `pnpm exec electron test/smoke/electron-video-quality.cjs`。测试会短暂显示自己的窗口，结果写入 `.local/video-quality/result.json`，包含实际显示器缩放比例。普通显示器上的结果不代表已经完成 Retina 或手机实机验收。
 
+保持唤醒烟测在真实 Electron 中驱动 `electron-main/keep-awake.ts` 和系统的 `powerSaveBlocker`，不打开窗口、不需要后端，也不修改电源设置：
+
+```bash
+pnpm exec electron test/smoke/electron-keep-awake.cjs
+```
+
+macOS 上读取 `pmset -g assertions`，确认开启后本进程恰好持有一个阻止空闲系统睡眠的断言（显示为 `NoIdleSleepAssertion`）、没有阻止显示器睡眠的断言，关闭、退出释放和重新启动恢复后的状态也正确；其他平台只检查 Electron 报告的状态。设置 `SMOKE_KEEP_AWAKE_HOLD=60` 会在开启状态停留 60 秒，可在 Windows 管理员终端运行 `powercfg /requests`，在 `EXECUTION` 下查看该请求。结果写入 `.local/keep-awake/result.json`。烟测不等待真实的空闲睡眠时间，也不验证熄屏、锁屏或合盖行为。
+
 业务流程烟测需要运行中的前端和后端：
 
 ```bash

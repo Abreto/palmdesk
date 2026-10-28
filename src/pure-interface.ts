@@ -97,3 +97,13 @@ export interface IReleaseStatus {
   /** The last check was requested by the user. */
   manual?: boolean;
 }
+
+export interface IKeepAwakeStatus {
+  /** The saved choice for this desktop installation; off by default. */
+  enabled: boolean;
+  /** PalmDesk holds a blocker against automatic idle sleep. */
+  active: boolean;
+  supported: boolean;
+  /** Why the option is on but not in effect. */
+  error?: string;
+}
