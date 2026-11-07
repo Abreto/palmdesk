@@ -22,7 +22,10 @@ operator actions; this rename does not publish images or update a running servic
 When switching, update both image references to the same commit tag. Keep the
 existing MySQL database/user, Redis, secrets, volumes and service configuration.
 No database rename or data migration is required. The existing `palmdesk:*`
-Redis keys are retained for compatibility.
+Redis keys are retained for compatibility. Keep
+`NODE_APP_RELEASE_PROJECT_NAME=palmdesk-server` (or your existing custom value):
+the pinned upstream backend derives its device Redis keys from this variable,
+so it remains a storage namespace rather than adopting the new product name.
 
 The new official address is `https://tenori.abreto.icu`. During the transition,
 serve `https://palmdesk.abreto.icu` from the same web frontend and backend without
