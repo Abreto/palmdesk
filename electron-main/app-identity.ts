@@ -13,13 +13,13 @@ export function assertUniqueApplicationIdentity(
   packaged: boolean
 ) {
   if (
-    !/^io\.github\.abreto\.palmdesk(?:\.(?:local|worktree)\.[a-f0-9]{10}(?:\.dev)?)?$/.test(
+    !/^io\.github\.abreto\.tenori(?:\.(?:local|worktree)\.[a-f0-9]{10}(?:\.dev)?)?$/.test(
       identity.bundleId
     ) ||
     identity.bundleId.endsWith('.dev') === packaged ||
     realpathSync(identity.executablePath) !== realpathSync(executable)
   ) {
-    throw new Error('应用身份与当前进程不一致，请重新构建 PalmDesk 后启动。');
+    throw new Error('应用身份与当前进程不一致，请重新构建过目后启动。');
   }
   const current = realpathSync(identity.bundlePath);
   const conflicts = [

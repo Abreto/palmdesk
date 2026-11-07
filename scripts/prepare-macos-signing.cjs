@@ -91,7 +91,7 @@ function prepare() {
     throw new Error(
       'Signing requires the certificate and password secrets, RUNNER_TEMP and GITHUB_ENV.'
     );
-  const directory = mkdtempSync(path.join(RUNNER_TEMP, 'palmdesk-signing-'));
+  const directory = mkdtempSync(path.join(RUNNER_TEMP, 'tenori-signing-'));
   const keychain = path.join(directory, 'signing.keychain-db');
   const p12 = path.join(directory, 'certificate.p12');
   const pem = path.join(directory, 'certificate.pem');
@@ -99,7 +99,7 @@ function prepare() {
   // Make the always-run cleanup step available even if setup is interrupted.
   appendFileSync(
     GITHUB_ENV,
-    `CSC_KEYCHAIN=${keychain}\nPALMDESK_SIGNING_DIR=${directory}\n`
+    `CSC_KEYCHAIN=${keychain}\nTENORI_SIGNING_DIR=${directory}\n`
   );
   try {
     console.log('Importing the fixed certificate into a temporary keychain.');
@@ -184,7 +184,7 @@ function prepare() {
         'The fixed certificate and private key are not usable for code signing.'
       );
     console.log(
-      'Fixed PalmDesk signing identity is ready in a temporary keychain.'
+      'Fixed Tenori signing identity is ready in a temporary keychain.'
     );
   } catch (error) {
     try {
@@ -199,8 +199,8 @@ function prepare() {
 try {
   if (process.platform !== 'darwin') throw new Error('macOS is required.');
   if (process.argv[2] === 'prepare') prepare();
-  else if (process.argv[2] === 'cleanup' && process.env.PALMDESK_SIGNING_DIR)
-    cleanup(process.env.PALMDESK_SIGNING_DIR);
+  else if (process.argv[2] === 'cleanup' && process.env.TENORI_SIGNING_DIR)
+    cleanup(process.env.TENORI_SIGNING_DIR);
   else throw new Error('Usage: prepare-macos-signing.cjs prepare|cleanup');
 } catch (error) {
   console.error(error.message);

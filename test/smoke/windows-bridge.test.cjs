@@ -78,11 +78,11 @@ test('helper paths distinguish Windows resources from the macOS executable direc
   const resources = path.resolve('packaged-resources');
   assert.equal(
     nativeHelperPath('win32', main),
-    path.resolve('native-bin/palmdesk-window.exe')
+    path.resolve('native-bin/tenori-window.exe')
   );
   assert.equal(
     nativeHelperPath('win32', main, resources),
-    path.join(resources, 'native/palmdesk-window.exe')
+    path.join(resources, 'native/tenori-window.exe')
   );
   assert.equal(
     nativeHelperPath('darwin', main, resources),
@@ -103,7 +103,7 @@ test('Windows helper starts hidden and preserves structured errors and request I
       'node:child_process': {
         spawn: (executable, args, options) => {
           spawned += 1;
-          assert.equal(executable, 'palmdesk-window.exe');
+          assert.equal(executable, 'tenori-window.exe');
           assert.deepEqual(args, []);
           assert.equal(options.windowsHide, true);
           return child;
@@ -125,7 +125,7 @@ test('Windows helper starts hidden and preserves structured errors and request I
       )}\n`
     );
   });
-  const bridge = new NativeWindowBridge('palmdesk-window.exe', 'win32');
+  const bridge = new NativeWindowBridge('tenori-window.exe', 'win32');
   try {
     assert.deepEqual(await bridge.request('list'), []);
     await assert.rejects(bridge.request('focus'), (error) => {

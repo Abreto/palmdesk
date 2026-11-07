@@ -9,10 +9,10 @@ const { assertUniqueApplicationIdentity } = load(
 );
 
 test('runtime identity accepts path aliases but rejects duplicate apps, shared Electron, and the wrong executable', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'palmdesk-startup-'));
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'tenori-startup-'));
   try {
-    const bundle = path.join(root, 'PalmDesk.app');
-    const duplicate = path.join(root, 'worktree', 'PalmDesk.app');
+    const bundle = path.join(root, 'Tenori.app');
+    const duplicate = path.join(root, 'worktree', 'Tenori.app');
     fs.mkdirSync(bundle);
     fs.mkdirSync(duplicate, { recursive: true });
     const alias = path.join(root, 'alias.app');
@@ -22,7 +22,7 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
       process.platform === 'win32' ? 'junction' : 'dir'
     );
     const identity = {
-      bundleId: 'io.github.abreto.palmdesk',
+      bundleId: 'io.github.abreto.tenori',
       bundlePath: bundle,
       executablePath: process.execPath,
       registeredPaths: [bundle, alias],
@@ -40,7 +40,7 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
     );
     for (const invalid of [
       { bundleId: 'com.github.Electron' },
-      { bundleId: 'io.github.abreto.palmdesk.dev' },
+      { bundleId: 'io.github.abreto.tenori.dev' },
       { executablePath: bundle },
     ]) {
       assert.throws(
@@ -56,7 +56,7 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
     assert.throws(
       () =>
         assertUniqueApplicationIdentity(
-          { ...identity, bundleId: 'io.github.abreto.palmdesk.dev' },
+          { ...identity, bundleId: 'io.github.abreto.tenori.dev' },
           process.execPath,
           false
         ),
@@ -66,7 +66,7 @@ test('runtime identity accepts path aliases but rejects duplicate apps, shared E
       for (const packaged of [true, false]) {
         const isolated = {
           ...identity,
-          bundleId: `io.github.abreto.palmdesk.${scope}.0123456789${packaged ? '' : '.dev'}`,
+          bundleId: `io.github.abreto.tenori.${scope}.0123456789${packaged ? '' : '.dev'}`,
         };
         assertUniqueApplicationIdentity(isolated, process.execPath, packaged);
         assert.throws(
@@ -95,7 +95,7 @@ test('startup validates identity before singleton handoff or loading the permiss
       electron: {
         app: {
           isPackaged: false,
-          getName: () => 'PalmDesk Dev',
+          getName: () => 'Tenori Dev',
           setName() {},
           getPath: () => '/tmp',
           setPath() {},

@@ -80,7 +80,7 @@ async function main() {
     server.once('error', reject);
     server.listen(config.port, '0.0.0.0', resolve);
   });
-  console.log(`PalmDesk API and signaling listening on port ${config.port}`);
+  console.log(`Tenori API and signaling listening on port ${config.port}`);
 }
 
 main().catch((error) => {

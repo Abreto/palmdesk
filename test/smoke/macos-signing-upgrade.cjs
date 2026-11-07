@@ -13,10 +13,10 @@ test('different app and native helper builds satisfy the previous signed identit
   assert.equal(process.platform, 'darwin');
   assert.ok(process.env.CSC_KEYCHAIN, 'Prepare the signing keychain first.');
   const directory = mkdtempSync(
-    path.join(os.tmpdir(), 'palmdesk-signing-upgrade-')
+    path.join(os.tmpdir(), 'tenori-signing-upgrade-')
   );
   t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const id = 'io.github.abreto.palmdesk.signing-test';
+  const id = 'io.github.abreto.tenori.signing-test';
   const entitlements = path.join(directory, 'entitlements.plist');
   writeFileSync(
     entitlements,

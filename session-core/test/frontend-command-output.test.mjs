@@ -1,4 +1,4 @@
-// Modified for PalmDesk: add incomplete/truncated Markdown regressions.
+// Modified for Tenori: add incomplete/truncated Markdown regressions.
 // Original Glassline tests are Apache-2.0.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

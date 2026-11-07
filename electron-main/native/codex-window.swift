@@ -50,7 +50,7 @@ enum WindowError: String, Error {
     var message: String {
         switch self {
         case .unavailable: return "Target window is no longer available"
-        case .permission: return "Accessibility permission is required for the PalmDesk native window helper"
+        case .permission: return "Accessibility permission is required for the Tenori native window helper"
         case .ambiguous: return "Cannot identify the exact accessibility window"
         case .focus: return "The selected window could not be focused"
         case .space: return "Could not switch to the selected window's desktop"

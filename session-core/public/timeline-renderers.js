@@ -1,4 +1,4 @@
-// Modified for PalmDesk: guarantee progress for incomplete Markdown markers.
+// Modified for Tenori: guarantee progress for incomplete Markdown markers.
 // Original Glassline code is Apache-2.0.
 export function groupTimelineItems(items) {
   const grouped = [];

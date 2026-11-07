@@ -1,8 +1,18 @@
 # Changelog
 
-All notable changes to PalmDesk are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [semantic versioning](https://semver.org/) while the project is in `0.0.x` preview. Each release lists its security-relevant changes under **Security**; advisories are also published under [GitHub security advisories](https://github.com/Abreto/palmdesk/security/advisories).
+All notable changes to Tenori are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [semantic versioning](https://semver.org/) while the project is in `0.0.x` preview. Each release lists its security-relevant changes under **Security**; advisories are also published under [GitHub security advisories](https://github.com/Abreto/palmdesk/security/advisories).
 
 ## [Unreleased]
+
+### v0.0.9 preview draft — Tenori migration
+
+- PalmDesk is now **Tenori**, with the Chinese name **过目** ("for your review"). The existing window-in-a-palm artwork keeps its geometry and colors; product text, asset names and installers adopt the new name. ([#93](https://github.com/Abreto/palmdesk/issues/93))
+- **macOS:** the bundle ID changes from `io.github.abreto.palmdesk` to `io.github.abreto.tenori`, including development and helper identities. Quit PalmDesk, install `Tenori.app` (displayed as **过目** in Chinese), grant **Screen Recording** and **Accessibility** again, then remove the old `PalmDesk.app`. Restart Tenori after granting permissions. The fixed signing certificate is retained, but the new bundle ID makes this a new app to macOS.
+- **Windows:** the new app ID changes the installer identity. Tenori installs **side by side** with PalmDesk rather than upgrading it. Quit and uninstall the old PalmDesk app after installing Tenori. The new desktop app has a separate data directory on both platforms; reconnect devices and reapply any self-hosted service settings. Do not remove your self-hosted server data.
+- The default desktop API, signaling and phone invitation address becomes **https://tenori.abreto.icu**. The operator must confirm DNS, HTTPS and routing before release. **https://palmdesk.abreto.icu** remains an alias to the same backend during the transition; saved custom service addresses still work. Browser preferences are separate on the new origin.
+- Self-hosters can switch to `ghcr.io/abreto/tenori-web` and `ghcr.io/abreto/tenori-backend` after publication. Existing `palmdesk-*` images and published tags remain available during the transition. Preserve the database, Redis, secrets and volumes; see the [migration guide](containers/README.md#migration-from-palmdesk).
+
+中文迁移提示：PalmDesk 更名为**过目（Tenori）**。macOS 需重新授予屏幕录制和辅助功能权限，授权后重启，并移除旧 App；Windows 安装为独立应用，安装后请卸载旧 PalmDesk。两平台均需重新配置新应用的连接信息。新默认服务地址为 **https://tenori.abreto.icu**，旧域名和旧镜像在过渡期保留；发版前仍需确认域名及实机验收。
 
 ## [0.0.8] - 2026-10-27
 

@@ -39,7 +39,7 @@ test(
   },
   async () => {
     const directory = await realpath(
-      await mkdtemp(path.join(os.tmpdir(), 'palmdesk-app-paths-'))
+      await mkdtemp(path.join(os.tmpdir(), 'tenori-app-paths-'))
     );
     const executable = path.join(directory, 'Codex.exe');
     try {
@@ -78,7 +78,7 @@ test(
   async () => {
     // Windows CI's TEMP may use an 8.3 alias; PowerShell resolves the long path.
     const directory = await realpath(
-      await mkdtemp(path.join(os.tmpdir(), 'palmdesk-msix-'))
+      await mkdtemp(path.join(os.tmpdir(), 'tenori-msix-'))
     );
     const packageDirectory = path.join(directory, 'Claude 测试');
     const executable = path.join(packageDirectory, 'app', 'Claude.exe');

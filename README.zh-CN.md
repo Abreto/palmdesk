@@ -1,16 +1,20 @@
-# PalmDesk
+# 过目（Tenori）
+
+**桌面 AI Agent，尽在掌中。**「过目」取自「请您过目」，英文名 Tenori，原名 PalmDesk。
 
 [English](README.md) | 简体中文
 
 面向 AI agent 工作流优化的 AI-native 远程控制：在手机浏览器中阅读本地 AI 会话，并操作 macOS 或 Windows 上的单个应用窗口。
 
-PalmDesk 由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。产品以 agent-ready workflows 为目标，围绕用户使用 AI agent 的流程做专门优化：发现 Agent 应用、阅读支持的本地会话，再回到原应用窗口继续操作。从手机浏览器即可与 macOS 或 Windows 上的 Codex、ChatGPT、Claude、Kimi、ZCode 或终端交互；电脑浏览器也可作为控制端。
+过目由 [Abreto](https://github.com/Abreto) 维护，基于 [BilldDesk](https://github.com/galaxy-s10/billd-desk) 开源版开发。产品以 agent-ready workflows 为目标，围绕用户使用 AI agent 的流程做专门优化：发现 Agent 应用、阅读支持的本地会话，再回到原应用窗口继续操作。从手机浏览器即可与 macOS 或 Windows 上的 Codex、ChatGPT、Claude、Kimi、ZCode 或终端交互；电脑浏览器也可作为控制端。
 
-**状态：实验性预览版，尚未发布稳定版。** 打包后的桌面客户端默认连接官方后端 [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu)。连接设备后，电脑已开启会话阅读时默认进入阅读页，否则进入 Agent 目录；选择窗口后才开始捕获。“打开即恢复到上次窗口”属于后续计划。历史依赖审计结果和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
+**从 PalmDesk 迁移：** 下一版 v0.0.9 预览版使用新的应用身份。macOS 需要重新授予屏幕录制和辅助功能权限，并移除旧 App；Windows 会与旧版并排安装，需另行卸载 PalmDesk。新应用需重新设置连接信息，中文显示名为「过目」，安装文件和 `.app` 路径使用 Tenori。旧服务域名和已发布镜像在过渡期仍可用，详见[迁移说明](CHANGELOG.md#unreleased)和[自托管指南](containers/README.md#migration-from-palmdesk)。新域名由 Abreto 在发版前确认。
+
+**状态：实验性预览版，尚未发布稳定版。** 打包后的桌面客户端默认连接官方后端 [https://tenori.abreto.icu](https://tenori.abreto.icu)。连接设备后，电脑已开启会话阅读时默认进入阅读页，否则进入 Agent 目录；选择窗口后才开始捕获。“打开即恢复到上次窗口”属于后续计划。历史依赖审计结果和发布前待办见 [开源准备记录](docs/OPEN_SOURCE_READINESS.md)。
 
 ## 会话阅读（预览）
 
-PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。支持 **macOS 和 Windows 上当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话**，按更新时间混合展示并标明来源。
+过目现已内置从 Glassline 迁入的会话读取模块，无须单独部署 Glassline。支持 **macOS 和 Windows 上当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 会话**，按更新时间混合展示并标明来源。
 
 | 本地来源 | macOS 主机 | Windows 主机 |
 | --- | --- | --- |
@@ -21,9 +25,9 @@ PalmDesk 现已内置从 Glassline 迁入的会话读取模块，无须单独部
 
 Codex 读取 `CODEX_HOME` 或 `~/.codex`。Claude Code 读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`，支持会话重命名、文字回复和工具结果。Windows 上的 `~` 是当前用户的主目录（通常为 `%USERPROFILE%`）。Claude Desktop 在 macOS 上读取 `~/Library/Application Support/Claude` 和 `Claude-3p`；在 Windows 上检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下对应的应用包目录。`CLAUDE_USER_DATA_DIR` 可指定唯一的自定义 Desktop 目录。兼容全局及会话专属日志，保留 Desktop 标题，并对共享日志去重。
 
-自定义目录需设置在启动 PalmDesk 的环境中，支持空格和非 ASCII 路径。读取仅限本地且只读，不自动搜索 WSL 主目录，跳过 Desktop SSH/WSL 索引和嵌套子 Agent 日志，不抓取云端记录；本地日志仍需存在且可读。Linux 主机不支持会话阅读。Windows 存储核对和自动化检查见 [验证记录](docs/smoke-artifacts/windows-session-reading-2026-09-24.md)；三种来源的真实 Windows 主机 + 手机完整流程仍未验收。
+自定义目录需设置在启动过目的环境中，支持空格和非 ASCII 路径。读取仅限本地且只读，不自动搜索 WSL 主目录，跳过 Desktop SSH/WSL 索引和嵌套子 Agent 日志，不抓取云端记录；本地日志仍需存在且可读。Linux 主机不支持会话阅读。Windows 存储核对和自动化检查见 [验证记录](docs/smoke-artifacts/windows-session-reading-2026-09-24.md)；三种来源的真实 Windows 主机 + 手机完整流程仍未验收。
 
-1. 在电脑 PalmDesk 首页开启「会话阅读」，允许已连接设备读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 回复及工具输出。设置默认关闭，保存在当前安装的应用数据目录。
+1. 在电脑过目首页开启「会话阅读」，允许已连接设备读取当前用户的 Codex、Claude Code 和 Claude Desktop 本地 Code 回复及工具输出。设置默认关闭，保存在当前安装的应用数据目录。
 2. 用手机扫码或设备代码连接，默认进入「阅读」页，按项目、标题或最近消息搜索并打开会话。单独阅读不要求启动窗口捕获，也不需要屏幕录制和辅助功能权限。
 3. 阅读页支持 Markdown、复制和历史分页；命令、工具输出与差异默认折叠。页面可见时每 8 秒检查所选会话，发现变化后显示提示，点击后转到最新内容。
 4. 点击「去窗口继续」切到窗口视图，尚未选窗时选择原应用窗口。可以关联当前窗口，但发送 prompt 前仍需确认 GUI 中打开的是目标任务。阅读／窗口切换保留连接、阅读位置和未发送的输入草稿；阅读时会释放按键、阻止窗口输入并暂停视频传输。
@@ -63,15 +67,15 @@ Linux 暂无原生主机适配器，会拒绝捕获和输入。浏览器控制�
 
 连接 macOS 或 Windows 主机并选择 Codex 窗口后，在底部使用「选择图片」「粘贴图片」，或在文字框中长按粘贴图片。第一版支持单张 PNG/JPEG，最大 10 MiB、约 2500 万像素，单边不超过 16384 像素；不支持 HEIC、GIF 或其他文件。传输保留原始图片字节，主机解码后写入图片剪贴板，不缩放、不做有损重压缩。Windows 根据可执行文件和进程身份识别 Codex，不依赖窗口标题；其他应用不展示这些图片控件。
 
-先在远程画面中点一下 Codex 的 prompt 输入框，再点击「粘贴到 Codex」。电脑校验当前控制会话和窗口身份，将图片写入系统剪贴板，在 macOS 执行 `Cmd+V`，在 Windows 执行 `Ctrl+V`；原有文字草稿保留，由你确认附件后发送消息。当前只验证窗口焦点，不自动定位 prompt 输入框，也不自动选择 GUI 任务。粘贴会把电脑剪贴板替换为该图片。Windows 检测到窗口或进程身份变化、前台焦点丢失、仍有输入按下或权限不足时会停止粘贴；请松开按键和鼠标按钮、切回目标窗口后重试，并以相同权限级别运行 Codex 与 PalmDesk（通常均不使用管理员权限）。
+先在远程画面中点一下 Codex 的 prompt 输入框，再点击「粘贴到 Codex」。电脑校验当前控制会话和窗口身份，将图片写入系统剪贴板，在 macOS 执行 `Cmd+V`，在 Windows 执行 `Ctrl+V`；原有文字草稿保留，由你确认附件后发送消息。当前只验证窗口焦点，不自动定位 prompt 输入框，也不自动选择 GUI 任务。粘贴会把电脑剪贴板替换为该图片。Windows 检测到窗口或进程身份变化、前台焦点丢失、仍有输入按下或权限不足时会停止粘贴；请松开按键和鼠标按钮、切回目标窗口后重试，并以相同权限级别运行 Codex 与过目（通常均不使用管理员权限）。
 
 图片经已认证连接的独立 WebRTC 通道分块传到主机，不使用云端文件存储。切换到阅读、仅观看、断开或结束窗口控制时会取消待处理操作。若图片连接断开，可点「重新连接图片」后手动重试，已选图片会保留。若显示结果未确认，先检查 Codex 附件再重试，避免重复粘贴；已经交给操作系统的输入无法撤销。主动读取手机剪贴板需要 HTTPS 和浏览器允许粘贴；不可用时使用选图入口。两端均需更新到支持此功能的版本。临时原生测试窗口已验证 Windows 真实剪贴板像素、`Ctrl+V`、中英文草稿保留、取消和目标拒绝；真实手机连接 Codex 的附件显示、iOS Safari 及提权目标恢复仍待实机验收，详见 [Windows 图片粘贴验证记录](docs/smoke-artifacts/windows-image-paste-2026-09-24.md)。
 
 ## 安装预览版
 
-从 [GitHub Releases](https://github.com/Abreto/palmdesk/releases) 下载 Apple Silicon Mac DMG 或 Windows x64 安装包。使用安装包无需安装 Node.js、pnpm 或开发工具。Mac 打开 DMG 后将 PalmDesk 拖入 Applications，Windows 运行安装向导；随后在手机网页扫码或输入设备凭据连接。
+从 [GitHub Releases](https://github.com/Abreto/palmdesk/releases) 下载 Apple Silicon Mac DMG 或 Windows x64 安装包。使用安装包无需安装 Node.js、pnpm 或开发工具。Mac 打开 DMG 后将过目拖入 Applications，Windows 运行安装向导；随后在手机网页扫码或输入设备凭据连接。
 
-桌面端每天向 GitHub Releases 查询一次，发现新版本时显示提示，包含安全修复的版本会醒目提示。PalmDesk 不会自动下载或安装更新。如需立即检查，可在 macOS 应用菜单选择“检查更新”，或使用“高级设置”中的检查按钮；每日检查也在该处关闭，关闭后不会发出更新请求。
+桌面端每天向 GitHub Releases 查询一次，发现新版本时显示提示，包含安全修复的版本会醒目提示。过目不会自动下载或安装更新。如需立即检查，可在 macOS 应用菜单选择“检查更新”，或使用“高级设置”中的检查按钮；每日检查也在该处关闭，关闭后不会发出更新请求。
 
 暂不提供 Intel Mac 安装包。Mac 预览版需要 macOS 13 Ventura 及以上，在 macOS 15 构建，macOS 13 和 14 尚未验收；Windows 需要 Windows 10 1903 及以上 / Windows 11 x64，并具有可用的 Windows Graphics Capture。从 v0.0.3 起，macOS 使用固定自签名证书，尚无 Developer ID 签名和公证；Windows 安装包未签名。安装和发布说明见 [桌面安装包与预发布](docs/DESKTOP_RELEASES.md)。
 
@@ -85,9 +89,9 @@ cp .env.example .env.local
 pnpm dev:desktop
 ```
 
-Windows PowerShell 将复制环境文件的命令替换为 `Copy-Item .env.example .env.local`。首次运行会编译 `native-bin/palmdesk-window.exe`，随后启动 Electron。使用 `pnpm dev:desktop:lan` 可开放开发网页供局域网手机访问。Windows 运行和测试说明见 [Windows 桌面](docs/LOCAL_DEVELOPMENT.md#windows-桌面)。
+Windows PowerShell 将复制环境文件的命令替换为 `Copy-Item .env.example .env.local`。首次运行会编译 `native-bin/tenori-window.exe`，随后启动 Electron。使用 `pnpm dev:desktop:lan` 可开放开发网页供局域网手机访问。Windows 运行和测试说明见 [Windows 桌面](docs/LOCAL_DEVELOPMENT.md#windows-桌面)。
 
-打包后的桌面客户端默认连接 `https://palmdesk.abreto.icu`，手机邀请网页也使用该地址。网页构建默认同源，开发模式使用本地后端代理，两端必须连接同一个服务。自部署可使用本仓库的 [容器适配层](containers/README.md)，它基于固定 BilldDesk 后端快照提供会话认证和 Cloudflare/coturn 临时凭据，需要 MySQL 和 Redis。部署顺序和浏览器测试方法见 [开发环境](docs/LOCAL_DEVELOPMENT.md)，地址、HTTPS 和 TURN 配置见 [服务配置](docs/SERVICE_CONFIGURATION.md)。
+打包后的桌面客户端默认连接 `https://tenori.abreto.icu`，手机邀请网页也使用该地址。网页构建默认同源，开发模式使用本地后端代理，两端必须连接同一个服务。自部署可使用本仓库的 [容器适配层](containers/README.md)，它基于固定 BilldDesk 后端快照提供会话认证和 Cloudflare/coturn 临时凭据，需要 MySQL 和 Redis。部署顺序和浏览器测试方法见 [开发环境](docs/LOCAL_DEVELOPMENT.md)，地址、HTTPS 和 TURN 配置见 [服务配置](docs/SERVICE_CONFIGURATION.md)。
 
 使用默认 `.env.local` 时，设备注册和连接需要本机 `4300` 端口上的后端；启动桌面端或网页不会自动启动后端。使用其他服务时，在 `.env.local` 或客户端连接设置中配置地址，界面保存的设置优先于环境变量默认值。
 
@@ -95,13 +99,13 @@ macOS 开发脚本编译 Swift 窗口辅助程序，并创建、本地签名独�
 
 ```text
 .local/electron-dev/Electron.app
-name: PalmDesk Local <id> Dev
-bundle ID: io.github.abreto.palmdesk.local.<id>.dev
+name: Tenori Local <id> Dev
+bundle ID: io.github.abreto.tenori.local.<id>.dev
 ```
 
-所有本地构建都按工作区隔离身份。以上名称和 bundle ID 用于主工作区或普通 clone；linked worktree 使用 `PalmDesk WT <id> Dev` 及 `io.github.abreto.palmdesk.worktree.<id>.dev`。本地打包版去掉名称中的 ` Dev` 和标识末尾的 `.dev`；只有显式 `--release` 构建才使用 `PalmDesk` 和 `io.github.abreto.palmdesk`。各身份的权限和配置独立，详情及旧版本迁移步骤见 [应用身份](docs/LOCAL_DEVELOPMENT.md#应用身份)。
+所有本地构建都按工作区隔离身份。以上名称和 bundle ID 用于主工作区或普通 clone；linked worktree 使用 `Tenori WT <id> Dev` 及 `io.github.abreto.tenori.worktree.<id>.dev`。本地打包版去掉名称中的 ` Dev` 和标识末尾的 `.dev`；只有显式 `--release` 构建才使用 `Tenori` 和 `io.github.abreto.tenori`。各身份的权限和配置独立，详情及旧版本迁移步骤见 [应用身份](docs/LOCAL_DEVELOPMENT.md#应用身份)。
 
-macOS 上需给当前工作区的开发应用（`PalmDesk Local <id> Dev` 或 `PalmDesk WT <id> Dev`）配置“屏幕录制”和“辅助功能”权限。观看当前桌面可捕获的窗口需要屏幕录制；切换桌面、还原窗口和发送输入还需要辅助功能，即使处于窗口只读模式也需要授权才能自动切换。屏幕录制授权后可能需要重启。从 Codex Remote 开发版迁移时，应用身份和本地数据目录已改变，需要重新授权和设置连接服务。
+macOS 上需给当前工作区的开发应用（`Tenori Local <id> Dev` 或 `Tenori WT <id> Dev`）配置“屏幕录制”和“辅助功能”权限。观看当前桌面可捕获的窗口需要屏幕录制；切换桌面、还原窗口和发送输入还需要辅助功能，即使处于窗口只读模式也需要授权才能自动切换。屏幕录制授权后可能需要重启。从 Codex Remote 开发版迁移时，应用身份和本地数据目录已改变，需要重新授权和设置连接服务。
 
 `pnpm doctor:desktop` 可检查使用冲突身份的旧构建；macOS 启动检查发现同一身份有多个已注册副本时，也会显示路径并退出。同一身份只保留一个可启动的安装位置，仅给旧 `.app` 改名不能消除冲突。
 
@@ -115,7 +119,7 @@ macOS 上需给当前工作区的开发应用（`PalmDesk Local <id> Dev` 或 `P
 
 也可在电脑的“手机扫码连接”区域设置手机网页地址，点击“显示二维码”，随后用手机网页里的扫码按钮、系统相机或微信扫描。临时密码和二维码每次启动时默认隐藏，各自提供独立的显示／隐藏按钮。二维码包含当前设备代码和临时密码，网页打开后自动连接；更新密码会使旧二维码失效、断开所有已连接的控制端，并重新隐藏新凭据。地址、HTTPS 和微信兼容性说明见 [扫码连接](docs/SERVICE_CONFIGURATION.md#扫码连接)。
 
-窗口列表和阅读内容通过已验证连接的 WebRTC DataChannel 传输，后端负责设备认证、信令和 TURN 凭据。自部署需使用 [容器说明](containers/README.md) 中与 PalmDesk 兼容的后端。窗口列表包含当前用户会话中 macOS 各桌面或 Windows 当前虚拟桌面的普通应用窗口，排除本客户端、桌面元素和整个屏幕。macOS 其他桌面、隐藏或最小化的窗口标注“未在当前桌面显示”，仍可展示缩略图。macOS 14 及以上在 Electron 缺少预览时，使用 ScreenCaptureKit 单窗口截图补齐，不激活窗口或切换桌面；系统无法提供画面时保留可选择的窗口条目。选择后主机会激活目标窗口，macOS 可按需切换桌面，最小化时只还原所选窗口。系统或应用拒绝激活、无法唯一识别窗口时会报错；只有窗口实际出现在捕获列表中才会启动视频。刷新列表不会切换桌面，窗口关闭、切离可捕获桌面或身份变化后会结束会话，不会自动选择其他窗口。
+窗口列表和阅读内容通过已验证连接的 WebRTC DataChannel 传输，后端负责设备认证、信令和 TURN 凭据。自部署需使用 [容器说明](containers/README.md) 中与过目兼容的后端。窗口列表包含当前用户会话中 macOS 各桌面或 Windows 当前虚拟桌面的普通应用窗口，排除本客户端、桌面元素和整个屏幕。macOS 其他桌面、隐藏或最小化的窗口标注“未在当前桌面显示”，仍可展示缩略图。macOS 14 及以上在 Electron 缺少预览时，使用 ScreenCaptureKit 单窗口截图补齐，不激活窗口或切换桌面；系统无法提供画面时保留可选择的窗口条目。选择后主机会激活目标窗口，macOS 可按需切换桌面，最小化时只还原所选窗口。系统或应用拒绝激活、无法唯一识别窗口时会报错；只有窗口实际出现在捕获列表中才会启动视频。刷新列表不会切换桌面，窗口关闭、切离可捕获桌面或身份变化后会结束会话，不会自动选择其他窗口。
 
 macOS 的辅助功能接口可能省略其他桌面的窗口。跨桌面激活会按需动态调用 SkyLight 私有接口读取桌面归属，通过 Mission Control 选择目标桌面，再验证目标实际可见、身份和焦点一致；切换时主机会短暂显示 Mission Control。原生 AX 窗口 ID 用于区分同名同尺寸窗口，接口不可用时只接受唯一的标题与边界匹配。这些接口依赖 macOS 版本，无法完成校验时会停止选择并报错。没有辅助功能信息的不可见无标题窗口会被过滤。
 
@@ -155,7 +159,7 @@ Apple Silicon Mac 上使用 `pnpm dist:mac`、Windows 上使用 `pnpm dist:win` 
 
 从 v0.0.3 起，macOS 预发布使用固定自签名证书，并固定原生辅助程序的签名标识；`--release` 构建在证书缺失或不匹配时失败。本地普通构建未配置证书时仍使用 ad-hoc 签名。自签名不替代 Developer ID 和公证，详见[签名配置](docs/DESKTOP_RELEASES.md#固定-macos-签名)。
 
-ad-hoc 签名在重建后可能使旧授权失效，辅助功能和屏幕录制都需要检查。修改授权后，请完全退出 PalmDesk 并重新启动；仅关闭窗口或刷新窗口列表可能仍保留旧进程的权限状态。若重启后仍未授权，请在对应权限列表中移除旧项，再添加并授权该身份当前构建的应用，然后再次完全退出并重启。
+ad-hoc 签名在重建后可能使旧授权失效，辅助功能和屏幕录制都需要检查。修改授权后，请完全退出过目并重新启动；仅关闭窗口或刷新窗口列表可能仍保留旧进程的权限状态。若重启后仍未授权，请在对应权限列表中移除旧项，再添加并授权该身份当前构建的应用，然后再次完全退出并重启。
 
 `pnpm test:smoke` 已包含会话阅读测试；只检查解析器与读取模块可运行 `pnpm test:session-core`。[会话阅读验证说明](docs/GLASSLINE_INTEGRATION.md#验证) 另提供浏览器联调页，以合成内容和真实 WebRTC 检查混合来源、分页、更新提示及视图切换。
 
@@ -208,6 +212,6 @@ node scripts/dev.mjs --prepare-only
 
 ## 贡献与许可证
 
-问题和建议提交到 [PalmDesk Issues](https://github.com/Abreto/palmdesk/issues)，参见 [贡献说明](.github/CONTRIBUTING.md)。安全问题见 [SECURITY.md](SECURITY.md)，不要公开设备密码、TURN 凭据或未脱敏的窗口截图。
+问题和建议提交到 [过目 Issues](https://github.com/Abreto/palmdesk/issues)，参见 [贡献说明](.github/CONTRIBUTING.md)。安全问题见 [SECURITY.md](SECURITY.md)，不要公开设备密码、TURN 凭据或未脱敏的窗口截图。
 
-项目采用 [MIT 许可证](LICENSE.txt)，保留上游 shuisheng 的版权声明并增加 Abreto 的署名。上游归属和依赖说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。[上游开源版说明](README_OpenSource.md) 中的产品、服务和 Pro 功能不代表 PalmDesk 的能力。PalmDesk 是独立项目，与 OpenAI、Anthropic 或 BilldDesk 官方无隶属关系。
+项目采用 [MIT 许可证](LICENSE.txt)，保留上游 shuisheng 的版权声明并增加 Abreto 的署名。上游归属和依赖说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。[上游开源版说明](README_OpenSource.md) 中的产品、服务和 Pro 功能不代表过目的能力。过目是独立项目，与 OpenAI、Anthropic 或 BilldDesk 官方无隶属关系。

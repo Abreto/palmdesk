@@ -7,29 +7,29 @@ import { defineConfig } from 'vite';
 import { createSessionReader } from '../../session-core/index.mjs';
 
 const root = fileURLToPath(new URL('../..', import.meta.url));
-const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-browser-'));
+const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-browser-'));
 const uuid = '33333333-3333-4333-8333-333333333333';
 const record = (payload, type = 'response_item') => JSON.stringify({ timestamp: new Date().toISOString(), type, payload });
 const message = (role, text) => record({ type: 'message', role, content: [{ type: 'output_text', text }] });
 await mkdir(path.join(directory, 'sessions'));
 const file = path.join(directory, 'sessions', `rollout-${uuid}.jsonl`);
 await writeFile(file, [
-  record({ id: uuid, cwd: '/workspace/palmdesk' }, 'session_meta'),
-  message('user', '给 PalmDesk 增加适合手机的会话阅读。'),
+  record({ id: uuid, cwd: '/workspace/tenori' }, 'session_meta'),
+  message('user', '给 Tenori 增加适合手机的会话阅读。'),
   ...Array.from({ length: 64 }, (_, i) => message(i % 2 ? 'assistant' : 'user', `历史消息 ${i + 1}：核对会话读取、窗口切换和手机上的阅读体验。`)),
   record({ type: 'function_call', name: 'exec_command', call_id: 'test-command', arguments: JSON.stringify({ cmd: 'pnpm test:smoke' }) }),
   record({ type: 'function_call_output', call_id: 'test-command', output: '测试输出\n'.repeat(3000) }),
   message('assistant', '# 会话阅读已接入\n\n现在可以在手机上阅读 **Codex 回复**，并随时回到原窗口继续操作。\n\n- 支持历史记录与复制\n- 命令输出默认折叠\n- 新回复不会打断当前位置\n\n```ts\nconst view = "read";\n```\n\n这是一条合成测试记录。[查看项目](https://github.com/Abreto/palmdesk)。'),
   record({ type: 'task_complete' }, 'event_msg'),
 ].join('\n') + '\n');
-await writeFile(path.join(directory, 'session_index.jsonl'), JSON.stringify({ id: uuid, thread_name: 'PalmDesk · 会话阅读', updated_at: new Date().toISOString() }) + '\n');
+await writeFile(path.join(directory, 'session_index.jsonl'), JSON.stringify({ id: uuid, thread_name: 'Tenori · 会话阅读', updated_at: new Date().toISOString() }) + '\n');
 const claudeConfigDir = path.join(directory, 'claude');
-const claudeFile = path.join(claudeConfigDir, 'projects', '-workspace-palmdesk', `${uuid}.jsonl`);
-const claudeRecord = (value) => JSON.stringify({ sessionId: uuid, cwd: '/workspace/palmdesk', timestamp: new Date().toISOString(), ...value });
+const claudeFile = path.join(claudeConfigDir, 'projects', '-workspace-tenori', `${uuid}.jsonl`);
+const claudeRecord = (value) => JSON.stringify({ sessionId: uuid, cwd: '/workspace/tenori', timestamp: new Date().toISOString(), ...value });
 const claudeMessage = (role, text, id) => claudeRecord({ type: role, uuid: id, message: { content: text, stop_reason: role === 'assistant' ? 'end_turn' : null } });
 await mkdir(path.dirname(claudeFile), { recursive: true });
 await writeFile(claudeFile, [
-  claudeRecord({ type: 'custom-title', customTitle: 'PalmDesk · Claude 会话阅读' }),
+  claudeRecord({ type: 'custom-title', customTitle: 'Tenori · Claude 会话阅读' }),
   ...Array.from({ length: 65 }, (_, i) => claudeMessage(i % 2 ? 'assistant' : 'user', `Claude 历史消息 ${i + 1}：核对两种来源的会话阅读。`, `claude-message-${i}`)),
   claudeRecord({ type: 'assistant', uuid: 'claude-tool', message: { content: [{ type: 'tool_use', id: 'claude-bash', name: 'Bash', input: { command: 'pnpm test:smoke' } }] } }),
   claudeRecord({ type: 'user', uuid: 'claude-result', message: { content: [{ type: 'tool_result', tool_use_id: 'claude-bash', content: 'Claude 测试输出\n'.repeat(3000) }] } }),
@@ -39,14 +39,14 @@ const claudeDesktopDataDir = path.join(directory, 'Claude');
 const desktopUuid = '44444444-4444-4444-8444-444444444444';
 const desktopId = 'local_dddddddd-dddd-4ddd-8ddd-dddddddddddd';
 const desktopOrg = path.join(claudeDesktopDataDir, 'claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb');
-const desktopFile = path.join(desktopOrg, desktopId, '.claude', 'projects', '-workspace-palmdesk', `${desktopUuid}.jsonl`);
+const desktopFile = path.join(desktopOrg, desktopId, '.claude', 'projects', '-workspace-tenori', `${desktopUuid}.jsonl`);
 const desktopMessage = (role, text, id) => JSON.stringify({
-  sessionId: desktopUuid, cwd: '/workspace/palmdesk', timestamp: new Date().toISOString(),
+  sessionId: desktopUuid, cwd: '/workspace/tenori', timestamp: new Date().toISOString(),
   type: role, uuid: id, message: { content: text, stop_reason: role === 'assistant' ? 'end_turn' : null },
 });
 await mkdir(path.dirname(desktopFile), { recursive: true });
 await writeFile(path.join(desktopOrg, `${desktopId}.json`), JSON.stringify({
-  sessionId: desktopId, cliSessionId: desktopUuid, title: 'PalmDesk · Desktop Code 会话',
+  sessionId: desktopId, cliSessionId: desktopUuid, title: 'Tenori · Desktop Code 会话',
   createdAt: Date.now(), lastActivityAt: Date.now(),
 }));
 await writeFile(desktopFile, [
@@ -60,7 +60,7 @@ let updates = 0;
 export default defineConfig({
   root,
   resolve: { alias: { '@': path.join(root, 'src') } },
-  define: { 'process.env': { NODE_ENV: 'development' }, PALMDESK_VERSION: JSON.stringify('0.0.0-smoke') },
+  define: { 'process.env': { NODE_ENV: 'development' }, TENORI_VERSION: JSON.stringify('0.0.0-smoke') },
   css: { preprocessorOptions: { scss: { additionalData: '@use "billd-scss/src/index.scss" as *;@import "@/assets/css/constant.scss";' } } },
   plugins: [vue(), {
     name: 'synthetic-session-reader',

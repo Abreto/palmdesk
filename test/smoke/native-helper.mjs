@@ -34,7 +34,7 @@ const application = await _electron.launch({
   env: {
     ...process.env,
     VITE_DEV_SERVER_URL:
-      'data:text/html,<title>PalmDesk helper smoke test</title>',
+      'data:text/html,<title>Tenori helper smoke test</title>',
   },
 });
 
@@ -52,7 +52,7 @@ async function verifyBackground() {
       .filter((entry) => entry.bundleId === config.appId)
       .map((entry) => entry.pid),
     [application.process().pid],
-    'only the main PalmDesk process must appear in the Dock'
+    'only the main Tenori process must appear in the Dock'
   );
 }
 

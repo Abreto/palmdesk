@@ -1,4 +1,4 @@
-// Modified for PalmDesk: head/tail summaries, per-turn message deduplication,
+// Modified for Tenori: head/tail summaries, per-turn message deduplication,
 // and a bounded detail-file read. Original Glassline code is Apache-2.0.
 import { lstat, open, readFile, readdir, stat } from "node:fs/promises";
 import os from "node:os";

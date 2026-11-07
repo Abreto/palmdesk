@@ -11,8 +11,8 @@ function getDesktopIdentity(
     if (development)
       throw new Error('A development runtime cannot use the release identity.');
     return {
-      appId: 'io.github.abreto.palmdesk',
-      productName: 'PalmDesk',
+      appId: 'io.github.abreto.tenori',
+      productName: 'Tenori',
       checkoutId: '',
       worktreeId: '',
     };
@@ -41,8 +41,8 @@ function getDesktopIdentity(
     .digest('hex')
     .slice(0, 10);
   const worktreeId = linkedWorktree ? checkoutId : '';
-  const baseId = `io.github.abreto.palmdesk.${linkedWorktree ? 'worktree' : 'local'}.${checkoutId}`;
-  const baseName = `PalmDesk ${linkedWorktree ? 'WT' : 'Local'} ${checkoutId}`;
+  const baseId = `io.github.abreto.tenori.${linkedWorktree ? 'worktree' : 'local'}.${checkoutId}`;
+  const baseName = `Tenori ${linkedWorktree ? 'WT' : 'Local'} ${checkoutId}`;
   return {
     appId: `${baseId}${development ? '.dev' : ''}`,
     productName: `${baseName}${development ? ' Dev' : ''}`,

@@ -9,7 +9,7 @@ const readline = require('node:readline');
   if (process.platform !== 'darwin') throw new Error('macOS required');
   await mkdir(path.resolve('.local'), { recursive: true });
   const root = await mkdtemp(path.resolve('.local/agent-launch-fixture-'));
-  const bundleId = `io.github.abreto.palmdesk.launch-test-${process.pid}`;
+  const bundleId = `io.github.abreto.tenori.launch-test-${process.pid}`;
   const application = path.join(root, 'Launch Fixture.app');
   const contents = path.join(application, 'Contents');
   const marker = path.join(root, 'state.json');
@@ -47,7 +47,7 @@ const readline = require('node:readline');
     await mkdir(path.join(contents, 'MacOS'), { recursive: true });
     await writeFile(
       path.join(contents, 'Info.plist'),
-      `<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${bundleId}</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundleName</key><string>PalmDesk Launch Fixture</string><key>CFBundleVersion</key><string>1</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`
+      `<?xml version="1.0"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>${bundleId}</string><key>CFBundleExecutable</key><string>fixture</string><key>CFBundleName</key><string>Tenori Launch Fixture</string><key>CFBundleVersion</key><string>1</string><key>CFBundlePackageType</key><string>APPL</string></dict></plist>`
     );
     const swift = `import AppKit
 let marker = ${JSON.stringify(marker)}
@@ -62,7 +62,7 @@ class Delegate: NSObject, NSApplicationDelegate {
   func show() {
     if window == nil {
       window = NSWindow(contentRect: NSRect(x: 100, y: 100, width: 420, height: 220), styleMask: [.titled, .closable], backing: .buffered, defer: false)
-      window!.title = "PalmDesk disposable launch fixture"
+      window!.title = "Tenori disposable launch fixture"
       window!.isReleasedWhenClosed = false
     }
     opens += 1

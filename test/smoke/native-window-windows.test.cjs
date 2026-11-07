@@ -10,12 +10,12 @@ const test = require('node:test');
 const { setTimeout: delay } = require('node:timers/promises');
 
 const root = path.resolve(__dirname, '../..');
-const executable = path.join(root, 'native-bin/palmdesk-window.exe');
+const executable = path.join(root, 'native-bin/tenori-window.exe');
 const fixtureSource = path.join(__dirname, 'fixtures/windows-test-window.cs');
-const interactive = process.env.PALMDESK_NATIVE_SMOKE === 'true';
+const interactive = process.env.TENORI_NATIVE_SMOKE === 'true';
 const focusSkip = interactive
   ? false
-  : 'Set PALMDESK_NATIVE_SMOKE=true on an unlocked Windows desktop to test focus';
+  : 'Set TENORI_NATIVE_SMOKE=true on an unlocked Windows desktop to test focus';
 const timeoutMs = 12000;
 
 function startJsonProcess(file, args = [], expectsReady = false) {
@@ -179,13 +179,13 @@ test(
       process.platform !== 'win32'
         ? 'Windows only'
         : !interactive &&
-          'Set PALMDESK_NATIVE_SMOKE=true after building the helper',
+          'Set TENORI_NATIVE_SMOKE=true after building the helper',
     timeout: 150000,
   },
   async (t) => {
     assert.ok(
       existsSync(executable),
-      'PALMDESK_NATIVE_SMOKE=true requires native-bin/palmdesk-window.exe; run node scripts/build-native.mjs first'
+      'TENORI_NATIVE_SMOKE=true requires native-bin/tenori-window.exe; run node scripts/build-native.mjs first'
     );
 
     const windows = process.env.SystemRoot || 'C:\\Windows';
@@ -196,7 +196,7 @@ test(
       .find(existsSync);
     assert.ok(compiler, 'Windows .NET Framework v4 csc.exe is required');
 
-    const temporary = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-native-'));
+    const temporary = await mkdtemp(path.join(os.tmpdir(), 'tenori-native-'));
     const clients = [];
     const killChildren = () => clients.forEach((client) => client.kill());
     process.once('exit', killChildren);
@@ -223,7 +223,7 @@ test(
       }
     });
 
-    const fixtureExecutable = path.join(temporary, 'palmdesk-smoke-window.exe');
+    const fixtureExecutable = path.join(temporary, 'tenori-smoke-window.exe');
     const compilation = spawnSync(
       compiler,
       [

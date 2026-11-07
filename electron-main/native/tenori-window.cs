@@ -8,7 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Web.Script.Serialization;
 
-internal static class PalmDeskWindow
+internal static class TenoriWindow
 {
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect { public int Left, Top, Right, Bottom; }

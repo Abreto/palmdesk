@@ -1,6 +1,6 @@
-# Contributing to PalmDesk
+# Contributing to Tenori
 
-PalmDesk is an experimental project maintained by [Abreto](https://github.com/Abreto), based on [BilldDesk](https://github.com/galaxy-s10/billd-desk). Upstream contributors include [galaxy-s10](https://github.com/galaxy-s10) and [xiaolu289](https://github.com/xiaolu289).
+Tenori is an experimental project maintained by [Abreto](https://github.com/Abreto), based on [BilldDesk](https://github.com/galaxy-s10/billd-desk). Upstream contributors include [galaxy-s10](https://github.com/galaxy-s10) and [xiaolu289](https://github.com/xiaolu289).
 
 Read the [README](../README.md) and [development guide](../docs/LOCAL_DEVELOPMENT.md) before changing the client. The signaling backend is a separate project.
 

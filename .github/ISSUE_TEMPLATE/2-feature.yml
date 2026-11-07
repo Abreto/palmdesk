@@ -1,5 +1,5 @@
 name: Feature Request
-description: Suggest an improvement to PalmDesk.
+description: Suggest an improvement to Tenori.
 body:
   - type: textarea
     id: problem

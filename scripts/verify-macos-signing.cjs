@@ -36,7 +36,7 @@ function verify(app) {
         return [helper, id];
       }),
   ];
-  const temporary = mkdtempSync(path.join(os.tmpdir(), 'palmdesk-signature-'));
+  const temporary = mkdtempSync(path.join(os.tmpdir(), 'tenori-signature-'));
   try {
     for (const [target, id] of targets) {
       execFileSync(

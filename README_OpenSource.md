@@ -1,5 +1,5 @@
 > 以下为保留的 BilldDesk 上游开源版说明，产品、服务、下载和联系方式均属于上游。
-> PalmDesk 的功能范围和启动方法见 [README.md](./README.md)。
+> Tenori 的功能范围和启动方法见 [README.md](./README.md)。
 
 [BilldDesk Pro](https://github.com/galaxy-s10/billd-desk) | BilldDesk 开源版
 

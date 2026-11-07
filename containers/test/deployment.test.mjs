@@ -6,7 +6,7 @@ import { cors, errors, engineCors, deskPackets } from '../backend/runtime/http.c
 
 const valid = () => ({
   PUBLIC_ORIGIN: 'https://remote.example.com',
-  MYSQL_DATABASE: 'palmdesk', MYSQL_USER: 'palmdesk',
+  MYSQL_DATABASE: 'tenori', MYSQL_USER: 'tenori',
   MYSQL_PASSWORD: 'a'.repeat(64), REDIS_PASSWORD: 'b'.repeat(64), JWT_SECRET: 'c'.repeat(64),
 });
 
@@ -24,6 +24,54 @@ test('origin policy permits the configured web and Electron, and rejects suffix 
   for (const origin of ['https://remote.example.com', 'null', 'file://', undefined, '', 'http://localhost:5173']) assert.equal(isAllowedOrigin(origin, config), true);
   for (const origin of ['https://remote.example.com.evil.test', 'https://evil.test', 'http://remote.example.com', 'file://evil.test', 'file:///tmp/app.html']) assert.equal(isAllowedOrigin(origin, config), false);
   for (const origin of ['null', 'file://']) assert.equal(isAllowedOrigin(origin, readConfig({ ...valid(), ALLOW_ELECTRON_ORIGIN: 'false' })), false);
+});
+
+test('Tenori and the PalmDesk alias share strict HTTP and WebSocket origin checks', async () => {
+  const config = readConfig({
+    ...valid(),
+    PUBLIC_ORIGIN: 'https://tenori.abreto.icu',
+    EXTRA_ALLOWED_ORIGINS: 'https://palmdesk.abreto.icu',
+  });
+  await Promise.all(
+    [
+      ['https://tenori.abreto.icu', true],
+      ['https://palmdesk.abreto.icu', true],
+      ['https://palmdesk.abreto.icu.evil.test', false],
+      ['https://tenori.abreto.icu.evil.test', false],
+      ['http://palmdesk.abreto.icu', false],
+    ].map(async ([origin, allowed]) => {
+      const headers = {};
+      const ctx = {
+        method: 'OPTIONS',
+        get: () => origin,
+        vary: () => {},
+        set: (key, value) => {
+          headers[key] = value;
+        },
+      };
+      await cors(config)(ctx, () =>
+        assert.fail('preflight must not reach routes')
+      );
+      assert.equal(ctx.status, allowed ? 204 : 403);
+      assert.equal(
+        headers['Access-Control-Allow-Origin'],
+        allowed ? origin : undefined
+      );
+      engineCors(config)(
+        { headers: { origin }, method: 'GET' },
+        {
+          setHeader: (key, value) => {
+            headers[key] = value;
+          },
+        },
+        (error) => assert.equal(Boolean(error), !allowed)
+      );
+      assert.equal(
+        headers['Access-Control-Allow-Origin'],
+        allowed ? origin : undefined
+      );
+    })
+  );
 });
 
 test('repeated initialization preserves existing tables and customized configuration', async () => {

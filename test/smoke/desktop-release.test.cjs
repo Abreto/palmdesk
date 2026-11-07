@@ -17,10 +17,10 @@ const {
   prepareReleaseAssets,
 } = require('../../scripts/desktop-release.cjs');
 
-const manifest = { version: '0.1.0-beta.1', productName: 'PalmDesk' };
+const manifest = { version: '0.1.0-beta.1', productName: 'Tenori' };
 
 function directory(t) {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'palmdesk release '));
+  const root = mkdtempSync(path.join(os.tmpdir(), 'tenori release '));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   return root;
 }
@@ -130,16 +130,13 @@ for (const kind of [
     if (kind === 'missing') rmSync(filename);
     if (kind === 'wrong version') {
       rmSync(filename);
-      writeFileSync(
-        path.join(root, 'PalmDesk-0.0.1-mac-arm64.dmg'),
-        'old build'
-      );
+      writeFileSync(path.join(root, 'Tenori-0.0.1-mac-arm64.dmg'), 'old build');
     }
     if (kind === 'extra installer')
       writeFileSync(path.join(root, 'extra.exe'), 'extra');
     if (kind === 'Intel Mac installer')
       writeFileSync(
-        path.join(root, `PalmDesk-${manifest.version}-mac-x64.dmg`),
+        path.join(root, `Tenori-${manifest.version}-mac-x64.dmg`),
         'unsupported architecture'
       );
     if (kind === 'empty') writeFileSync(filename, '');

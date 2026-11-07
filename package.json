@@ -1,5 +1,5 @@
 {
-  "name": "palmdesk",
+  "name": "tenori",
   "version": "0.0.8",
   "private": true,
   "description": "AI-native remote control for desktop apps: stream one macOS or Windows window to your phone for agent-ready workflows.",
@@ -120,5 +120,5 @@
     "vue-eslint-parser": "^9.4.3",
     "vue-tsc": "^2.1.10"
   },
-  "productName": "PalmDesk"
+  "productName": "Tenori"
 }

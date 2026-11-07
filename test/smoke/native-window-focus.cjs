@@ -38,7 +38,7 @@ async function fixture(title, bounds = {}) {
   });
   fixtures.push(window);
   await window.loadURL(
-    `data:text/html,<title>${title}</title><p>PalmDesk temporary focus fixture</p>`
+    `data:text/html,<title>${title}</title><p>Tenori temporary focus fixture</p>`
   );
   const source = await until(
     async () =>
@@ -55,13 +55,13 @@ app.whenReady().then(async () => {
   let other;
   try {
     assert.equal((await native.request('permissions')).accessibility, true);
-    const first = await fixture('PalmDesk focus fixture A');
+    const first = await fixture('Tenori focus fixture A');
     const second = await fixture(
-      'PalmDesk focus fixture B',
+      'Tenori focus fixture B',
       first.window.getBounds()
     );
     await second.window.webContents.executeJavaScript(
-      'document.title = "PalmDesk focus fixture A"'
+      'document.title = "Tenori focus fixture A"'
     );
     // eslint-disable-next-line no-restricted-syntax -- Focus requests must run in order.
     for (const selected of [first, second, first]) {

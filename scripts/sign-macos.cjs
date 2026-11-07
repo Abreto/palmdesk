@@ -11,9 +11,9 @@ const { signAsync } = packagerRequire('@electron/osx-sign');
 
 module.exports = async (options, packager) => {
   const fixedCertificate = options.identity?.toUpperCase() === certificate.sha1;
-  if (process.env.PALMDESK_BUILD_CHANNEL === 'release' && !fixedCertificate) {
+  if (process.env.TENORI_BUILD_CHANNEL === 'release' && !fixedCertificate) {
     throw new Error(
-      'Release builds require the fixed PalmDesk signing certificate.'
+      'Release builds require the fixed Tenori signing certificate.'
     );
   }
   if (fixedCertificate) {
@@ -23,7 +23,7 @@ module.exports = async (options, packager) => {
       );
     const helper = path.join(options.app, 'Contents/MacOS/codex-window');
     const helperId = `${packager.appInfo.id}.window-helper`;
-    console.log('Signing PalmDesk with the fixed self-signed certificate.');
+    console.log('Signing Tenori with the fixed self-signed certificate.');
     return signAsync({
       ...options,
       identityValidation: false,
@@ -61,7 +61,7 @@ module.exports = async (options, packager) => {
     throw new Error('The requested macOS signing certificate is unavailable.');
   }
 
-  console.log('Signing PalmDesk locally (ad-hoc, not for distribution).');
+  console.log('Signing Tenori locally (ad-hoc, not for distribution).');
   await signAsync({
     ...options,
     identity: '-',

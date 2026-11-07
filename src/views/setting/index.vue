@@ -47,7 +47,7 @@
         </div>
       </header>
       <label class="toggle"
-        ><span><strong>窗口置顶</strong><small>保持 PalmDesk 置顶</small></span
+        ><span><strong>窗口置顶</strong><small>保持过目置顶</small></span
         ><input
           v-model="cacheStore.isAlwaysOnTop"
           type="checkbox"

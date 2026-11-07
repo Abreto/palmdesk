@@ -19,8 +19,8 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 
 | 平台                | Runner         | 安装包                               |
 | ------------------- | -------------- | ------------------------------------ |
-| macOS Apple Silicon | `macos-15`     | `PalmDesk-<version>-mac-arm64.dmg`   |
-| Windows x64         | `windows-2022` | `PalmDesk-<version>-windows-x64.exe` |
+| macOS Apple Silicon | `macos-15`     | `Tenori-<version>-mac-arm64.dmg`   |
+| Windows x64         | `windows-2022` | `Tenori-<version>-windows-x64.exe` |
 
 当前预发布仅支持 Apple Silicon Mac 和 Windows x64，不提供 Intel Mac 安装包。Mac 包需要 macOS 13 Ventura 及以上，在 macOS 15 构建，macOS 13 和 14 尚未验收。Windows 运行时要求 Windows 10 1903 及以上或 Windows 11 x64，并具有可用的 Windows Graphics Capture。
 
@@ -49,6 +49,10 @@ Base64 只是编码，必须存为 Secret。原始 `.p12`、密码和到期日�
 
 从 v0.0.2 及更早 ad-hoc 版本升级到固定证书时，可能需要重新授予屏幕录制及辅助功能权限一次。后续签名身份保持稳定，但 CI 校验不能替代真实 macOS 升级授权测试。自签名仍不满足 Gatekeeper 的 Developer ID 和公证要求。
 
+## Tenori（过目）改名与签名兼容
+
+改名兼容：继续使用现有 `PALMDESK_SIGNING_P12`、`PALMDESK_SIGNING_PASSWORD` Secrets，以及 `build/macos-signing.json` 中原始证书的 `PalmDesk Code Signing` 名称和固定指纹；它们是现有证书身份，不是产品显示名，无需重新生成证书或修改仓库 Secrets。应用和辅助程序的 bundle ID 已改为 `io.github.abreto.tenori` 及其派生值，因此用户仍需重新授权。macOS 包内的 `InfoPlist.strings` 将中文显示名设为「过目」，保留本地构建的身份后缀；英文名称、可执行文件和 `.app` 路径使用 Tenori。Windows 安装器使用新 appId，需验收并排安装与旧版卸载。当前没有 App Store 发布配置；后续中文商店展示名应使用「过目」。
+
 ## 本地构建
 
 开发机需要 Node.js 22.16.0 及以上、pnpm 11.19.0。macOS 需要 Xcode Command Line Tools，Windows 使用系统 .NET Framework 4.x 编译器。正常安装依赖，不使用源码检查流水线的 `--ignore-scripts`，以便下载 Electron 并准备运行依赖。
@@ -67,12 +71,12 @@ pnpm dist:win --release
 
 命令会先构建桌面页面与 Electron 主进程，再编译原生辅助程序并生成安装包，本地构建不会上传 GitHub。macOS 请在 Apple Silicon Mac 上构建；Intel Mac 安装包暂不支持。Windows 输出 x64 安装包。
 
-`--release` 显式选择固定的正式身份 `io.github.abreto.palmdesk`（PalmDesk），产物位于 `electron-release/<version>/`；从主工作区、clone 或 linked worktree 执行结果一致。GitHub Actions 同样显式传入该参数，并检查 macOS 包的正式 bundle ID。
+`--release` 显式选择固定的正式身份 `io.github.abreto.tenori`（Tenori），产物位于 `electron-release/<version>/`；从主工作区、clone 或 linked worktree 执行结果一致。GitHub Actions 同样显式传入该参数，并检查 macOS 包的正式 bundle ID。
 
 本地开发测试请省略 `--release`。`pnpm dist:mac`、`pnpm dist:win` 和 `pnpm build:desktop` 默认使用当前工作区独立的应用名称及 bundle ID：主工作区或普通 clone 的产物位于 `electron-release/<version>/local-<id>/`，linked worktree 位于 `electron-release/<version>/worktree-<id>/`，权限及配置与正式版隔离。`build:desktop` 和 `build:desktop:win` 只生成本地应用目录。身份规则及旧开发包的迁移步骤见 [本地开发](LOCAL_DEVELOPMENT.md#应用身份)。
 
 ## 用户安装与后续发行
 
-用户打开 DMG 并将应用拖入 Applications，或运行 Windows 安装向导，无需安装 Node.js、pnpm 或开发工具。macOS 远控需要屏幕录制和辅助功能权限。默认连接 `https://palmdesk.abreto.icu`；手机网页和桌面端必须使用同一服务，安装包不包含服务端。
+用户打开 DMG 并将应用拖入 Applications，或运行 Windows 安装向导，无需安装 Node.js、pnpm 或开发工具。macOS 远控需要屏幕录制和辅助功能权限。默认连接 `https://tenori.abreto.icu`；手机网页和桌面端必须使用同一服务，安装包不包含服务端。
 
 CI 的源码检查和打包验证不能替代真实屏幕捕获、键鼠输入、权限恢复、手机及跨网络 TURN 验收。稳定分发前继续处理 [发行前提](OPEN_SOURCE_READINESS.md)，并接入 macOS Developer ID 签名与公证及 Windows 代码签名。证书和私钥只通过 CI 的安全配置提供，不写入仓库或 `VITE_*` 变量。

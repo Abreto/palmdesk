@@ -21,12 +21,12 @@ const release = (tag, extra = {}) => ({
   html_url: `https://evil.example/${tag}`,
   draft: false,
   prerelease: true,
-  body: 'Experimental PalmDesk desktop installers for testing.',
+  body: 'Experimental Tenori desktop installers for testing.',
   ...extra,
 });
 
 function checker(t, releases, { enabled } = {}) {
-  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'palmdesk-release-'));
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'tenori-release-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   if (enabled !== undefined)
     fs.writeFileSync(

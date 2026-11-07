@@ -1,4 +1,4 @@
-// Modified for PalmDesk: bounded summary/detail reads, renamed session titles,
+// Modified for Tenori: bounded summary/detail reads, renamed session titles,
 // and sidechain filtering. Original Glassline code is Apache-2.0.
 import { lstat, readdir, stat } from "node:fs/promises";
 import os from "node:os";
@@ -55,7 +55,7 @@ export function createClaudeSessionFileCatalog({
   statFile = stat
 } = {}) {
   // Direct parser callers stay scoped to the requested Claude config directory.
-  // The PalmDesk provider explicitly opts in to Desktop index discovery.
+  // The Tenori provider explicitly opts in to Desktop index discovery.
   const discoverDesktop = createClaudeDesktopSessionDiscovery({ claudeDesktopDataDirs });
   return createSessionFileCatalog({
     concurrency,

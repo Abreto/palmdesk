@@ -23,7 +23,7 @@ export function resolveClaudeDesktopDataDirs(
       env.APPDATA || path.win32.join(os.homedir(), 'AppData', 'Roaming');
     const local =
       env.LOCALAPPDATA || path.win32.join(os.homedir(), 'AppData', 'Local');
-    // MSIX virtualizes Claude's app data; PalmDesk runs outside that package.
+    // MSIX virtualizes Claude's app data; Tenori runs outside that package.
     const cache = path.win32.join(
       local,
       'Packages',

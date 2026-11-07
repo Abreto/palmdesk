@@ -6,12 +6,13 @@ import { fileURLToPath } from 'node:url';
 
 import './build-native.mjs';
 import { getDesktopIdentity } from './desktop-identity.cjs';
+import { writeMacDisplayNames } from './localize-macos.cjs';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../', import.meta.url));
 const env = { ...process.env };
 const identity = getDesktopIdentity(root, { development: true });
-env.PALMDESK_APP_NAME = identity.productName;
+env.TENORI_APP_NAME = identity.productName;
 if (process.platform === 'darwin') {
   const electron = require('electron');
   const original = path.resolve(electron, '../../..');
@@ -25,7 +26,7 @@ if (process.platform === 'darwin') {
   const signer = process.env.CSC_NAME?.trim() || '-';
   const version = JSON.stringify({
     electron: require('electron/package.json').version,
-    revision: 4,
+    revision: 5,
     appId: identity.appId,
     productName: identity.productName,
     signer,
@@ -73,8 +74,9 @@ if (process.platform === 'darwin') {
         'Share the selected application window with your phone.',
       // Required by desktopCapturer on macOS 14.2+; no audio is recorded.
       NSAudioCaptureUsageDescription:
-        'PalmDesk shares window video only and never records audio.',
+        'Tenori shares window video only and never records audio.',
     });
+    await writeMacDisplayNames(target, identity.productName);
     const frameworks = path.join(target, 'Contents/Frameworks');
     const helpers = await readdir(frameworks, { withFileTypes: true });
     helpers.forEach((entry) => {

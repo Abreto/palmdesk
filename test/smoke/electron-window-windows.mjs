@@ -131,9 +131,9 @@ async function run() {
     console.log('SKIP packaged Windows capture smoke: Windows only');
     return;
   }
-  if (process.env.PALMDESK_NATIVE_SMOKE !== 'true') {
+  if (process.env.TENORI_NATIVE_SMOKE !== 'true') {
     console.log(
-      'SKIP packaged Windows capture smoke: set PALMDESK_NATIVE_SMOKE=true on an interactive desktop'
+      'SKIP packaged Windows capture smoke: set TENORI_NATIVE_SMOKE=true on an interactive desktop'
     );
     return;
   }
@@ -160,10 +160,10 @@ async function run() {
   assert.ok(
     existsSync(
       development
-        ? path.join(root, 'native-bin/palmdesk-window.exe')
+        ? path.join(root, 'native-bin/tenori-window.exe')
         : path.join(
             path.dirname(executable),
-            'resources/native/palmdesk-window.exe'
+            'resources/native/tenori-window.exe'
           )
     ),
     `${mode} Windows native helper is missing; finish building before running this smoke`
@@ -183,7 +183,7 @@ async function run() {
   delete process.env.PWDEBUG;
   const { _electron } = require('playwright');
   const temporary = await mkdtemp(
-    path.join(os.tmpdir(), 'palmdesk-electron-smoke-')
+    path.join(os.tmpdir(), 'tenori-electron-smoke-')
   );
   let fixture;
   let application;
@@ -221,7 +221,7 @@ async function run() {
     assert.ok(compiler, 'Windows .NET Framework v4 csc.exe is required');
     const fixtureExecutable = path.join(
       temporary,
-      'palmdesk-electron-fixture.exe'
+      'tenori-electron-fixture.exe'
     );
     const compilation = spawnSync(
       compiler,
@@ -265,7 +265,7 @@ async function run() {
       APPDATA: appData,
       LOCALAPPDATA: localAppData,
       ...(development
-        ? { PALMDESK_APP_NAME: `PalmDesk Smoke ${process.pid}-${Date.now()}` }
+        ? { TENORI_APP_NAME: `Tenori Smoke ${process.pid}-${Date.now()}` }
         : {}),
     };
     delete env.VITE_DEV_SERVER_URL;
@@ -420,7 +420,7 @@ async function run() {
       await bounded(
         page.evaluate(async (streamId) => {
           const state = { tracks: [], video: document.createElement('video') };
-          window.__palmdeskWindowsSmoke = state;
+          window.__tenoriWindowsSmoke = state;
           state.video.muted = true;
           state.video.autoplay = true;
           state.video.playsInline = true;
@@ -442,7 +442,7 @@ async function run() {
       const frame = await until(
         () =>
           page.evaluate(() => {
-            const video = window.__palmdeskWindowsSmoke.video;
+            const video = window.__tenoriWindowsSmoke.video;
             if (video.readyState < 2 || !video.videoWidth || !video.videoHeight)
               return null;
             const canvas = document.createElement('canvas');
@@ -534,7 +534,7 @@ async function run() {
             .inputFocused
         );
       }, 'fixture TextBox receives the mouse click');
-      const text = `PalmDesk smoke ${index + 1} \u4f60\u597d`;
+      const text = `Tenori smoke ${index + 1} \u4f60\u597d`;
       assert.equal(
         (
           await ipc('remoteInput', {
@@ -582,7 +582,7 @@ async function run() {
       );
       assert.equal(
         sibling.text,
-        index === 0 ? '' : 'PalmDesk smoke 1 \u4f60\u597d'
+        index === 0 ? '' : 'Tenori smoke 1 \u4f60\u597d'
       );
       console.log(
         `PASS fixture ${index + 1}: decoded color, dimensions, mouse, text and invalid-session rejection`
@@ -590,11 +590,11 @@ async function run() {
       reports.push(dimensions);
 
       const tracksStopped = await page.evaluate(() => {
-        const state = window.__palmdeskWindowsSmoke;
+        const state = window.__tenoriWindowsSmoke;
         state.tracks.forEach((track) => track.stop());
         state.video.pause();
         state.video.srcObject = null;
-        delete window.__palmdeskWindowsSmoke;
+        delete window.__tenoriWindowsSmoke;
         return state.tracks.every((track) => track.readyState === 'ended');
       });
       assert.equal(
@@ -638,12 +638,12 @@ async function run() {
     if (page && !page.isClosed()) {
       await bounded(
         page.evaluate(async (sessionId) => {
-          const state = window.__palmdeskWindowsSmoke;
+          const state = window.__tenoriWindowsSmoke;
           state?.tracks.forEach((track) => track.stop());
           if (state) {
             state.video.pause();
             state.video.srcObject = null;
-            delete window.__palmdeskWindowsSmoke;
+            delete window.__tenoriWindowsSmoke;
           }
           if (sessionId)
             await window.electronAPI.ipcRenderer.invoke('stopCapture', {

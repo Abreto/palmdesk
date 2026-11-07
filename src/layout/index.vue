@@ -39,17 +39,17 @@
       <RouterLink
         class="brand"
         :to="{ name: routerName.remote }"
-        aria-label="PalmDesk 首页"
+        aria-label="过目首页"
       >
         <span class="brand-mark">
           <img
-            :src="palmdeskMark"
+            :src="tenoriMark"
             alt=""
             aria-hidden="true"
           />
         </span>
         <span class="brand-name"
-          >PalmDesk<span>AI-native remote control</span></span
+          >过目<span>AI-native remote control</span></span
         >
       </RouterLink>
       <div class="list">
@@ -96,7 +96,7 @@
         >
         <p>桌面工作，<br />掌心继续。</p>
         <div>
-          <span>PalmDesk</span><span>v{{ appStore.version }}</span>
+          <span>过目</span><span>v{{ appStore.version }}</span>
         </div>
       </div>
     </nav>
@@ -140,7 +140,7 @@ import { getRandomString, windowReload } from 'billd-utils';
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
-import palmdeskMark from '@/assets/img/palmdesk-mark.svg';
+import tenoriMark from '@/assets/img/tenori-mark.svg';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';

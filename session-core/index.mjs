@@ -1,4 +1,4 @@
-// PalmDesk's read-only entry point. Provider/parser code originated in Glassline.
+// Tenori's read-only entry point. Provider/parser code originated in Glassline.
 import { createHash } from 'node:crypto';
 
 import { createCodexProvider } from './src/providers/codex.mjs';

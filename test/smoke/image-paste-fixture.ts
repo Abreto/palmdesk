@@ -164,7 +164,7 @@ createApp(
           },
           [
             h('div', { style: 'padding:8px;background:#e5ede9' }, [
-              'PalmDesk · 图片粘贴联调 ',
+              'Tenori · 图片粘贴联调 ',
               h(
                 'button',
                 {

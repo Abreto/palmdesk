@@ -37,7 +37,7 @@ app
       })
     );
     const fixture = new BrowserWindow({
-      title: 'PalmDesk video quality fixture',
+      title: 'Tenori video quality fixture',
       x: display.bounds.x + 20,
       y: display.bounds.y + 20,
       width: Math.min(1800, display.bounds.width - 40),
@@ -49,7 +49,7 @@ app
     await fixture.loadURL(
       'data:text/html,' +
         encodeURIComponent(
-          `<!doctype html><style>body { background:#fff;color:#171717;font:16px monospace;margin:20px;} .lines {height:40px;background:repeating-linear-gradient(90deg,#000 0px,#000 1px,#fff 1px,#fff 2px)}</style><h2>PalmDesk — Retina text capture</h2><div class="lines"></div>${'<p>const message = "清晰文字 ABCDEFG abcdefg 0123456789";</p>'.repeat(14)}<span id="clock"></span><script>setInterval(() => document.querySelector('#clock').textContent = Date.now(), 50)</script>`
+          `<!doctype html><style>body { background:#fff;color:#171717;font:16px monospace;margin:20px;} .lines {height:40px;background:repeating-linear-gradient(90deg,#000 0px,#000 1px,#fff 1px,#fff 2px)}</style><h2>Tenori — Retina text capture</h2><div class="lines"></div>${'<p>const message = "清晰文字 ABCDEFG abcdefg 0123456789";</p>'.repeat(14)}<span id="clock"></span><script>setInterval(() => document.querySelector('#clock').textContent = Date.now(), 50)</script>`
         )
     );
     fixture.showInactive();

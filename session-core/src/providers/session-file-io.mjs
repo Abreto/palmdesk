@@ -1,4 +1,4 @@
-// Shared PalmDesk bounds for the Apache-2.0 Glassline file adapters.
+// Shared Tenori bounds for the Apache-2.0 Glassline file adapters.
 import { open } from 'node:fs/promises';
 import { StringDecoder } from 'node:string_decoder';
 

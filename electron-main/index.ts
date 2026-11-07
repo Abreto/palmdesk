@@ -86,8 +86,9 @@ process.env.VITE_PUBLIC = app.isPackaged
 
 const appName = app.isPackaged
   ? app.getName()
-  : process.env.PALMDESK_APP_NAME || 'PalmDesk Dev';
+  : process.env.TENORI_APP_NAME || 'Tenori Dev';
 app.setName(appName);
+const appDisplayName = appName.replace(/^Tenori/, '过目');
 const userData = path.join(app.getPath('appData'), appName);
 mkdirSync(userData, { recursive: true });
 app.setPath('userData', userData);
@@ -103,7 +104,7 @@ const controllerSessions = new WeakMap<
   Electron.WebContents,
   ControllerSession
 >();
-// Only this document, in a PalmDesk window, may use IPC or navigate.
+// Only this document, in a Tenori window, may use IPC or navigate.
 const appEntryUrl =
   process.env.VITE_DEV_SERVER_URL ||
   pathToFileURL(path.join(process.env.DIST as string, 'index.html')).href;
@@ -229,7 +230,7 @@ const captureSession = new CaptureSession(
       const inputErrors: Record<string, string> = {
         permission:
           platform === 'win32'
-            ? 'Windows 不允许控制此窗口，请使用相同权限级别运行目标应用和 PalmDesk 后重试'
+            ? 'Windows 不允许控制此窗口，请使用相同权限级别运行目标应用和过目后重试'
             : `原生窗口服务没有辅助功能权限，请在电脑上重新授权 ${appName} 并重启`,
         ambiguous:
           '无法识别选定窗口的辅助功能信息，请在电脑上打开该窗口后重试控制',
@@ -355,7 +356,7 @@ function createChildWindow(
     childWindows.delete(win);
   });
   loadApp(win, kind).catch((error) => {
-    console.error('[PalmDesk] window failed to load', kind, error);
+    console.error('[Tenori] window failed to load', kind, error);
   });
 }
 
@@ -384,7 +385,7 @@ function sendToWindow(
 type WindowScope = 'main' | 'any';
 
 /**
- * The PalmDesk window behind an IPC message, if the message came from the
+ * The Tenori window behind an IPC message, if the message came from the
  * top-level app document of that window. `main` also requires the host
  * window, which owns capture, input and the local services.
  */
@@ -495,7 +496,7 @@ function main() {
       const response = await net.fetch(RELEASES_API, {
         headers: {
           Accept: 'application/vnd.github+json',
-          'User-Agent': `PalmDesk/${app.getVersion()}`,
+          'User-Agent': `Tenori/${app.getVersion()}`,
         },
         signal: AbortSignal.timeout(15000),
       });
@@ -533,7 +534,7 @@ function main() {
       label: '文件',
       submenu: [
         {
-          label: `关于${appName}`,
+          label: `关于${appDisplayName}`,
           click: () => {
             sendToWindow(mainWindow, IPC_EVENT.response_open_about);
           },
@@ -551,7 +552,7 @@ function main() {
           label: '重新启动',
           role: 'forceReload',
         },
-        { role: 'quit', label: `退出${appName}` },
+        { role: 'quit', label: `退出${appDisplayName}` },
       ],
     },
     {
@@ -642,7 +643,7 @@ function main() {
           data: await action(request?.data || {}),
         };
       } catch (error) {
-        console.warn('[PalmDesk] capture request failed', {
+        console.warn('[Tenori] capture request failed', {
           channel,
           action: request?.data?.input?.action,
           message: error instanceof Error ? error.message : String(error),
@@ -806,7 +807,7 @@ app.on('ready', async () => {
   } catch (error) {
     nativeWindows.close();
     dialog.showErrorBox(
-      'PalmDesk 应用身份冲突',
+      '过目应用身份冲突',
       error instanceof Error ? error.message : String(error)
     );
     app.exit(1);

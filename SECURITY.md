@@ -1,6 +1,6 @@
 # Security Policy
 
-PalmDesk is an experimental remote-control client in public preview. It gives a phone or browser control of one window on your computer, so treat its connection credentials like a password.
+Tenori is an experimental remote-control client in public preview. It gives a phone or browser control of one window on your computer, so treat its connection credentials like a password.
 
 ## Supported Versions
 
@@ -25,7 +25,7 @@ Include the affected version or commit, environment, reproduction steps and impa
 
 ## The Hosted Service
 
-Packaged desktop builds and the connection QR code use the PalmDesk service at `https://palmdesk.abreto.icu` unless you configure other servers under **高级设置 → 连接服务** (Advanced settings → Services). The project maintainer runs it as a best-effort preview, without an availability or security guarantee. The installer does not include a backend.
+Packaged desktop builds and the connection QR code use the Tenori service at `https://tenori.abreto.icu` unless you configure other servers under **高级设置 → 连接服务** (Advanced settings → Services). The project maintainer runs it as a best-effort preview, without an availability or security guarantee. The installer does not include a backend.
 
 The service:
 
@@ -40,7 +40,7 @@ Anyone who obtains your device code and temporary password, or who controls the 
 
 The updated backend also revokes session tokens and rejects connection attempts that authenticated with the old password but were still being established when it changed. Self-hosted deployments must rebuild and redeploy the backend image to enable this server-side enforcement. With an older backend, disconnection relies on the updated desktop client.
 
-To avoid the hosted service, deploy the PalmDesk-compatible backend from [containers](containers/README.md) and configure its addresses on both the desktop and the phone. See [service configuration](docs/SERVICE_CONFIGURATION.md).
+To avoid the hosted service, deploy the Tenori-compatible backend from [containers](containers/README.md) and configure its addresses on both the desktop and the phone. See [service configuration](docs/SERVICE_CONFIGURATION.md).
 
 ## Current Boundaries
 

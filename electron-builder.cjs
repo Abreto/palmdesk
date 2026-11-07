@@ -5,9 +5,9 @@
 const { getDesktopIdentity } = require('./scripts/desktop-identity.cjs');
 const signingCertificate = require('./build/macos-signing.json');
 
-const channel = process.env.PALMDESK_BUILD_CHANNEL || 'local';
+const channel = process.env.TENORI_BUILD_CHANNEL || 'local';
 if (!['local', 'release'].includes(channel))
-  throw new Error('PALMDESK_BUILD_CHANNEL must be local or release.');
+  throw new Error('TENORI_BUILD_CHANNEL must be local or release.');
 const identity = getDesktopIdentity(__dirname, {
   release: channel === 'release',
 });
@@ -19,6 +19,7 @@ module.exports = {
   productName: identity.productName,
   extraMetadata: { productName: identity.productName },
   beforePack: './scripts/before-pack.cjs',
+  afterPack: './scripts/localize-macos.cjs',
   directories: {
     output: identity.checkoutId
       ? `electron-release/\${version}/${identity.worktreeId ? 'worktree' : 'local'}-${identity.checkoutId}`
@@ -40,12 +41,12 @@ module.exports = {
     artifactName: '${productName}-${version}-mac-${arch}.${ext}',
     icon: 'build/icons/icon.icns',
     extendInfo: {
-      PalmDeskBuildChannel: channel,
+      TenoriBuildChannel: channel,
       NSScreenCaptureUsageDescription:
         '用于远程观察或控制时捕获选定的应用窗口。',
       // Electron 39+ needs this key for desktopCapturer on macOS 14.2+.
-      // PalmDesk captures window video only and never records audio.
-      NSAudioCaptureUsageDescription: 'PalmDesk 只捕获窗口画面，不录制音频。',
+      // Tenori captures window video only and never records audio.
+      NSAudioCaptureUsageDescription: '过目只捕获窗口画面，不录制音频。',
       NSAppleEventsUsageDescription: '用于聚焦选定的应用窗口。',
     },
   },
@@ -58,8 +59,8 @@ module.exports = {
   win: {
     extraResources: [
       {
-        from: 'native-bin/palmdesk-window.exe',
-        to: 'native/palmdesk-window.exe',
+        from: 'native-bin/tenori-window.exe',
+        to: 'native/tenori-window.exe',
       },
     ],
     artifactName: '${productName}-${version}-windows-${arch}.${ext}',

@@ -20,7 +20,7 @@ const message = (index, text = `Claude 消息 ${index}`) => record({
 });
 
 async function setup(t) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-claude-reader-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-claude-reader-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const codexHome = path.join(directory, 'codex');
   const claudeConfigDir = path.join(directory, 'claude');

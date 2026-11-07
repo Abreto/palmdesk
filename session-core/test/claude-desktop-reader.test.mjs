@@ -29,7 +29,7 @@ async function put(file, contents) {
   await writeFile(file, contents);
 }
 async function setup(t, { shortDirectory = false } = {}) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-claude-desktop-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-claude-desktop-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const claudeDesktopDataDir = path.join(directory, 'Claude');
   const claudeConfigDir = path.join(directory, '.claude');

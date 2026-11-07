@@ -7,7 +7,44 @@ const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
 
+const localizeMacOS = require('../../scripts/localize-macos.cjs');
+
 const root = path.resolve(__dirname, '../..');
+
+test('macOS packaging localizes the display name and preserves isolated checkout suffixes', async (t) => {
+  const directory = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'tenori-localization-')
+  );
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  await Promise.all(
+    ['', ' WT 0123456789', ' Local 0123456789 Dev'].map(async (suffix) => {
+      const productName = `Tenori${suffix}`;
+      await localizeMacOS({
+        electronPlatformName: 'darwin',
+        appOutDir: directory,
+        packager: { appInfo: { productFilename: productName, productName } },
+      });
+      ['en', 'zh_CN', 'zh_TW', 'zh-Hans', 'zh-Hant'].forEach((locale) => {
+        const name = `${locale === 'en' ? 'Tenori' : '过目'}${suffix}`;
+        const content = fs.readFileSync(
+          path.join(
+            directory,
+            `${productName}.app`,
+            'Contents/Resources',
+            `${locale}.lproj`,
+            'InfoPlist.strings'
+          ),
+          'utf8'
+        );
+        assert.equal(
+          content,
+          `"CFBundleName" = "${name}";\n"CFBundleDisplayName" = "${name}";\n`
+        );
+      });
+    })
+  );
+  await localizeMacOS({ electronPlatformName: 'win32' });
+});
 
 function harness(
   t,
@@ -15,7 +52,7 @@ function harness(
   { compiler = 'Framework64', failure, args = [] } = {}
 ) {
   const directory = fs.realpathSync(
-    fs.mkdtempSync(path.join(os.tmpdir(), 'palmdesk packaging '))
+    fs.mkdtempSync(path.join(os.tmpdir(), 'tenori packaging '))
   );
   const calls = [];
   const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
@@ -56,7 +93,7 @@ function harness(
     }
   }
   write('electron-main/native/codex-window.swift');
-  write('electron-main/native/palmdesk-window.cs');
+  write('electron-main/native/tenori-window.cs');
   for (const [name, bin] of [
     ['vite', 'bin/vite.js'],
     ['electron-builder', 'cli.js'],
@@ -105,8 +142,8 @@ test('Windows compiles the helper with Framework64, AnyCPU and Framework JSON', 
     '/target:exe',
     '/platform:anycpu',
     '/reference:System.Web.Extensions.dll',
-    `/out:${path.join(directory, 'native-bin/palmdesk-window.exe')}`,
-    path.join(directory, 'electron-main/native/palmdesk-window.cs'),
+    `/out:${path.join(directory, 'native-bin/tenori-window.exe')}`,
+    path.join(directory, 'electron-main/native/tenori-window.cs'),
   ]) {
     assert.ok(calls[0].args.includes(argument), `Missing ${argument}`);
   }
@@ -150,9 +187,9 @@ for (const difference of [0, 60_000]) {
     const { directory, calls, write, run } = harness(t, 'win32');
     const source = path.join(
       directory,
-      'electron-main/native/palmdesk-window.cs'
+      'electron-main/native/tenori-window.cs'
     );
-    const output = write('native-bin/palmdesk-window.exe', 'current helper');
+    const output = write('native-bin/tenori-window.exe', 'current helper');
     const sourceTime = new Date(Date.now() - 120_000);
     const outputTime = new Date(sourceTime.getTime() + difference);
     fs.utimesSync(source, sourceTime, sourceTime);
@@ -169,7 +206,7 @@ for (const difference of [0, 60_000]) {
 
 test('Windows reuses a current helper without requiring an installed compiler', async (t) => {
   const { calls, write, run } = harness(t, 'win32', { compiler: null });
-  const output = write('native-bin/palmdesk-window.exe');
+  const output = write('native-bin/tenori-window.exe');
   const future = new Date(Date.now() + 60_000);
   fs.utimesSync(output, future, future);
 
@@ -180,7 +217,7 @@ test('Windows reuses a current helper without requiring an installed compiler', 
 
 test('Windows recompiles the helper when its source is newer', async (t) => {
   const { calls, write, run } = harness(t, 'win32');
-  const output = write('native-bin/palmdesk-window.exe');
+  const output = write('native-bin/tenori-window.exe');
   const past = new Date(Date.now() - 60_000);
   fs.utimesSync(output, past, past);
 
@@ -281,7 +318,7 @@ for (const [platform, target] of [
     ]);
     assert.equal(calls[0].options.cwd, directory + path.sep);
     assert.equal(calls[1].options.cwd, directory + path.sep);
-    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
+    assert.equal(calls[1].options.env.TENORI_BUILD_CHANNEL, 'local');
   });
 }
 
@@ -335,7 +372,7 @@ for (const [platform, requested, target] of [
     await run('build-desktop.mjs');
     assert.equal(calls.length, 2);
     assert.equal(calls[0].options.env.VITE_APP_RELEASE_PROJECT_ISWEB, 'false');
-    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
+    assert.equal(calls[1].options.env.TENORI_BUILD_CHANNEL, 'local');
     assert.deepEqual(calls[1].args.slice(1), [...target, '--publish', 'never']);
   });
 }
@@ -346,21 +383,21 @@ for (const installer of [false, true]) {
       args: ['--release', ...(installer ? ['--installer'] : [])],
     });
     await run('build-desktop.mjs');
-    assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'release');
+    assert.equal(calls[1].options.env.TENORI_BUILD_CHANNEL, 'release');
     assert.equal(calls[1].args.includes('--dir'), !installer);
   });
 }
 
 test('local builds ignore an inherited release channel unless --release is passed', async (t) => {
-  const previous = process.env.PALMDESK_BUILD_CHANNEL;
+  const previous = process.env.TENORI_BUILD_CHANNEL;
   t.after(() => {
-    if (previous === undefined) delete process.env.PALMDESK_BUILD_CHANNEL;
-    else process.env.PALMDESK_BUILD_CHANNEL = previous;
+    if (previous === undefined) delete process.env.TENORI_BUILD_CHANNEL;
+    else process.env.TENORI_BUILD_CHANNEL = previous;
   });
-  process.env.PALMDESK_BUILD_CHANNEL = 'release';
+  process.env.TENORI_BUILD_CHANNEL = 'release';
   const { calls, run } = harness(t, 'win32', { args: ['--installer'] });
   await run('build-desktop.mjs');
-  assert.equal(calls[1].options.env.PALMDESK_BUILD_CHANNEL, 'local');
+  assert.equal(calls[1].options.env.TENORI_BUILD_CHANNEL, 'local');
 });
 
 test('installer builds reject conflicting platforms before invoking build tools', async (t) => {
@@ -383,8 +420,8 @@ test('packaging includes the Windows helper as a resource without elevation', ()
   const config = require('../../electron-builder.cjs');
   assert.deepEqual(config.win.extraResources, [
     {
-      from: 'native-bin/palmdesk-window.exe',
-      to: 'native/palmdesk-window.exe',
+      from: 'native-bin/tenori-window.exe',
+      to: 'native/tenori-window.exe',
     },
   ]);
   assert.equal(config.win.requestedExecutionLevel, 'asInvoker');
@@ -422,7 +459,7 @@ test(
   { skip: process.platform !== 'win32' },
   (t) => {
     const directory = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'palmdesk compiler ')
+      path.join(os.tmpdir(), 'tenori compiler ')
     );
     t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
     fs.mkdirSync(path.join(directory, 'scripts'));
@@ -434,7 +471,7 @@ test(
       path.join(directory, 'scripts/build-native.mjs')
     );
     fs.writeFileSync(
-      path.join(directory, 'electron-main/native/palmdesk-window.cs'),
+      path.join(directory, 'electron-main/native/tenori-window.cs'),
       `using System;
 using System.Web.Script.Serialization;
 class PackagingFixture {
@@ -457,7 +494,7 @@ class PackagingFixture {
       options
     );
     const output = childProcess.execFileSync(
-      path.join(directory, 'native-bin/palmdesk-window.exe'),
+      path.join(directory, 'native-bin/tenori-window.exe'),
       [],
       options
     );

@@ -8,7 +8,7 @@ const load = require('./load-source.cjs');
 for (const platform of ['darwin', 'win32']) {
 for (const method of ['list', 'read']) {
 test(`${platform}: desktop reader persists opt-in and revokes in-flight ${method}`, async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-settings-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-settings-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   let unblock;
   let started;
@@ -38,7 +38,7 @@ test(`${platform}: desktop reader persists opt-in and revokes in-flight ${method
 }
 
 test(`${platform}: malformed settings and failed persistence leave reading disabled`, async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-fail-closed-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-fail-closed-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
     '../session-core/index.mjs': { createSessionReader: () => assert.fail('reader must stay disabled') },
@@ -59,7 +59,7 @@ test(`${platform}: malformed settings and failed persistence leave reading disab
 });
 
 test(`${platform}: desktop requests read Claude transcripts through the same opt-in boundary`, async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-desktop-claude-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-desktop-claude-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const claudeConfigDir = path.join(directory, 'claude');
   await cp(path.join(__dirname, '../../session-core/test/fixtures/claude-config'), claudeConfigDir, { recursive: true });
@@ -81,7 +81,7 @@ test(`${platform}: desktop requests read Claude transcripts through the same opt
 });
 
 test(`${platform}: desktop requests discover Claude Desktop Code records and revoke access with the same setting`, async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-claude-desktop-opt-in-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-claude-desktop-opt-in-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const claudeDesktopDataDir = path.join(directory, 'Claude');
   const desktopId = 'local_dddddddd-dddd-4ddd-8ddd-dddddddddddd';
@@ -112,7 +112,7 @@ test(`${platform}: desktop requests discover Claude Desktop Code records and rev
 }
 
 test('unsupported hosts ignore saved opt-in and reject configuration', async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-unsupported-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-unsupported-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(path.join(directory, 'session-reader.json'), JSON.stringify({ enabled: true }));
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
