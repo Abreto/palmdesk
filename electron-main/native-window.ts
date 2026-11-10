@@ -25,6 +25,16 @@ export interface NativeWindow {
 type WindowIdentity = Pick<NativeWindow, 'nativeId' | 'ownerPid' | 'bundleId'>;
 type WindowThumbnail = WindowIdentity & { thumbnail: string };
 
+// Commands on the remote input path. They go ahead of waiting catalog,
+// preview and diagnostics work; the helper still runs one command at a time.
+const INPUT_COMMANDS = new Set([
+  'focus',
+  'verifyFocus',
+  'text',
+  'verifyImagePaste',
+  'pasteImage',
+]);
+
 /** macOS bundle IDs for desktop clients that are useful agent targets. */
 export const TARGET_BUNDLES = new Set<string>(
   AGENT_DEFINITIONS.flatMap((agent) => [...agent.bundles])
@@ -115,9 +125,44 @@ export function matchCaptureSources(
   return matched.sort((a, b) => Number(b.isAiTarget) - Number(a.isAiTarget));
 }
 
+// While a window is captured the catalog is listed without generating a
+// preview and icon for every window.
+export function captureSourceOptions(
+  previews: boolean
+): Electron.SourcesOptions {
+  return {
+    types: ['window'],
+    thumbnailSize: previews
+      ? { width: 320, height: 180 }
+      : { width: 0, height: 0 },
+    fetchWindowIcons: previews,
+  };
+}
+
+// Reuses the last generated previews so listings without them keep images.
+export class CapturePreviews {
+  private previews = new Map<
+    string,
+    Pick<ICaptureSource, 'thumbnail' | 'appIcon'>
+  >();
+
+  apply(sources: ICaptureSource[], generated: boolean) {
+    if (!generated)
+      return sources.map((source) => ({
+        ...source,
+        ...this.previews.get(source.id),
+      }));
+    this.previews = new Map(
+      sources.map(({ id, thumbnail, appIcon }) => [id, { thumbnail, appIcon }])
+    );
+    return sources;
+  }
+}
+
 export class NativeWindowBridge {
   private child?: ChildProcessWithoutNullStreams;
-  private serial: Promise<unknown> = Promise.resolve();
+  private waiting: { input: boolean; run: () => Promise<void> }[] = [];
+  private running = false;
   private generation = 0;
   private sequence = 0;
   private pending = new Map<
@@ -179,15 +224,41 @@ export class NativeWindowBridge {
     const generation = this.generation;
     // Keep waiting commands in JS, where session cancellation can still
     // withdraw a paste. Never leave input queued behind native focus/list work.
-    const result = this.serial.then(() => {
-      if (generation !== this.generation)
-        throw new Error('原生窗口服务不可用，请重新启动客户端');
-      if (current && !current())
-        throw new NativeWindowError('操作已取消', 'cancelled');
-      return this.dispatch<T>(command, target);
+    return new Promise<T>((resolve, reject) => {
+      const task = {
+        input: INPUT_COMMANDS.has(command),
+        run: async () => {
+          try {
+            if (generation !== this.generation)
+              throw new Error('原生窗口服务不可用，请重新启动客户端');
+            if (current && !current())
+              throw new NativeWindowError('操作已取消', 'cancelled');
+            resolve(await this.dispatch<T>(command, target));
+          } catch (error) {
+            reject(error);
+          }
+        },
+      };
+      const background = task.input
+        ? this.waiting.findIndex((waiting) => !waiting.input)
+        : -1;
+      if (background === -1) this.waiting.push(task);
+      else this.waiting.splice(background, 0, task);
+      void this.drain();
     });
-    this.serial = result.catch(() => {});
-    return result;
+  }
+
+  private async drain() {
+    if (this.running) return;
+    this.running = true;
+    try {
+      // Commands requested together are ordered before the first one runs.
+      await Promise.resolve();
+      for (let task = this.waiting.shift(); task; task = this.waiting.shift())
+        await task.run();
+    } finally {
+      this.running = false;
+    }
   }
 
   private dispatch<T>(

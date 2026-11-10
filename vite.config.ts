@@ -108,10 +108,15 @@ export default defineConfig(({ mode }) => {
                 // Avoid merged ESM/CJS library formats writing the same file.
                 lib: false,
                 rollupOptions: {
-                  input: 'electron-main/index.ts',
+                  input: {
+                    index: 'electron-main/index.ts',
+                    // Session logs are parsed off the main thread.
+                    'session-worker': 'session-core/worker.mjs',
+                  },
                   output: {
                     format: 'cjs',
                     entryFileNames: '[name].cjs',
+                    chunkFileNames: '[name]-[hash].cjs',
                   },
                 },
               },

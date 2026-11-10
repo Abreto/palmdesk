@@ -167,6 +167,7 @@ test('quitting waits for input to stop, but not longer than the quit timeout', a
       typeInChunks() {},
     },
     './native-window': {
+      CapturePreviews: class {},
       nativeHelperPath: () => '/unused-native-helper',
       NativeWindowBridge: class {
         close() {
@@ -214,6 +215,7 @@ test('startup turns off the nut-js delay before every typed character and key pr
     },
     './app-identity': { assertUniqueApplicationIdentity() {} },
     './native-window': {
+      CapturePreviews: class {},
       nativeHelperPath: () => '/unused-native-helper',
       NativeWindowBridge: class {
         async request() {

@@ -28,6 +28,7 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 | `session-core/src/` | Codex、Claude Code 解析器和缓存，以及共享的有界文件读取；Codex 摘要读取头尾各最多 64 KiB，Claude 摘要以流读取并保留紧凑父链记录，最多 32 MiB |
 | `session-core/public/timeline-renderers.js` | 浏览器端 Markdown 渲染，转义原始 HTML 并限制链接协议 |
 | `electron-main/session-reader.ts` | 默认关闭的读取设置、平台检查、设置持久化、撤销正在处理的请求 |
+| `electron-main/session-worker.ts`、`session-core/worker.mjs` | 在 worker 线程中解析日志，一次只处理一个请求，超时、关闭或空闲后结束线程 |
 | `src/utils/session-reader-channel.ts` | 独立可靠通道上的请求、分片、背压、超时、撤销和断开处理 |
 | `src/components/SessionReader/` | 手机会话列表与阅读组件 |
 | `src/components/SessionReaderSettings/` | 本机读取开关 |
@@ -35,6 +36,8 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 | `src/views/webrtc/index.vue` | 阅读／窗口切换与临时关联 |
 
 远端只提交会话 ID 和历史游标，源文件路径由本机目录映射解析，不提供任意文件、raw 数据或执行接口。主进程仅接受主窗口 IPC；网络桥接在每次请求和分片发送时核对当前认证连接。关闭开关会令进行中的读取失效，并通知手机清除内容。
+
+日志解析在 worker 线程中进行，不占用处理 IPC 和远程输入的主进程。worker 一次只处理一个请求，单次超过 30 秒即结束并重启。每个来源缓存最近读取的一份解析结果，只要文件路径、大小和修改时间不变，翻页和每 8 秒的检查就不必重新解析。关闭读取开关或空闲两分钟后，worker 退出并释放缓存。在 M 系列 Mac 上用 31 MiB 的合成 Codex 日志测量：原先在 Electron 主进程中解析，事件循环最长阻塞约 49 ms；改用 worker 后主进程最长延迟约 3 ms，文件未变时一次检查约 2 ms。较慢的电脑上，原先的阻塞会成比例变长。
 
 读取通道与原有输入通道分离。回复以最多 8,000 UTF-16 单元分片，每片 JSON 小于 64 KiB；发送队列有背压检查和时限，客户端重组上限 8 MiB。客户端可同时等待最多三项请求，主机有界串行处理。
 

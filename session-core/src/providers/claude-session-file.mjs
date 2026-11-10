@@ -110,7 +110,8 @@ export async function getClaudeSessionFileSession(id, options = {}) {
   }
 
   try {
-    const session = await parseClaudeSessionFile(filePath);
+    const parse = () => parseClaudeSessionFile(filePath);
+    const session = await (options.parseCache ? options.parseCache(filePath, parse) : parse());
     return session?.id === id ? session : null;
   } catch (error) {
     if (error instanceof SessionFileTooLargeError) throw error;
@@ -129,7 +130,8 @@ export async function getClaudeSessionFileTimelinePage(
     claudeConfigDir,
     ...(Object.hasOwn(options, "sessionFilePath")
       ? { sessionFilePath: options.sessionFilePath }
-      : {})
+      : {}),
+    parseCache: options.parseCache
   });
   return session ? pageTimelineItems(session.timeline, { limit, cursor }) : null;
 }

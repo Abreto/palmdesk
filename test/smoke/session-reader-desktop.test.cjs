@@ -5,6 +5,13 @@ const path = require('node:path');
 const test = require('node:test');
 const load = require('./load-source.cjs');
 
+// Runs the real session-core worker; the desktop build bundles the same entry.
+const { createWorkerSessionReader } = load('electron-main/session-worker.ts');
+const realWorker = {
+  createWorkerSessionReader: (options) =>
+    createWorkerSessionReader(options, path.join(__dirname, '../../session-core/worker.mjs')),
+};
+
 for (const platform of ['darwin', 'win32']) {
 for (const method of ['list', 'read']) {
 test(`${platform}: desktop reader persists opt-in and revokes in-flight ${method}`, async (t) => {
@@ -14,8 +21,9 @@ test(`${platform}: desktop reader persists opt-in and revokes in-flight ${method
   let started;
   const entered = new Promise((resolve) => { started = resolve; });
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
-    '../session-core/index.mjs': { createSessionReader: () => ({
+    './session-worker': { createWorkerSessionReader: () => ({
       [method]: () => { started(); return new Promise((resolve) => { unblock = resolve; }); },
+      close() {},
     }) },
   });
   const reader = new DesktopSessionReader(directory, platform);
@@ -41,7 +49,7 @@ test(`${platform}: malformed settings and failed persistence leave reading disab
   const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-fail-closed-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
-    '../session-core/index.mjs': { createSessionReader: () => assert.fail('reader must stay disabled') },
+    './session-worker': { createWorkerSessionReader: () => assert.fail('reader must stay disabled') },
   });
   for (const saved of ['null', '{', '{"enabled":"true"}']) {
     await writeFile(path.join(directory, 'session-reader.json'), saved);
@@ -64,7 +72,7 @@ test(`${platform}: desktop requests read Claude transcripts through the same opt
   const claudeConfigDir = path.join(directory, 'claude');
   await cp(path.join(__dirname, '../../session-core/test/fixtures/claude-config'), claudeConfigDir, { recursive: true });
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
-    '../session-core/index.mjs': await import('../../session-core/index.mjs'),
+    './session-worker': realWorker,
   });
   const reader = new DesktopSessionReader(directory, platform, path.join(directory, 'no-codex'), claudeConfigDir, '');
   const id = 'claude-code:session-file:33333333-3333-4333-8333-333333333333';
@@ -93,7 +101,7 @@ test(`${platform}: desktop requests discover Claude Desktop Code records and rev
     title: 'Desktop Code fixture', createdAt: Date.now(), lastActivityAt: Date.now(),
   }));
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
-    '../session-core/index.mjs': await import('../../session-core/index.mjs'),
+    './session-worker': realWorker,
   });
   const reader = new DesktopSessionReader(directory, platform, path.join(directory, 'no-codex'), path.join(directory, 'no-cli'), claudeDesktopDataDir);
   const id = 'claude-code:session-file:33333333-3333-4333-8333-333333333333';
@@ -116,7 +124,7 @@ test('unsupported hosts ignore saved opt-in and reject configuration', async (t)
   t.after(() => rm(directory, { recursive: true, force: true }));
   await writeFile(path.join(directory, 'session-reader.json'), JSON.stringify({ enabled: true }));
   const { DesktopSessionReader } = load('electron-main/session-reader.ts', {
-    '../session-core/index.mjs': { createSessionReader: () => assert.fail('reader must stay disabled') },
+    './session-worker': { createWorkerSessionReader: () => assert.fail('reader must stay disabled') },
   });
   const reader = new DesktopSessionReader(directory, 'linux');
   assert.deepEqual(await reader.settings(), { enabled: false, supported: false });

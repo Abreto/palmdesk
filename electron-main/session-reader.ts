@@ -1,12 +1,12 @@
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import { createSessionReader } from '../session-core/index.mjs';
+import { createWorkerSessionReader } from './session-worker';
 
 export class DesktopSessionReader {
   private enabled = false;
   private generation = 0;
-  private reader?: ReturnType<typeof createSessionReader>;
+  private reader?: ReturnType<typeof createWorkerSessionReader>;
   private ready: Promise<void>;
   private saving = false;
 
@@ -48,6 +48,8 @@ export class DesktopSessionReader {
     this.saving = true;
     this.generation += 1;
     this.enabled = false;
+    // Ending the worker also drops any transcript it has cached.
+    this.reader?.close();
     this.reader = undefined;
     try {
       await mkdir(this.directory, { recursive: true });
@@ -73,7 +75,7 @@ export class DesktopSessionReader {
     if (data.method === 'status') return await this.settings();
     if (!this.enabled) throw new Error('请在电脑 PalmDesk 中开启「会话阅读」');
     const generation = this.generation;
-    this.reader ||= createSessionReader({
+    this.reader ||= createWorkerSessionReader({
       codexHome: this.codexHome,
       claudeConfigDir: this.claudeConfigDir,
       claudeDesktopDataDir: this.claudeDesktopDataDir,
