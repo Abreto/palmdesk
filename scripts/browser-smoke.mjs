@@ -14,11 +14,21 @@ const { chromium } = require('playwright');
 
 const suites = [
   // These serve dist/ from their own HTTP and Socket.IO servers.
-  { scripts: ['credential-visibility.mjs', 'mobile-resume.mjs'] },
+  {
+    scripts: [
+      'credential-visibility.mjs',
+      'mobile-resume.mjs',
+      'desktop-controller.mjs',
+    ],
+  },
   {
     config: 'test/smoke/image-paste.vite.mjs',
     page: 'http://127.0.0.1:5196/test/smoke/image-paste.html',
-    scripts: ['image-paste-browser.mjs', 'viewport-gestures-browser.mjs'],
+    scripts: [
+      'image-paste-browser.mjs',
+      'viewport-gestures-browser.mjs',
+      'desktop-input-browser.mjs',
+    ],
   },
   {
     config: 'test/smoke/agent-launch.vite.mjs',

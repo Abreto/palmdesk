@@ -1,5 +1,8 @@
 <template>
-  <main class="controller-page">
+  <main
+    class="controller-page"
+    :class="interactionProfile"
+  >
     <header class="controller-header">
       <button
         type="button"
@@ -55,6 +58,24 @@
             :model-value="videoQuality"
             @update:model-value="updateQuality"
           />
+          <label class="interaction-mode">
+            交互方式
+            <select
+              aria-label="交互方式"
+              :value="interactionMode"
+              @change="
+                setInteractionMode(($event.target as HTMLSelectElement).value)
+              "
+            >
+              <option value="auto">
+                自动（{{
+                  interactionProfile === 'desktop' ? '鼠标和键盘' : '触摸'
+                }}）
+              </option>
+              <option value="touch">触摸</option>
+              <option value="desktop">鼠标和键盘</option>
+            </select>
+          </label>
           <span v-if="peer"
             >延迟 {{ Math.max(0, Math.round(peer.rtt)) }} ms</span
           >
@@ -213,6 +234,7 @@ import RemoteViewport from '@/components/RemoteViewport/index.vue';
 import SessionReader from '@/components/SessionReader/index.vue';
 import { WINDOW_ID_ENUM } from '@/constant';
 import { IPC_EVENT } from '@/event';
+import { useInteractionProfile } from '@/hooks/use-interaction-profile';
 import { useRemoteVideoQuality } from '@/hooks/use-remoteVideoQuality';
 import { useWebsocket } from '@/hooks/use-websocket';
 import type { IRemoteAgent, IRemoteWindow } from '@/pure-interface';
@@ -256,6 +278,11 @@ const {
 const roomId = ref('');
 const receiverId = ref('');
 const { videoQuality, setVideoQuality } = useRemoteVideoQuality();
+const {
+  mode: interactionMode,
+  profile: interactionProfile,
+  setMode: setInteractionMode,
+} = useInteractionProfile();
 const error = ref('');
 const inputError = ref('');
 const retryingInput = ref(false);
@@ -1351,6 +1378,72 @@ onUnmounted(() => {
   margin-top: 12px;
   font-size: 12px;
   color: var(--pd-muted);
+}
+.interaction-mode {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--pd-border);
+  font-size: 13px;
+  select {
+    min-width: 130px;
+    min-height: 40px;
+    padding: 0 8px;
+    border: 1px solid var(--pd-border);
+    border-radius: var(--pd-radius-sm);
+    background: var(--pd-bg);
+    color: var(--pd-text);
+    font: inherit;
+  }
+}
+// Mouse and keyboard controllers give the remote window the vertical space.
+.controller-page.desktop {
+  .controller-header {
+    gap: 8px;
+    padding: max(6px, env(safe-area-inset-top)) 12px 6px;
+  }
+  .controller-header > button {
+    flex-basis: 32px;
+    width: 32px;
+    height: 32px;
+    padding: 6px;
+  }
+  .connection-options summary {
+    width: 32px;
+    height: 32px;
+  }
+  .controller-header svg {
+    width: 18px;
+    height: 18px;
+  }
+  .heading {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+  .heading h1 {
+    flex-shrink: 0;
+    font-size: 15px;
+  }
+  .heading span {
+    min-width: 0;
+  }
+  .options-panel {
+    top: 38px;
+  }
+  .view-tabs {
+    padding: 3px 12px;
+    button {
+      min-height: 30px;
+      padding: 4px 16px;
+    }
+  }
+  .reading-context {
+    padding: 5px 12px;
+  }
 }
 .connection-message {
   position: absolute;
