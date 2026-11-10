@@ -42,7 +42,7 @@ Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
 
 These builds pass source checks and packaging verification in CI. Real screen capture, input, permission recovery and phone/network behavior still require testing on physical devices.
 
-`SHA256SUMS.txt` contains SHA256 hashes of the two installers.
+`SHA256SUMS.txt` contains SHA256 hashes of the two installers and the CycloneDX SBOM (`*-sbom.cdx.json`). To confirm that a download was built by this repository's release workflow, run `gh attestation verify <file> --repo Abreto/palmdesk`.
 Remaining dependency exceptions, development-tool advisories and license review items are documented in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md).
 
 ## 中文说明
@@ -90,5 +90,5 @@ CI 运行源码检查、浏览器烟测和依赖审计；发布检查覆盖两�
 
 这些构建已通过 CI 中的源码检查和打包验证。真实的屏幕捕获、输入、权限恢复以及手机和网络行为仍需在实体设备上测试。
 
-`SHA256SUMS.txt` 包含两个安装包的 SHA256 校验和。
+`SHA256SUMS.txt` 包含两个安装包及 CycloneDX SBOM（`*-sbom.cdx.json`）的 SHA256 校验和。运行 `gh attestation verify <文件> --repo Abreto/palmdesk` 可确认下载的文件由本仓库的发布工作流构建。
 剩余依赖例外、开发工具链安全公告及许可证审查事项见[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md)。

@@ -7,7 +7,21 @@ The `Container Images` workflow builds two Linux x86_64 images:
 
 Pull requests build and check both images. Pushes to `main`, or a manual run on
 `main`, publish `sha-<full-commit>` and `latest` tags using `GITHUB_TOKEN`.
-Use the immutable commit tag when selecting a production release.
+Each desktop prerelease also runs the workflow on its tag, which adds a
+`<version>` tag such as `0.0.8`. The run fails instead of moving an existing
+version tag. `latest` follows `main`; select a production release by version
+tag, commit tag or digest.
+
+Published images carry BuildKit provenance (`mode=max`) and SBOM attestations
+and a keyless cosign signature from this repository's workflow. To check an
+image before deploying it:
+
+```bash
+cosign verify ghcr.io/abreto/palmdesk-backend:0.0.8 \
+  --certificate-identity-regexp '^https://github\.com/Abreto/palmdesk/\.github/workflows/images\.yml@refs/(heads/main|tags/v.+)$' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+docker buildx imagetools inspect ghcr.io/abreto/palmdesk-backend:0.0.8 --format '{{ json .Provenance }}'
+```
 
 The web image uses the checked-out PalmDesk commit. The backend is fetched at
 the exact commit in `backend.lock.json`. Its deployment adapter exposes device

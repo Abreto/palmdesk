@@ -9,7 +9,8 @@
 1. 将待发布代码及工作流合并到 `main`，确认 `package.json` 中的版本号，并在 [CHANGELOG.md](../CHANGELOG.md) 中把 `Unreleased` 条目移到该版本下；有安全修复时写入 **Security**，并在 GitHub 发布对应的安全公告。
 2. 打开仓库 **Actions → Desktop Prerelease → Run workflow**。
 3. 选择 `main`，输入与版本号完全对应的标签，例如版本 `0.0.3` 输入 `v0.0.3`，然后运行。
-4. 等待两个平台的测试、编译和打包全部成功。最后一个任务会创建公开的 GitHub Prerelease，上传两个安装包及 `SHA256SUMS.txt`，并在运行摘要提供下载页面链接。
+4. 等待两个平台的测试、编译和打包成功。macOS 签名任务使用受保护的 `release` 环境，在运行页面点击 **Review deployments** 批准后才会读取证书。
+5. 签名完成后，最后一个任务为安装包生成构建来源证明（provenance）和 SBOM 证明，创建公开的 GitHub Prerelease，上传两个安装包、CycloneDX SBOM 及 `SHA256SUMS.txt`，在运行摘要提供下载页面链接，并为该标签发布带版本号的[容器镜像](../containers/README.md)。
 
 也可通过 GitHub CLI 手动触发：
 
@@ -26,15 +27,30 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 
 普通 push 和 pull request 不触发此发布流程。工作流固定构建触发时的提交；输入标签必须匹配该提交的版本，已有标签必须指向同一提交。标签不存在时，发布步骤为该提交创建标签。已存在的 Release 不覆盖；发布阶段失败若留下草稿，需先检查和处理该草稿再重跑，或者使用新版本。
 
-构建任务仅有仓库读取权限，发布任务使用 `contents: write` 的内置 `GITHUB_TOKEN`，不需要额外 PAT。macOS 签名需要下面两项 Actions Secrets。所有构建成功后才进入发布任务；临时安装包也会在 Actions Artifacts 中保留 14 天。预发布不会标记为 Latest。
+构建任务仅有仓库读取权限，会安装全部依赖并运行其安装脚本，因此拿不到签名证书。macOS 应用在构建任务中保持未签名，连同 electron-builder 生成的 DMG Finder 布局作为临时 Artifact 交给签名任务。签名任务只在 `release` 环境中运行，不安装任何包，只运行仅依赖 Node.js 内置模块的仓库脚本、macOS 系统工具和固定到提交 SHA 的 GitHub Actions。发布任务的内置 `GITHUB_TOKEN` 具有 `contents: write`、`attestations: write`、`id-token: write`，以及用于触发镜像工作流的 `actions: write`，不需要额外 PAT。所有构建和签名成功后才进入发布任务；安装包也会在 Actions Artifacts 中保留 14 天，未签名的应用保留 3 天。预发布不会标记为 Latest。
 
-发布前会检查两份安装包的名称、版本和非空文件状态，并生成 SHA256 校验和。macOS 还校验主程序及 Swift 辅助程序架构、签名完整性、主应用及各辅助进程的固定证书和稳定 designated requirement；Windows 检查原生辅助程序已包含在包内。签名烟测会编译并签署两个内容不同的测试应用，验证新版主程序和原生辅助程序仍满足旧版签名身份。
+所有工作流的 `uses:` 都固定到完整提交 SHA，并在注释中标明版本；升级 Action 时须同时更新两者。`test/smoke/release-workflows.test.cjs` 检查固定方式、签名 Secrets 的使用范围和证明步骤。
+
+发布前会检查两份安装包及 SBOM 的名称、版本和非空文件状态，并生成 SHA256 校验和。macOS 签名任务在导入证书前解压并检查未签名应用：只接受预期的文件，符号链接不得指向应用之外，并核对 bundle ID、发行渠道和架构。签名后校验签名完整性、主应用及各辅助进程的固定证书和稳定 designated requirement，再用 `hdiutil` 按原有 Finder 布局重建 DMG 并挂载复核。Windows 检查原生辅助程序已包含在包内。签名烟测会编译并签署两个内容不同的测试应用，验证新版主程序和原生辅助程序仍满足旧版签名身份。
+
+### 校验下载文件
+
+```bash
+gh attestation verify PalmDesk-<version>-mac-arm64.dmg --repo Abreto/palmdesk
+gh attestation verify PalmDesk-<version>-mac-arm64.dmg --repo Abreto/palmdesk --predicate-type https://cyclonedx.org/bom
+```
+
+第一条确认文件由本仓库的 Desktop Prerelease 工作流生成，第二条确认对应的 SBOM 证明；Windows 安装包、SBOM 本身同样适用第一条。SBOM 由 `pnpm sbom` 从锁文件生成，包含构建工具在内的全部锁定依赖。
 
 ## 固定 macOS 签名
 
-`build/macos-signing.json` 只保存公开证书名称及 SHA-1 / SHA-256 指纹。正式身份的 `--release` 构建必须使用这一证书，不允许退回 ad-hoc 或自动选择其他证书。原生窗口辅助程序固定使用 `<应用 bundle ID>.window-helper`，避免编译器生成的 UUID 改变签名标识。
+`build/macos-signing.json` 只保存公开证书名称、SHA-1 / SHA-256 指纹和可选的到期日。正式身份的 `--release` 构建必须使用这一证书，不允许退回 ad-hoc 或自动选择其他证书。原生窗口辅助程序固定使用 `<应用 bundle ID>.window-helper`，避免编译器生成的 UUID 改变签名标识。
 
-在仓库 Actions Secrets 中配置：
+在仓库 **Settings → Environments** 中创建 `release` 环境：
+
+- 在 **Required reviewers** 中添加发布负责人；
+- 将 **Deployment branches and tags** 限制为 `main`；
+- 在 **Environment secrets** 中配置下表两项，然后删除同名的仓库级 Actions Secrets，否则其他任务仍可引用它们。
 
 | Secret                      | 内容                                         |
 | --------------------------- | -------------------------------------------- |
@@ -43,11 +59,24 @@ gh workflow run desktop-release.yml --repo Abreto/palmdesk --ref main -f tag=v0.
 
 Base64 只是编码，必须存为 Secret。原始 `.p12`、密码和到期日保存在 1Password；不要提交私钥或密码。换构建机时恢复原证书，不重新生成同名证书。若确需更换证书，同时更新固定指纹并说明用户可能需要重新授权。
 
-工作流仅在 macOS 源码检查通过后读取 Secrets，导入随机密码保护的临时钥匙串，只信任该证书的代码签名用途。CI 仅支持一次性 GitHub 托管 runner：通过非交互管理员命令配置公开证书信任，随虚拟机销毁清除，避免 macOS 移除信任时等待 GUI 授权。签名结束或构建失败后，清理步骤恢复钥匙串搜索列表、删除含私钥的临时钥匙串和文件；自托管 runner 会在导入前被拒绝。证书与密码不进入构建产物，也不提供给 Windows 构建。
-
-本机发布构建前，将同一证书及私钥导入钥匙串，并在证书信任设置中允许代码签名。`pnpm dist:mac --release` 会按固定指纹选取它；使用独立钥匙串时可指定 `CSC_KEYCHAIN`。自签名不使用 Apple 团队标识自动填充、公证或时间戳服务。
+签名任务将证书导入随机密码保护的临时钥匙串：`.p12` 密码经 `security -i` 的标准输入传入，不出现在进程参数中；私钥导入后不可导出，只信任该证书的代码签名用途。CI 仅支持一次性 GitHub 托管 runner：通过非交互管理员命令配置公开证书信任，随虚拟机销毁清除，避免 macOS 移除信任时等待 GUI 授权。签名结束或构建失败后，清理步骤恢复钥匙串搜索列表、删除含私钥的临时钥匙串和文件；自托管 runner 会在导入前被拒绝。证书与密码不进入构建产物，也不提供给构建任务或 Windows 构建。
 
 从 v0.0.2 及更早 ad-hoc 版本升级到固定证书时，可能需要重新授予屏幕录制及辅助功能权限一次。后续签名身份保持稳定，但 CI 校验不能替代真实 macOS 升级授权测试。自签名仍不满足 Gatekeeper 的 Developer ID 和公证要求。
+
+### 证书到期与轮换
+
+签名任务在运行摘要中写出证书到期日，剩余不足 180 天时给出警告，证书过期后停止签名。可在 `build/macos-signing.json` 中以 `"notAfter": "YYYY-MM-DD"`（UTC）记录到期日，签名任务会核对它与实际证书一致；到期日可从 1Password 中的证书或运行摘要读取。
+
+自签名证书无法撤销。macOS 的屏幕录制和辅助功能授权绑定在包含证书指纹的 designated requirement 上，更换证书后用户需要重新授权一次。轮换步骤：
+
+1. 至少提前一个发行周期生成新的自签名代码签名证书，与密码一起保存到 1Password。
+2. 更新 `build/macos-signing.json` 中的名称、SHA-1、SHA-256 和 `notAfter`，并替换 `release` 环境中的两项 Secrets。
+3. 在发行说明中提示用户升级后重新授予两项权限，做法同 v0.0.3 从 ad-hoc 签名迁移时的说明。
+4. 若私钥可能泄露，立即删除环境 Secrets，按以上步骤换用新证书，并通过安全公告说明受影响的版本。
+
+### 本机发布构建
+
+本机发布构建前，将同一证书及私钥导入钥匙串，并在证书信任设置中允许代码签名。`pnpm dist:mac --release` 会按固定指纹选取它，并与 CI 一样由 `scripts/macos-codesign.cjs` 签名；使用独立钥匙串时可指定 `CSC_KEYCHAIN`。自签名不使用 Apple 团队标识自动填充、公证或时间戳服务。
 
 ## 本地构建
 

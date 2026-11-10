@@ -25,12 +25,12 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       commit: ${{ steps.release.outputs.commit }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: Validate version and tag
@@ -39,6 +39,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: node scripts/desktop-release.cjs validate
 
+  # Builds run every dependency and its install scripts, so they never receive
+  # signing secrets. The macOS app leaves this job unsigned.
   build:
     needs: validate
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
@@ -52,28 +54,25 @@ jobs:
             platform: mac
             arch: arm64
             native_arch: arm64
-            app_directory: mac-arm64
-            command: dist:mac
-            extension: dmg
+            command: dist:mac --release --unsigned
           - os: windows-2022
             platform: windows
             arch: x64
-            command: dist:win
-            extension: exe
+            command: dist:win --release
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       EXPECTED_ARCH: ${{ matrix.arch }}
       RELEASE_VERSION: ${{ needs.validate.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.validate.outputs.commit }}
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
           architecture: ${{ matrix.arch }}
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           run_install: false
       - name: Check build architecture
@@ -82,33 +81,32 @@ jobs:
         run: pnpm install --frozen-lockfile
       - run: pnpm test:smoke
       - run: pnpm typecheck
-      - name: Prepare fixed macOS signing certificate
-        if: runner.os == 'macOS'
-        env:
-          PALMDESK_SIGNING_P12: ${{ secrets.PALMDESK_SIGNING_P12 }}
-          PALMDESK_SIGNING_PASSWORD: ${{ secrets.PALMDESK_SIGNING_PASSWORD }}
-        run: node scripts/prepare-macos-signing.cjs prepare
-      - name: Verify signing identity survives a rebuild
-        if: runner.os == 'macOS'
-        run: node --test test/smoke/macos-signing-upgrade.cjs
       - name: Build installer
-        run: pnpm ${{ matrix.command }} --release
-      - name: Verify macOS binaries and fixed signing identity
+        run: pnpm ${{ matrix.command }}
+      - name: Check and stage the unsigned macOS app
         if: runner.os == 'macOS'
         shell: bash
         env:
-          APP_DIRECTORY: ${{ matrix.app_directory }}
           NATIVE_ARCH: ${{ matrix.native_arch }}
         run: |
-          app="electron-release/$RELEASE_VERSION/$APP_DIRECTORY/PalmDesk.app"
+          app="electron-release/$RELEASE_VERSION/mac-arm64/PalmDesk.app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.abreto.palmdesk'
           test "$(/usr/libexec/PlistBuddy -c 'Print :PalmDeskBuildChannel' "$app/Contents/Info.plist")" = 'release'
           lipo "$app/Contents/MacOS/PalmDesk" -verify_arch "$NATIVE_ARCH"
           lipo "$app/Contents/MacOS/codex-window" -verify_arch "$NATIVE_ARCH"
-          node scripts/verify-macos-signing.cjs "$app"
-      - name: Remove temporary macOS signing keychain
-        if: always() && runner.os == 'macOS' && env.PALMDESK_SIGNING_DIR != ''
-        run: node scripts/prepare-macos-signing.cjs cleanup
+          node scripts/macos-release.cjs stage \
+            "electron-release/$RELEASE_VERSION/PalmDesk-$RELEASE_VERSION-mac-arm64.dmg" \
+            "$app" \
+            "release-stage/PalmDesk-$RELEASE_VERSION-mac-arm64-unsigned.zip"
+      - name: Upload unsigned macOS app
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsigned-mac-arm64
+          path: release-stage/PalmDesk-${{ needs.validate.outputs.version }}-mac-arm64-unsigned.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
       - name: Verify Windows helper is packaged
         if: runner.os == 'Windows'
         shell: pwsh
@@ -119,48 +117,158 @@ jobs:
               throw "Missing packaged file: $file"
             }
           }
-      - name: Upload installer
-        uses: actions/upload-artifact@v7
+      - name: Upload Windows installer
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: installer-${{ matrix.platform }}-${{ matrix.arch }}
-          path: electron-release/${{ needs.validate.outputs.version }}/PalmDesk-${{ needs.validate.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.${{ matrix.extension }}
+          name: installer-windows-x64
+          path: electron-release/${{ needs.validate.outputs.version }}/PalmDesk-${{ needs.validate.outputs.version }}-windows-x64.exe
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
 
-  publish:
+  # The certificate secrets live only in the protected release environment.
+  # This job installs no packages: it runs repository scripts that use Node.js
+  # built-ins, macOS tools and pinned GitHub actions.
+  sign-macos:
     needs: [validate, build]
+    runs-on: macos-15
+    timeout-minutes: 20
+    environment: release
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unsigned-mac-arm64
+          path: unsigned
+      - name: Unpack and check the unsigned app before importing the key
+        shell: bash
+        run: |
+          node scripts/macos-release.cjs unpack \
+            "unsigned/PalmDesk-$RELEASE_VERSION-mac-arm64-unsigned.zip" stage
+          app=stage/PalmDesk.app
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.abreto.palmdesk'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :PalmDeskBuildChannel' "$app/Contents/Info.plist")" = 'release'
+          lipo "$app/Contents/MacOS/PalmDesk" -verify_arch arm64
+          lipo "$app/Contents/MacOS/codex-window" -verify_arch arm64
+      - name: Prepare fixed macOS signing certificate
+        env:
+          PALMDESK_SIGNING_P12: ${{ secrets.PALMDESK_SIGNING_P12 }}
+          PALMDESK_SIGNING_PASSWORD: ${{ secrets.PALMDESK_SIGNING_PASSWORD }}
+        run: node scripts/prepare-macos-signing.cjs prepare
+      - name: Verify signing identity survives a rebuild
+        run: node --test test/smoke/macos-signing-upgrade.cjs
+      - name: Sign app with the fixed certificate
+        run: node scripts/macos-codesign.cjs stage/PalmDesk.app
+      - name: Verify fixed signing identity
+        run: node scripts/verify-macos-signing.cjs stage/PalmDesk.app
+      - name: Create and verify DMG
+        shell: bash
+        run: |
+          dmg="release-assets/PalmDesk-$RELEASE_VERSION-mac-arm64.dmg"
+          node scripts/macos-release.cjs dmg stage "$dmg"
+          node scripts/macos-release.cjs verify-dmg "$dmg"
+      - name: Remove temporary macOS signing keychain
+        if: always() && env.PALMDESK_SIGNING_DIR != ''
+        run: node scripts/prepare-macos-signing.cjs cleanup
+      - name: Upload macOS installer
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: installer-mac-arm64
+          path: release-assets/PalmDesk-${{ needs.validate.outputs.version }}-mac-arm64.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  sbom:
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          run_install: false
+      # Lists every locked package, including build tools, without installing.
+      - name: Generate CycloneDX SBOM
+        run: pnpm sbom --sbom-format cyclonedx --sbom-spec-version 1.6 --lockfile-only --out "sbom/PalmDesk-$RELEASE_VERSION-sbom.cdx.json"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: sbom
+          path: sbom/PalmDesk-${{ needs.validate.outputs.version }}-sbom.cdx.json
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: [validate, build, sign-macos, sbom]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+      # Dispatch the container image workflow for the new tag.
+      actions: write
+      id-token: write
+      attestations: write
     env:
       RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.validate.outputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.validate.outputs.commit }}
           fetch-depth: 0
           persist-credentials: false
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: '22'
       - name: Recheck release tag
         run: node scripts/desktop-release.cjs validate
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: installer-*
           merge-multiple: true
           path: release-assets
-      - name: Verify installers and generate checksums
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: sbom
+          path: release-assets
+      - name: Verify assets and generate checksums
         run: node scripts/desktop-release.cjs assets release-assets
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: release-assets/SHA256SUMS.txt
+      - name: Attest SBOM for the installers
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            release-assets/*.dmg
+            release-assets/*.exe
+          sbom-path: release-assets/PalmDesk-${{ needs.validate.outputs.version }}-sbom.cdx.json
       - name: Publish prerelease
         shell: bash
         run: |
           gh release create "$RELEASE_TAG" \
             release-assets/*.dmg \
             release-assets/*.exe \
+            "release-assets/PalmDesk-$RELEASE_VERSION-sbom.cdx.json" \
             release-assets/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
@@ -169,3 +277,5 @@ jobs:
             --prerelease \
             --latest=false
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url --jq '.url' >> "$GITHUB_STEP_SUMMARY"
+      - name: Publish container images for the release tag
+        run: gh workflow run images.yml --repo "$GITHUB_REPOSITORY" --ref "$RELEASE_TAG" -f release="$RELEASE_TAG"

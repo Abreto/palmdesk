@@ -1,54 +1,42 @@
 const { createRequire } = require('node:module');
-const path = require('node:path');
+
 const certificate = require('../build/macos-signing.json');
 
-// Use the same signer version as the installed electron-builder.
-const builderRequire = createRequire(require.resolve('electron-builder'));
-const packagerRequire = createRequire(
-  builderRequire.resolve('app-builder-lib')
-);
-const { signAsync } = packagerRequire('@electron/osx-sign');
+const { helperIdentifiers, signApp } = require('./macos-codesign.cjs');
 
-module.exports = async (options, packager) => {
+// Other certificates keep the signer version of the installed electron-builder.
+function osxSign(options) {
+  const builderRequire = createRequire(require.resolve('electron-builder'));
+  const packagerRequire = createRequire(
+    builderRequire.resolve('app-builder-lib')
+  );
+  return packagerRequire('@electron/osx-sign').signAsync(options);
+}
+
+function sign(options, packager) {
   const fixedCertificate = options.identity?.toUpperCase() === certificate.sha1;
   if (process.env.PALMDESK_BUILD_CHANNEL === 'release' && !fixedCertificate) {
     throw new Error(
       'Release builds require the fixed PalmDesk signing certificate.'
     );
   }
+  const identifiers = helperIdentifiers(packager.appInfo.id);
   if (fixedCertificate) {
     if (options.platform === 'mas')
       throw new Error(
         'The self-signed certificate cannot sign Mac App Store builds.'
       );
-    const helper = path.join(options.app, 'Contents/MacOS/codex-window');
-    const helperId = `${packager.appInfo.id}.window-helper`;
+    // The release workflow signs with the same code, outside electron-builder.
     console.log('Signing PalmDesk with the fixed self-signed certificate.');
-    return signAsync({
-      ...options,
-      identityValidation: false,
-      preAutoEntitlements: false,
-      preEmbedProvisioningProfile: false,
-      optionsForFile: (file) => {
-        const original = options.optionsForFile?.(file) || {};
-        return {
-          ...original,
-          hardenedRuntime: false,
-          timestamp: 'none',
-          ...(file === helper
-            ? {
-                additionalArguments: [
-                  ...(original.additionalArguments || []),
-                  '--identifier',
-                  helperId,
-                ],
-              }
-            : {}),
-        };
-      },
+    signApp({
+      app: options.app,
+      identity: certificate.sha1,
+      keychain: options.keychain,
+      identifiers,
     });
+    return;
   }
-  if (options.identity && options.identity !== '-') return signAsync(options);
+  if (options.identity && options.identity !== '-') return osxSign(options);
 
   const configuredIdentity = packager.platformSpecificBuildOptions.identity;
   if (
@@ -62,15 +50,11 @@ module.exports = async (options, packager) => {
   }
 
   console.log('Signing PalmDesk locally (ad-hoc, not for distribution).');
-  await signAsync({
-    ...options,
-    identity: '-',
-    identityValidation: false,
-    preAutoEntitlements: false,
-    optionsForFile: (file) => ({
-      ...options.optionsForFile?.(file),
-      hardenedRuntime: false,
-      timestamp: 'none',
-    }),
+  signApp({ app: options.app, identity: '-', identifiers });
+}
+
+// electron-builder awaits the hook, so errors become a rejected promise.
+module.exports = (options, packager) =>
+  new Promise((resolve) => {
+    resolve(sign(options, packager));
   });
-};

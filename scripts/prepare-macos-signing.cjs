@@ -33,6 +33,44 @@ function security(args) {
   return result.stdout;
 }
 
+function importIdentity(p12, keychain, password) {
+  if (/[\r\n]/.test(password))
+    throw new Error('The certificate password must be a single line.');
+  const quote = (value) => `"${value.replace(/[\\"]/g, '\\$&')}"`;
+  // Interactive mode reads the command from stdin, keeping the password out
+  // of the process list. -x makes the private key non-extractable.
+  const result = spawnSync('/usr/bin/security', ['-i'], {
+    input: `import ${quote(p12)} -k ${quote(keychain)} -P ${quote(password)} -x -T /usr/bin/codesign\n`,
+    encoding: 'utf8',
+    timeout: 60_000,
+  });
+  // It exits 0 and reports a failed command as "<command>: returned <code>".
+  if (
+    result.error ||
+    result.status !== 0 ||
+    /: returned -?\d+/.test(`${result.stdout}${result.stderr}`)
+  )
+    throw new Error('macOS signing setup failed at security import.');
+}
+
+function reportExpiry(parsed) {
+  const expires = new Date(Date.parse(parsed.validTo));
+  const date = expires.toISOString().slice(0, 10);
+  if (certificate.notAfter && certificate.notAfter !== date)
+    throw new Error(
+      `build/macos-signing.json records notAfter ${certificate.notAfter}, but the certificate expires on ${date}.`
+    );
+  const days = Math.floor((expires.getTime() - Date.now()) / 86_400_000);
+  const message = `The fixed macOS signing certificate expires on ${date} (${days} days).`;
+  console.log(message);
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${message}\n`);
+  if (days < 180)
+    console.log(
+      `::warning::${message} See the rotation plan in docs/DESKTOP_RELEASES.md.`
+    );
+}
+
 function cleanup(directory) {
   const keychain = path.join(directory, 'signing.keychain-db');
   const cert = path.join(directory, 'certificate.pem');
@@ -109,16 +147,7 @@ function prepare() {
     security(['create-keychain', '-p', keychainPassword, keychain]);
     security(['set-keychain-settings', '-lut', '7200', keychain]);
     security(['unlock-keychain', '-p', keychainPassword, keychain]);
-    security([
-      'import',
-      p12,
-      '-k',
-      keychain,
-      '-P',
-      PALMDESK_SIGNING_PASSWORD,
-      '-T',
-      '/usr/bin/codesign',
-    ]);
+    importIdentity(p12, keychain, PALMDESK_SIGNING_PASSWORD);
     rmSync(p12);
     const certificates =
       security(['find-certificate', '-a', '-p', keychain]).match(
@@ -139,6 +168,7 @@ function prepare() {
       Date.now() >= Date.parse(parsed.validTo)
     )
       throw new Error('The signing certificate is not currently valid.');
+    reportExpiry(parsed);
     writeFileSync(pem, selected);
     console.log('Configuring temporary code-signing trust.');
     security([
