@@ -18,7 +18,11 @@ const suites = [
   {
     config: 'test/smoke/image-paste.vite.mjs',
     page: 'http://127.0.0.1:5196/test/smoke/image-paste.html',
-    scripts: ['image-paste-browser.mjs', 'viewport-gestures-browser.mjs'],
+    scripts: [
+      'image-paste-browser.mjs',
+      'image-markup-browser.mjs',
+      'viewport-gestures-browser.mjs',
+    ],
   },
   {
     config: 'test/smoke/agent-launch.vite.mjs',
