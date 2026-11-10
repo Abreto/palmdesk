@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const childProcess = require('node:child_process');
 const fs = require('node:fs');
-const { syncBuiltinESMExports } = require('node:module');
+const { builtinModules, syncBuiltinESMExports } = require('node:module');
 const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
@@ -414,6 +414,41 @@ test('the desktop package command delegates to host selection', () => {
   assert.equal(
     manifest.scripts['dist:win'],
     'node scripts/build-desktop.mjs --win --installer'
+  );
+});
+
+test('production dependencies are the packages the main process loads', () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(root, 'package.json'), 'utf8')
+  );
+  const specifiers = ['electron-main', 'session-core'].flatMap((directory) =>
+    fs
+      .readdirSync(path.join(root, directory))
+      .filter((file) => /\.(ts|mjs)$/.test(file))
+      .flatMap((file) => [
+        ...fs
+          .readFileSync(path.join(root, directory, file), 'utf8')
+          .matchAll(/(?:from|import\(|require\()\s*'([^'.][^']*)'/g),
+      ])
+      .map(([, specifier]) => specifier)
+  );
+  const packages = new Set(
+    specifiers
+      .map((specifier) => {
+        const [scope, base] = specifier.split('/');
+        return scope.startsWith('@') ? `${scope}/${base}` : scope;
+      })
+      .filter(
+        (name) =>
+          name !== 'electron' &&
+          !builtinModules.includes(name.replace(/^node:/, ''))
+      )
+  );
+  // electron-builder packs dependencies into app.asar; Vite bundles the
+  // renderer's libraries, so they belong in devDependencies.
+  assert.deepEqual(
+    Object.keys(manifest.dependencies).sort(),
+    [...packages].sort()
   );
 });
 

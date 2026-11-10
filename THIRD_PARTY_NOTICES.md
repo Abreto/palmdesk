@@ -2,7 +2,7 @@
 
 ## BilldDesk
 
-PalmDesk is derived from the open-source [BilldDesk](https://github.com/galaxy-s10/billd-desk) client. Its upstream source, copyright notice and MIT license are retained in [LICENSE.txt](LICENSE.txt). The original documentation is preserved in `README_OpenSource.md`, `doc/` and `readme_img/`; those product and contact details belong to upstream.
+PalmDesk is derived from the open-source [BilldDesk](https://github.com/galaxy-s10/billd-desk) client. Its upstream copyright notice and MIT license are retained in [LICENSE.txt](LICENSE.txt). The original documentation, product details and contact information are available in the [upstream repository](https://github.com/galaxy-s10/billd-desk) and belong to upstream.
 
 BilldDesk Pro is a separate upstream product. Its feature lists and download links are not PalmDesk releases or features.
 

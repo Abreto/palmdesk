@@ -1,7 +1,6 @@
 import { Socket, io } from 'socket.io-client';
 
 import { useNetworkStore } from '@/store/network';
-import { useUserStore } from '@/store/user';
 import {
   IReqWsFormat,
   WsConnectStatusEnum,
@@ -14,11 +13,7 @@ export function prettierReceiveWsMsg(...arg) {
   console.warn('【websocket】收到消息', ...arg);
 }
 
-export function prettierSendWsMsg(data: {
-  requestId: string;
-  msgType: string;
-  data;
-}) {
+function prettierSendWsMsg(data: { requestId: string; msgType: string; data }) {
   console.warn(
     `${new Date().toLocaleString()}【websocket】发送消息 msgType:${
       data.msgType
@@ -69,12 +64,9 @@ export class WebSocketClass {
       return;
     }
     prettierSendWsMsg({ requestId, msgType, data });
-    const userStore = useUserStore();
     const sendData: IReqWsFormat<any> = {
       request_id: requestId,
       socket_id: this.socketIo.id || '',
-      user_info: userStore.userInfo || {},
-      user_token: userStore.token || '',
       time: +new Date(),
       data: data || {},
     };

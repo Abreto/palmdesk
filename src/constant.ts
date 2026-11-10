@@ -1,32 +1,16 @@
 export * from '@/pure-constant';
-import { Key } from '@nut-tree-fork/shared';
 
+import { Key } from '@/utils/nut-keys';
 import { serviceDefaults } from '@/utils/service-defaults';
 
 export const PROJECT_GITHUB = 'https://github.com/Abreto/palmdesk';
 export const UPSTREAM_GITHUB = 'https://github.com/galaxy-s10/billd-desk';
-export const WEB_DESK_URL = `https://desk.hsslive.cn`;
 
 export const AUTHOR_INFO = {
   github: 'https://github.com/Abreto',
 };
 
-export const UPSTREAM_AUTHOR_INFO = {
-  github: 'https://github.com/galaxy-s10',
-  wechat: 'shuisheng9905',
-  qq: '2274751790',
-};
-
-export const COMMON_URL = {
-  privatizationDeployment: 'https://desk.hsslive.cn/privatizationDeployment',
-  payCoursesArticle: `https://www.hsslive.cn/article/151`,
-};
-
-export const PROJECT_NAME = 'palmdesk';
-
 export const APP_VERSION = PALMDESK_VERSION;
-
-export const NODE_ENV = process.env.NODE_ENV;
 
 export const COTURN_URL = import.meta.env.VITE_TURN_URL || '';
 
@@ -57,12 +41,6 @@ export const AXIOS_BASEURL =
 export const CLIENT_BASE_URL =
   import.meta.env.VITE_CLIENT_BASE_URL ||
   serviceDefaults(location.protocol, location.origin).client;
-
-// ======线上正式=====
-
-export const COOKIE_DOMAIN = undefined;
-
-export const THEME_COLOR = '#167c65';
 
 export const PRODUCT_NAME = 'PalmDesk';
 
@@ -153,19 +131,6 @@ export const NUT_KEY_MAP = {
   RightCmd: Key.RightCmd,
   LeftWin: Key.LeftWin,
   RightWin: Key.RightWin,
-};
-
-export const SRS_CB_URL_PARAMS = {
-  publishKey: 'pushkey',
-  publishType: 'pushtype',
-  userToken: 'usertoken',
-  userId: 'userid',
-  randomId: 'randomid',
-};
-
-// 全局的cookie的key
-export const COOKIE_KEY = {
-  thirdLoginInfo: 'thirdLoginInfo',
 };
 
 export const LS_KEY_PREFIX = 'billd_desk___';

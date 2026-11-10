@@ -30,13 +30,13 @@ test('the renderer allowlist names only defined channels and omits unused privil
   all.forEach((channel) => assert.ok(defined.has(channel), channel));
   assert.equal(new Set(all).size, all.length);
   [
-    IPC_EVENT.showTargetApplication,
-    IPC_EVENT.powerSaveBlockerStart,
-    IPC_EVENT.windowMaximize,
-    IPC_EVENT.setWindowBounds,
-    IPC_EVENT.handleMoveScreenRightBottom,
-    IPC_EVENT.getWindowTitlebarHeight,
-    IPC_EVENT.getWindowPosition,
+    'showTargetApplication',
+    'powerSaveBlockerStart',
+    'windowMaximize',
+    'setWindowBounds',
+    'handleMoveScreenRightBottom',
+    'getWindowTitlebarHeight',
+    'getWindowPosition',
   ].forEach((channel) => assert.ok(!all.includes(channel), channel));
 });
 
@@ -71,14 +71,14 @@ test('the preload forwards only allowed channels and never exposes the IPC event
 
   await api.invoke(IPC_EVENT.capturePermissions, { data: {} });
   await assert.rejects(
-    api.invoke(IPC_EVENT.showTargetApplication, { data: {} }),
+    api.invoke('showTargetApplication', { data: {} }),
     /not allowed/
   );
   await assert.rejects(api.invoke('anything', {}), /not allowed/);
   api.send(IPC_EVENT.closeWindow, { data: {} });
   // createWindow is a request with a reply; it cannot be sent.
   api.send(IPC_EVENT.createWindow, { data: {} });
-  api.send(IPC_EVENT.powerSaveBlockerStart, { data: {} });
+  api.send('powerSaveBlockerStart', { data: {} });
   assert.deepEqual(
     calls.map(([kind, channel]) => [kind, channel]),
     [

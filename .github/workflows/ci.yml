@@ -41,6 +41,11 @@ jobs:
       # see docs/LOCAL_DEVELOPMENT.md for the opt-in command.
       - run: pnpm typecheck
       - run: pnpm build:prod
+      # The build generates components.d.ts, which records the components
+      # templates use without importing them.
+      - name: Check for unused files and dependencies
+        if: runner.os == 'Linux'
+        run: pnpm lint:unused
 
   audit:
     runs-on: ubuntu-latest
