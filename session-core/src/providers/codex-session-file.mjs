@@ -311,7 +311,11 @@ export async function parseCodexSessionFile(filePath, { indexEntry, fileStat: kn
     }
 
     if (record.type === "event_msg" && payload.type === "patch_apply_end") {
-      applyCallOutput(callsById.get(payload.call_id), payload.stdout || payload.stderr);
+      const call = callsById.get(payload.call_id);
+      applyCallOutput(call, payload.stdout || payload.stderr);
+      if (call && payload.success === false) {
+        call.status = "failed";
+      }
       for (const [changePath, change] of Object.entries(payload.changes ?? {})) {
         timeline.push({
           id: timelineItemId(filePath, timeline.length, "file"),
@@ -320,6 +324,7 @@ export async function parseCodexSessionFile(filePath, { indexEntry, fileStat: kn
           path: changePath,
           summary: `${change.type ?? "change"} ${changePath}`,
           diff: change.unified_diff,
+          status: payload.success === false ? "failed" : "complete",
           sourceRefs: [sourceRef]
         });
       }
@@ -468,7 +473,10 @@ function applyCallOutput(item, output) {
 
   if (item.type === "tool_call") {
     item.output = contentToText(output);
-    item.status = "complete";
+    // The tool's own output follows patch_apply_end and must not hide its failure.
+    if (item.status !== "failed") {
+      item.status = "complete";
+    }
   }
 }
 

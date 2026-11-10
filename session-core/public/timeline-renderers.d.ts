@@ -1,1 +1,1 @@
-export function renderMarkdown(value: string): string;
+export function renderMarkdown(value: string, options?: { copyLabel?: string }): string;

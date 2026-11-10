@@ -122,12 +122,17 @@ function projectItem(item) {
     type: item.type,
     role: item.role,
     createdAt: clip(item.createdAt, 40),
+    // Older controllers only read `title`; newer ones label from the typed fields.
     title: clip(title, 512),
     text: clip(text, textLimit),
     detail: clip(detail, textLimit),
     truncated:
       String(text ?? '').length > textLimit ||
       String(detail ?? '').length > textLimit,
+    exitCode: Number.isInteger(item.exitCode) ? item.exitCode : null,
+    status: clip(item.status, 20),
+    toolName: item.type === 'tool_call' ? clip(item.name, 160) : '',
+    path: item.type === 'file_change' ? clip(item.path, 512) : '',
   };
 }
 

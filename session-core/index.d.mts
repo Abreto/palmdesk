@@ -18,6 +18,11 @@ export interface ReaderItem {
   text: string;
   detail: string;
   truncated: boolean;
+  // Hosts released before these fields omit them; fall back to `title`.
+  exitCode?: number | null;
+  status?: string;
+  toolName?: string;
+  path?: string;
 }
 export interface ReaderList {
   sessions: ReaderSession[];

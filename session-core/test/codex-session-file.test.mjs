@@ -411,6 +411,49 @@ test("parseCodexSessionFile maps function calls, outputs, and patch changes", as
   assert.equal(fileChange.path, "src/providers/codex.mjs");
   assert.equal(fileChange.summary, "update src/providers/codex.mjs");
   assert.match(fileChange.diff, /\+new/);
+  assert.equal(fileChange.status, "complete");
+});
+
+test("parseCodexSessionFile keeps a failed patch failed after the tool output arrives", async () => {
+  const codexHome = await mkdtemp(path.join(os.tmpdir(), "glassline-codex-patch-"));
+  const sessionId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const sessionDir = path.join(codexHome, "sessions/2026/07/05");
+  const sessionPath = path.join(sessionDir, `rollout-2026-07-05T09-00-00-${sessionId}.jsonl`);
+  const record = (type, payload) =>
+    JSON.stringify({ timestamp: "2026-07-05T09:00:01.000Z", type, payload });
+  const records = [
+    record("session_meta", { session_id: sessionId, cwd: "/repo/glassline" }),
+    record("response_item", {
+      type: "custom_tool_call",
+      status: "completed",
+      call_id: "call_patch",
+      name: "apply_patch",
+      input: "*** Begin Patch"
+    }),
+    record("event_msg", {
+      type: "patch_apply_end",
+      call_id: "call_patch",
+      success: false,
+      stdout: "",
+      stderr: "patch rejected",
+      changes: { "src/a.mjs": { type: "update", unified_diff: "@@ -1 +1 @@\n-old\n+new\n" } }
+    }),
+    record("response_item", {
+      type: "custom_tool_call_output",
+      call_id: "call_patch",
+      output: "patch rejected"
+    })
+  ];
+
+  await mkdir(sessionDir, { recursive: true });
+  await writeFile(sessionPath, records.join("\n"));
+
+  const session = await parseCodexSessionFile(sessionPath);
+  const tool = session.timeline.find((item) => item.type === "tool_call");
+  const fileChange = session.timeline.find((item) => item.type === "file_change");
+  assert.equal(tool.status, "failed");
+  assert.equal(tool.output, "patch rejected");
+  assert.equal(fileChange.status, "failed");
 });
 
 test("listCodexSessionFileSessions returns parsed and stale index sessions", async () => {

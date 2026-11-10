@@ -1,4 +1,4 @@
-// Modified for PalmDesk: add incomplete/truncated Markdown regressions.
+// Modified for PalmDesk: add Markdown regressions for agent output.
 // Original Glassline tests are Apache-2.0.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
@@ -10,6 +10,7 @@ import {
   groupTimelineItems,
   renderActivityGroup,
   renderCommandBody,
+  renderMarkdown,
   renderMessageBody,
   restoreOpenDisclosureIds,
   textForTimelineItem,
@@ -23,10 +24,11 @@ test("incomplete or truncated markdown markers always finish rendering", () => {
     import assert from "node:assert/strict";
     import { renderMarkdown } from ${JSON.stringify(moduleUrl)};
     for (const marker of ["- ", "*\\t", "1. ", "2)\\t", "# ", "##\\t", "### "]) {
-      assert.ok(renderMarkdown(marker).includes(marker.trim()));
+      // CommonMark may render a bare marker as an empty item or heading.
+      assert.equal(typeof renderMarkdown(marker), "string");
       assert.ok(renderMarkdown("before\\n" + marker + "\\n# after").includes("<h3>after</h3>"));
       const truncated = ("x".repeat(16384 - marker.length - 1) + "\\n" + marker + "more").slice(0, 16384);
-      assert.ok(renderMarkdown(truncated).includes(marker.trim()));
+      assert.ok(renderMarkdown(truncated).includes("x".repeat(100)));
     }
   `], { encoding: "utf8", timeout: 5000 });
   assert.ifError(result.error);
@@ -72,9 +74,67 @@ test("renderMessageBody renders a safe markdown subset", () => {
   assert.match(html, /<em>italic<\/em>/);
   assert.match(html, /<code>inline code<\/code>/);
   assert.match(html, /<a href="https:\/\/example\.com" target="_blank" rel="noreferrer">docs<\/a>/);
-  assert.match(html, /<ul><li>first item<\/li><li>second item<\/li><\/ul>/);
-  assert.match(html, /<blockquote><p>quoted note<\/p><\/blockquote>/);
-  assert.match(html, /<pre><code>const value = &quot;&lt;tag&gt;&quot;;\n<\/code><\/pre>/);
+  assert.match(html, /<ul>\s*<li>first item<\/li>\s*<li>second item<\/li>\s*<\/ul>/);
+  assert.match(html, /<blockquote>\s*<p>quoted note<\/p>\s*<\/blockquote>/);
+  assert.match(html, /<span>js<\/span><button type="button" data-copy-code>Copy<\/button>/);
+  assert.match(html, /<pre><code class="language-js">const value = &quot;&lt;tag&gt;&quot;;\n<\/code><\/pre>/);
+});
+
+test("renderMarkdown handles fences, tables and lists common in agent output", () => {
+  const html = renderMarkdown(
+    [
+      "Run:",
+      "",
+      "```shell-session",
+      "$ pnpm test",
+      "```",
+      "",
+      "Then check the summary.",
+      "",
+      "1. Install:",
+      "   ```bash",
+      "   pnpm install",
+      "   ```",
+      "2. Run the app.",
+      "",
+      "| File | Result |",
+      "| --- | --- |",
+      "| a.ts | ok |",
+      "",
+      "- parent",
+      "  - child",
+      "- [x] done",
+      "- [ ] todo",
+      "",
+      "~~old~~ new",
+      "",
+      "---",
+      "",
+      "~~~",
+      "code()",
+      "~~~",
+      "",
+      "![pixel](https://tracker.example/p.png)"
+    ].join("\n"),
+    { copyLabel: "复制" }
+  );
+
+  assert.match(html, /<code class="language-shell-session">\$ pnpm test\n<\/code>/);
+  assert.match(html, /<p>Then check the summary\.<\/p>/);
+  assert.match(
+    html,
+    /<li>Install:<div class="code-block">[\s\S]*pnpm install\n<\/code><\/pre><\/div>\s*<\/li>\s*<li>Run the app\.<\/li>/
+  );
+  assert.match(html, /<div class="table-scroll"><table>[\s\S]*<td>a\.ts<\/td>[\s\S]*<\/table><\/div>/);
+  assert.match(html, /<li>parent\s*<ul>\s*<li>child<\/li>/);
+  assert.match(html, /<li class="task-item"><input type="checkbox" disabled checked> done<\/li>/);
+  assert.match(html, /<li class="task-item"><input type="checkbox" disabled> todo<\/li>/);
+  assert.match(html, /<s>old<\/s> new/);
+  assert.match(html, /<hr>/);
+  assert.match(html, /<pre><code>code\(\)\n<\/code><\/pre>/);
+  assert.match(html, /data-copy-code>复制<\/button>/);
+  // Images would make the controller fetch arbitrary URLs.
+  assert.doesNotMatch(html, /<img/);
 });
 
 test("renderMessageBody escapes raw HTML and rejects unsafe links", () => {
