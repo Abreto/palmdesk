@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1"
+    />
+    <title>Preview prototype controller</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        font:
+          15px system-ui,
+          sans-serif;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid #ccc;
+      }
+      #preview {
+        flex: 1;
+        min-height: 0;
+      }
+      #preview iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+    </style>
+    <script src="/socket.io/socket.io.min.js"></script>
+    <script
+      type="module"
+      src="/controller.js"
+    ></script>
+  </head>
+  <body>
+    <header>
+      <strong>PalmDesk preview prototype</strong>
+      <span id="state">connecting</span>
+      <span id="targets"></span>
+      <button
+        id="stop"
+        type="button"
+      >
+        Stop
+      </button>
+    </header>
+    <main id="preview"></main>
+  </body>
+</html>
