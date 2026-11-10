@@ -34,8 +34,9 @@ const contentSecurityPolicy = [
 ].join('; ');
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(({ command, mode }) => {
   const isProduction = mode === 'production';
+  const isDevServer = command === 'serve';
 
   const outputStaticUrl = () => './';
 
@@ -131,14 +132,10 @@ export default defineConfig(({ mode }) => {
       //     '@nut-tree/nut-js': { type: 'cjs' },
       //   },
       // }),
-      checker({
-        // typescript: true,
-        vueTsc: true,
-        // eslint: {
-        //   lintCommand: 'eslint "./src/**/*.{ts,tsx}"', // for example, lint .ts & .tsx
-        // },
-      }),
-      eslint({}),
+      // Builds rely on the separate `pnpm typecheck` and `pnpm lint` steps;
+      // only the dev server reports type and lint errors as you edit.
+      isDevServer && checker({ vueTsc: true }),
+      isDevServer && eslint(),
       autoImport({
         imports: [
           {
@@ -147,7 +144,6 @@ export default defineConfig(({ mode }) => {
         ],
       }),
       unpluginVueComponents({
-        // eslint-disable-next-line
         resolvers: [NaiveUiResolver()],
       }),
       {

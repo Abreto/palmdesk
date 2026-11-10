@@ -1,4 +1,3 @@
-/* eslint-disable require-await, no-restricted-syntax, no-plusplus, global-require */
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const test = require('node:test');

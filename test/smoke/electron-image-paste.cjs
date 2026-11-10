@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax, require-await -- Clipboard cases run in sequence; async input-driver doubles match the production contract. */
 // Exercise real macOS image decoding and clipboard paste in a disposable,
 // hidden Electron window. This does not target Codex or synthesize OS keys.
 const assert = require('node:assert/strict');

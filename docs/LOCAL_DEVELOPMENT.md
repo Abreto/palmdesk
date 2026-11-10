@@ -28,12 +28,15 @@ Electron 下载器需要代理时，设置 `ELECTRON_GET_USE_PROXY=1` 和指向�
 无需后端的检查：
 
 ```bash
+pnpm lint
 pnpm test:smoke
 pnpm typecheck
 pnpm build:prod
 ```
 
-macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`，构建当前主机平台的原生辅助程序和本地应用目录。GitHub Actions 工作流包含 Windows 源码检查和辅助程序编译，云端结果以实际运行记录为准。
+macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`，构建当前主机平台的原生辅助程序和本地应用目录。随后 `pnpm test:desktop` 以 `--smoke-exit` 启动该应用：它使用临时配置目录，取消所有网络请求，不捕获窗口、不注入输入，也不请求系统权限，主窗口渲染完成后以退出码 0 结束。
+
+GitHub Actions 在 Ubuntu 上用 Node.js 22.16.0 运行 lint、类型检查、源码烟测和网页构建；在 macOS 和 Windows 上运行源码烟测（含平台专属测试）、编译原生辅助程序、构建本地应用目录并执行上述启动检查。云端结果以实际运行记录为准。
 
 生成本地测试安装包使用 `pnpm dist:mac` 或 `pnpm dist:win`，默认使用当前工作区的隔离身份。对外发布的固定身份须显式添加 `--release`。手动触发 GitHub Actions 构建并发布 Apple Silicon Mac 和 Windows x64 测试包的步骤见 [桌面安装包与预发布](DESKTOP_RELEASES.md)。
 

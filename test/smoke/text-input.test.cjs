@@ -1,4 +1,3 @@
-/* eslint-disable require-await -- Async input-driver doubles match the production contract. */
 const assert = require('node:assert/strict');
 const test = require('node:test');
 

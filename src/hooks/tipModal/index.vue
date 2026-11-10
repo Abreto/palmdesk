@@ -37,7 +37,7 @@
 import { VNode, defineComponent, ref, render, watch } from 'vue';
 
 export default defineComponent({
-  name: 'tipModal',
+  name: 'TipModal',
   emits: ['ok', 'cancel'],
   setup() {
     const title = ref('提示');

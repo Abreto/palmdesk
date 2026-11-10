@@ -142,6 +142,7 @@ macOS 通过 Launch Services 解析已安装的 `.app` bundle，并发送正常�
 ## 构建与检查
 
 ```bash
+pnpm lint
 pnpm test:smoke
 pnpm typecheck
 pnpm build:prod

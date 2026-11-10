@@ -1,4 +1,3 @@
-/* eslint-disable no-restricted-syntax -- Clipboard and native window scenarios must execute in order. */
 // Real Windows clipboard + SendInput integration, using only test-owned windows.
 // The fixture is named Codex.exe to exercise the production executable identity
 // gate. This is not a real Codex attachment or physical-phone acceptance test.

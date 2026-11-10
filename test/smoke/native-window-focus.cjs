@@ -63,7 +63,6 @@ app.whenReady().then(async () => {
     await second.window.webContents.executeJavaScript(
       'document.title = "PalmDesk focus fixture A"'
     );
-    // eslint-disable-next-line no-restricted-syntax -- Focus requests must run in order.
     for (const selected of [first, second, first]) {
       // The first request can activate; the second exercises live focus verification.
       for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -128,7 +127,6 @@ app.whenReady().then(async () => {
       'PASS focus verification rejects another application without activating the target'
     );
 
-    // eslint-disable-next-line no-restricted-syntax -- Keep native requests sequential.
     for (const mismatch of [
       { nativeId: 0 },
       { ownerPid: 0 },
