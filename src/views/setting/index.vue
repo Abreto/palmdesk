@@ -57,6 +57,35 @@
       /></label>
       <label class="toggle"
         ><span
+          ><strong>保持电脑唤醒</strong
+          ><small>PalmDesk 运行时阻止电脑自动睡眠，屏幕仍会照常关闭和锁定</small
+          ><small>会增加耗电；不会解锁电脑，也无法唤醒已睡眠的电脑</small></span
+        ><input
+          :checked="keepAwake?.enabled"
+          :disabled="!keepAwake?.supported || keepAwakeBusy"
+          type="checkbox"
+          class="pd-switch"
+          role="switch"
+          aria-label="保持电脑唤醒"
+          @change="configureKeepAwake"
+      /></label>
+      <p
+        v-if="keepAwakeFailure"
+        class="keep-awake failed"
+        role="alert"
+      >
+        {{ keepAwakeFailure }}
+      </p>
+      <p
+        v-else
+        class="keep-awake"
+        :class="{ active: keepAwake?.active }"
+        role="status"
+      >
+        {{ keepAwakeSummary }}
+      </p>
+      <label class="toggle"
+        ><span
           ><strong>自动检查更新</strong
           ><small
             >每天向 GitHub 查询新版本，只提示，不会自动下载或安装</small
@@ -129,7 +158,7 @@ import {
   ServerOutline,
 } from '@vicons/ionicons5';
 import { getRandomString } from 'billd-utils';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import {
   AXIOS_BASEURL,
@@ -142,6 +171,7 @@ import {
 } from '@/constant';
 import { IPC_EVENT } from '@/event';
 import { useIpcRendererSend } from '@/hooks/use-ipcRendererSend';
+import type { IKeepAwakeStatus } from '@/interface';
 import { useAppStore } from '@/store/app';
 import { usePiniaCacheStore } from '@/store/cache';
 import { ipcRenderer, ipcRendererInvoke } from '@/utils';
@@ -196,6 +226,70 @@ async function configureRelease(event: Event) {
 function checkRelease() {
   void releaseRequest(IPC_EVENT.releaseCheck);
 }
+
+const keepAwake = ref<IKeepAwakeStatus>();
+const keepAwakeBusy = ref(false);
+const keepAwakeLoadError = ref('');
+// The option is on but not in effect, or its state is unknown.
+const keepAwakeFailure = computed(() => {
+  if (keepAwakeLoadError.value) return keepAwakeLoadError.value;
+  const status = keepAwake.value;
+  if (!status?.enabled || status.active) return '';
+  return `未能阻止自动睡眠：${status.error || '请关闭后重新开启'}`;
+});
+const keepAwakeSummary = computed(() => {
+  const status = keepAwake.value;
+  if (!status) return '正在读取…';
+  if (!status.supported) return '保持唤醒支持 macOS 和 Windows';
+  if (status.active) return '已生效，关闭此项或退出 PalmDesk 后恢复自动睡眠';
+  return '未开启，电脑按系统设置自动睡眠';
+});
+
+async function keepAwakeRequest(channel: string, data = {}) {
+  const result = await ipcRendererInvoke({
+    windowId: WINDOW_ID_ENUM.remote,
+    channel,
+    requestId: 'keep-awake',
+    data,
+  });
+  if (result?.code !== 0)
+    throw new Error(result?.msg || '无法访问保持唤醒设置');
+  keepAwake.value = result.data;
+  keepAwakeLoadError.value = '';
+}
+
+async function loadKeepAwake() {
+  try {
+    await keepAwakeRequest(IPC_EVENT.keepAwakeStatus);
+  } catch (error) {
+    keepAwakeLoadError.value =
+      error instanceof Error ? error.message : String(error);
+  }
+}
+
+async function configureKeepAwake(event: Event) {
+  const input = event.target as HTMLInputElement;
+  keepAwakeBusy.value = true;
+  try {
+    await keepAwakeRequest(IPC_EVENT.keepAwakeConfigure, {
+      enabled: input.checked,
+    });
+  } catch (error) {
+    window.$message.error(
+      error instanceof Error ? error.message : '无法更新保持唤醒设置'
+    );
+    await loadKeepAwake();
+  } finally {
+    // Show the saved choice rather than the click when saving failed.
+    input.checked = !!keepAwake.value?.enabled;
+    keepAwakeBusy.value = false;
+  }
+}
+
+onMounted(() => {
+  if (ipcRenderer) void loadKeepAwake();
+});
+
 function openProject(url: string) {
   handleOpenExternal({
     windowId: WINDOW_ID_ENUM.remote,
@@ -280,8 +374,21 @@ dd {
   color: var(--pd-muted);
   font-size: 12px;
 }
-.toggle + .toggle {
+.toggle + .toggle,
+.keep-awake + .toggle {
   margin-top: 16px;
+}
+.keep-awake {
+  margin: 0;
+  padding-top: 12px;
+  color: var(--pd-muted);
+  font-size: 12px;
+  &.active {
+    color: var(--pd-accent);
+  }
+  &.failed {
+    color: var(--pd-danger);
+  }
 }
 .toggle {
   display: flex;

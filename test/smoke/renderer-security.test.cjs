@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const test = require('node:test');
 const { pathToFileURL } = require('node:url');
@@ -237,13 +239,24 @@ test('controller credentials are validated and stripped to the expected fields',
   );
 });
 
-function desktop({ packaged = false } = {}) {
+function desktop({ packaged = false, userData = '/tmp' } = {}) {
   const events = new Map();
   const handlers = new Map();
   const listeners = new Map();
   const opened = [];
   const windows = [];
   const permission = {};
+  // Electron's powerSaveBlocker: ids start at 0.
+  const sleep = { types: [], live: new Set() };
+  const powerSaveBlocker = {
+    start: (type) => {
+      sleep.types.push(type);
+      sleep.live.add(sleep.types.length - 1);
+      return sleep.types.length - 1;
+    },
+    stop: (id) => sleep.live.delete(id),
+    isStarted: (id) => sleep.live.has(id),
+  };
   class WebContents {
     constructor() {
       this.events = new Map();
@@ -324,7 +337,7 @@ function desktop({ packaged = false } = {}) {
           getName: () => 'PalmDesk Test',
           getVersion: () => '0.0.7',
           setName() {},
-          getPath: () => '/tmp',
+          getPath: () => userData,
           setPath() {},
           on: (event, listener) => events.set(event, listener),
           requestSingleInstanceLock: () => true,
@@ -355,6 +368,7 @@ function desktop({ packaged = false } = {}) {
           },
         },
         powerMonitor: { on() {} },
+        powerSaveBlocker,
         net: {
           fetch: () =>
             Promise.resolve({
@@ -408,6 +422,7 @@ function desktop({ packaged = false } = {}) {
     windows,
     opened,
     permission,
+    sleep,
     event,
     ready: () => events.get('ready')(),
     invoke: (channel, from, data = {}) =>
@@ -531,6 +546,70 @@ test('main-process IPC accepts only the app document of a PalmDesk window', asyn
 
   app.send(IPC_EVENT.handleOpenDevTools, trusted);
   assert.equal(main.webContents.devTools, true);
+});
+
+test('keeping the computer awake is a host setting that outlasts capture and windows until quit', async (t) => {
+  const userData = fs.mkdtempSync(path.join(os.tmpdir(), 'palmdesk-ipc-'));
+  t.after(() => fs.rmSync(userData, { recursive: true, force: true }));
+  const app = desktop({ userData });
+  await app.ready();
+  const [main] = app.windows;
+  const trusted = app.event(main);
+  assert.deepEqual(
+    (await app.invoke(IPC_EVENT.keepAwakeStatus, trusted)).data,
+    { enabled: false, active: false, supported: true }
+  );
+  await app.invoke(IPC_EVENT.createWindow, trusted, { kind: 'about' });
+  const fromAbout = app.event(app.windows[1], `${appUrl}#/about`);
+  const denied = await Promise.all(
+    [IPC_EVENT.keepAwakeStatus, IPC_EVENT.keepAwakeConfigure].map((channel) =>
+      app.invoke(channel, fromAbout, { enabled: true })
+    )
+  );
+  denied.forEach((result) => assert.equal(result.code, 1));
+  assert.equal(
+    (await app.invoke(IPC_EVENT.keepAwakeConfigure, trusted, { enabled: 1 }))
+      .code,
+    1
+  );
+  assert.deepEqual(app.sleep.types, []);
+
+  const enabled = await app.invoke(IPC_EVENT.keepAwakeConfigure, trusted, {
+    enabled: true,
+  });
+  assert.deepEqual(enabled.data, {
+    enabled: true,
+    active: true,
+    supported: true,
+  });
+  // Ending capture, reloading the page and minimizing leave it running.
+  main.webContents.events.get('render-process-gone')();
+  main.webContents.events.get('did-start-navigation')({}, appUrl, false, true);
+  app.send(IPC_EVENT.windowMinimize, trusted);
+  assert.equal(main.minimized, true);
+  assert.equal(
+    (await app.invoke(IPC_EVENT.keepAwakeStatus, trusted)).data.active,
+    true
+  );
+  assert.deepEqual(app.sleep.types, ['prevent-app-suspension']);
+  assert.equal(app.sleep.live.size, 1);
+
+  // The quit handler waits up to a few seconds for input to stop.
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  app.events.get('before-quit')({ preventDefault() {} });
+  assert.equal(app.sleep.live.size, 0);
+  t.mock.timers.reset();
+
+  // The next launch restores the choice once the app is ready.
+  const relaunched = desktop({ userData });
+  assert.deepEqual(relaunched.sleep.types, []);
+  await relaunched.ready();
+  const restored = await relaunched.invoke(
+    IPC_EVENT.keepAwakeStatus,
+    relaunched.event(relaunched.windows[0])
+  );
+  assert.equal(restored.data.active, true);
+  assert.deepEqual(relaunched.sleep.types, ['prevent-app-suspension']);
 });
 
 test('packaged builds cannot open DevTools', async () => {

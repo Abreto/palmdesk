@@ -15,6 +15,8 @@ export const RENDERER_INVOKE_CHANNELS: readonly string[] = [
   IPC_EVENT.releaseStatus,
   IPC_EVENT.releaseCheck,
   IPC_EVENT.releaseConfigure,
+  IPC_EVENT.keepAwakeStatus,
+  IPC_EVENT.keepAwakeConfigure,
   IPC_EVENT.getCaptureSources,
   IPC_EVENT.getAgentApplications,
   IPC_EVENT.getInstalledAgents,

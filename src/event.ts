@@ -50,6 +50,8 @@ export const IPC_EVENT = {
   sessionReaderSettings: 'sessionReaderSettings',
   sessionReaderConfigure: 'sessionReaderConfigure',
   sessionReaderRequest: 'sessionReaderRequest',
+  keepAwakeStatus: 'keepAwakeStatus',
+  keepAwakeConfigure: 'keepAwakeConfigure',
   beginCapture: 'beginCapture',
   stopCapture: 'stopCapture',
   remoteInput: 'remoteInput',
