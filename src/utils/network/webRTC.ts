@@ -681,6 +681,9 @@ export class WebRTCClass {
           this.update();
           return;
         }
+        // Every release labels its main channel MessageChannel. Leave other
+        // channels, such as controller verification, to their own handlers.
+        if (event.channel.label !== 'MessageChannel') return;
         this.cbDataChannel = event.channel;
         this.cbDataChannel.onclose = () => this.close();
         this.update();

@@ -235,6 +235,10 @@ import {
   getAgent,
   type AgentId,
 } from '@/utils/agent-registry';
+import {
+  HostAuthentication,
+  type HostAuthState,
+} from '@/utils/controller-auth-channel';
 import { REMOTE_SESSION_ENDED_EVENT } from '@/utils/network/remote-session';
 import { ControllerRecovery } from '@/utils/remote-presence';
 import type { RemoteVideoQuality } from '@/utils/remote-video';
@@ -310,14 +314,23 @@ let timeout: ReturnType<typeof setTimeout>;
 let heartbeat: ReturnType<typeof setInterval>;
 let hadPeer = false;
 let leaving = false;
+// Compatibility: desktops released before controller verification (0.0.8
+// and earlier) cannot verify, so a controller still uses them unverified, with
+// a warning. Set to false, or remove, once those desktops are unsupported.
+const ACCEPT_LEGACY_HOSTS = true;
+const hostAuth = ref<HostAuthState>('pending');
+let authentication: HostAuthentication | undefined;
 const peer = computed(() => networkStore.rtcMap.get(receiverId.value));
 const mySocketId = computed(
   () => networkStore.wsMap.get(roomId.value)?.socketIo?.id || ''
 );
+// The host answers nothing until this controller proves the password.
 const connected = computed(
   () =>
     peer.value?.peerConnection?.connectionState === 'connected' &&
-    peer.value?.dataChannel?.readyState === 'open'
+    peer.value?.dataChannel?.readyState === 'open' &&
+    (hostAuth.value === 'verified' ||
+      (ACCEPT_LEGACY_HOSTS && hostAuth.value === 'legacy'))
 );
 const controlling = computed(
   () =>
@@ -608,6 +621,7 @@ function receiveWindowMessage(event: MessageEvent) {
     presenceRequests.delete(message.requestId)
   ) {
     recovery.acknowledge(Date.now());
+    authentication?.hostAnswered();
     return;
   }
   if (
@@ -711,6 +725,36 @@ watch(
   (channel, previous) => {
     previous?.removeEventListener('message', receiveWindowMessage);
     channel?.addEventListener('message', receiveWindowMessage);
+  }
+);
+// Every connection proves the temporary password to the host again.
+watch(
+  () => peer.value?.peerConnection,
+  (connection) => {
+    authentication?.dispose();
+    authentication = undefined;
+    hostAuth.value = 'pending';
+    const current = peer.value;
+    if (!connection || !current?.dataChannel) return;
+    authentication = new HostAuthentication({
+      connection,
+      outgoing: current.dataChannel,
+      device: remoteDeskUserUuid.value,
+      password: remoteDeskUserPassword.value,
+      send: (message) => current.dataChannelSend(message),
+      probe: sendPresence,
+      onChange: (state) => {
+        hostAuth.value = state;
+        if (state === 'failed')
+          endConnection('无法验证电脑，请确认临时密码后重新连接');
+        else if (state === 'legacy' && !ACCEPT_LEGACY_HOSTS)
+          endConnection('电脑端 PalmDesk 版本较旧，请更新后重新连接');
+        else if (state === 'legacy')
+          window.$message?.warning(
+            '电脑端 PalmDesk 版本较旧，无法验证本次连接，请尽快更新'
+          );
+      },
+    });
   }
 );
 watch(
@@ -1145,6 +1189,7 @@ onUnmounted(() => {
   window.removeEventListener('pageshow', visibilityChanged);
   window.removeEventListener('online', visibilityChanged);
   readerClient.value?.dispose();
+  authentication?.dispose();
   leaving = true;
   clearTimeout(timeout);
   clearTimeout(requestTimer);

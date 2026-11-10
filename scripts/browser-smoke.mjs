@@ -14,7 +14,13 @@ const { chromium } = require('playwright');
 
 const suites = [
   // These serve dist/ from their own HTTP and Socket.IO servers.
-  { scripts: ['credential-visibility.mjs', 'mobile-resume.mjs'] },
+  {
+    scripts: [
+      'credential-visibility.mjs',
+      'mobile-resume.mjs',
+      'controller-auth-browser.mjs',
+    ],
+  },
   {
     config: 'test/smoke/image-paste.vite.mjs',
     page: 'http://127.0.0.1:5196/test/smoke/image-paste.html',

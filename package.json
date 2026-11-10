@@ -54,6 +54,8 @@
     }
   },
   "dependencies": {
+    "@noble/curves": "2.4.0",
+    "@noble/hashes": "2.4.0",
     "@nut-tree-fork/nut-js": "^4.2.2",
     "@nut-tree-fork/shared": "^4.2.2",
     "@vicons/ionicons5": "^0.12.0",

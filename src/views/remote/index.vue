@@ -458,7 +458,10 @@
           :key="key"
           class="item"
         >
-          <span>正在被{{ item[1].deskUserUuid }}控制</span>
+          <span v-if="verifiedControllers.has(item[1].sender)"
+            >正在被{{ item[1].deskUserUuid }}控制</span
+          >
+          <span v-else>正在验证 {{ item[1].deskUserUuid }}</span>
           <span
             class="del"
             @click="handleDel(item[1].sender)"
@@ -609,6 +612,11 @@ import {
   type ConnectionInvite,
   parseConnectionInvite,
 } from '@/utils/connection-invite';
+import {
+  type ControllerRejection,
+  controllerVerified,
+  verifyController,
+} from '@/utils/controller-auth-channel';
 import { ImageTransferHost } from '@/utils/image-transfer-channel';
 import { WebRTCClass } from '@/utils/network/webRTC';
 import { VideoActivityLease } from '@/utils/remote-presence';
@@ -697,12 +705,43 @@ const readerHosts = new Map<RTCDataChannel, ReaderHost>();
 const imageHosts = new Map<RTCDataChannel, ImageTransferHost>();
 let imagePasteSession = '';
 let readerEnabled = false;
+// Controllers shown as connected; access itself checks controllerVerified().
+const verifiedControllers = ref(new Set<string>());
+const rejectionNotices: Record<ControllerRejection, string> = {
+  legacy: '已断开旧版控制端，请对方刷新页面或更新 PalmDesk 后重新连接',
+  failed: '已断开未通过密码验证的控制端',
+  limited: '密码验证失败次数过多，暂不接受新的控制端',
+  aborted: '',
+};
+
+// The signaling server admits controllers; the host still requires each one
+// to prove the temporary password over its own connection.
+function verifyPeer(peer: WebRTCClass) {
+  const connection = peer.peerConnection;
+  const sender = peer.receiver;
+  if (!connection) return;
+  verifyController({
+    connection,
+    device: cacheStore.deskUserUuid,
+    password: () => cacheStore.deskUserPassword,
+    onVerified: () => verifiedControllers.value.add(sender),
+    onRejected: (reason) => {
+      verifiedControllers.value.delete(sender);
+      if (networkStore.rtcMap.get(sender)?.peerConnection !== connection)
+        return;
+      if (rejectionNotices[reason])
+        window.$message.warning(rejectionNotices[reason]);
+      handleDel(sender, reason === 'aborted' ? 'explicit' : 'unverified');
+    },
+  });
+}
 
 function bindImages(peer: WebRTCClass) {
   const channel = peer.imageChannel;
   if (!channel || imageHosts.has(channel)) return;
   const allowed = (sessionId: string) =>
     !!ipcRenderer &&
+    controllerVerified(peer.peerConnection) &&
     !!sessionId &&
     sessionId === imagePasteSession &&
     sessionId === captureSessionId.value &&
@@ -792,6 +831,7 @@ function bindReader(peer: WebRTCClass) {
   if (!incoming || !outgoing || readerHosts.has(incoming)) return;
   const current = () =>
     !!ipcRenderer &&
+    controllerVerified(peer.peerConnection) &&
     !stoppedPeers.has(peer.cbDataChannel!) &&
     appStore.remoteDesk.has(peer.receiver) &&
     !appStore.remoteDesk.get(peer.receiver)?.isClose &&
@@ -940,7 +980,9 @@ watch(
           stoppedPeers.has(item.cbDataChannel!) ||
           !appStore.remoteDesk.has(item.receiver) ||
           networkStore.rtcMap.get(item.receiver)?.cbDataChannel !==
-            item.cbDataChannel
+            item.cbDataChannel ||
+          // Input, window, Agent and image requests wait for verification.
+          !controllerVerified(item.peerConnection)
         )
           return;
         if (typeof event.data !== 'string' || event.data.length > 32768) return;
@@ -1080,6 +1122,7 @@ watch(
         // });
         appStore.remoteDesk.delete(item.sender);
         windowCatalogs.delete(item.sender);
+        verifiedControllers.value.delete(item.sender);
         if (item.sender === captureOwner) handleCloseAll();
         return;
       }
@@ -1476,7 +1519,7 @@ async function handleRTC(receiver) {
       roomId: roomId.value,
       anchorStream: undefined,
     });
-    await webRtcRemoteDesk.newWebRtc({
+    const peer = await webRtcRemoteDesk.newWebRtc({
       // 因为这里是收到offer，而offer是房主发的，所以此时的data.data.sender是房主；data.data.receiver是接收者；
       // 但是这里的nativeWebRtc的sender，得是自己，不能是data.data.sender，不要混淆
       sender: mySocketId.value,
@@ -1487,6 +1530,7 @@ async function handleRTC(receiver) {
       maxBitrate: currentMaxBitrate.value,
       maxFramerate: currentMaxFramerate.value,
     });
+    verifyPeer(peer);
     await webRtcRemoteDesk.sendOffer({
       sender: mySocketId.value,
       receiver,
@@ -1888,6 +1932,7 @@ function handleCloseAll() {
     networkStore.removeRtc(item.sender)
   );
   appStore.remoteDesk.clear();
+  verifiedControllers.value.clear();
 }
 
 function handleDel(sender: string, reason: SessionEndReason = 'explicit') {
