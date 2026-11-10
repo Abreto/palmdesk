@@ -15,16 +15,15 @@ import iconGen from 'icon-gen';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const source = await readFile(
-  path.join(root, 'build/source/palmdesk-mark.svg'),
+  path.join(root, 'build/source/tenori-mark.svg'),
   'utf8'
 );
 const artwork = source.match(/<g\b[\s\S]*<\/g>/)?.[0];
-if (!artwork)
-  throw new Error('PalmDesk source must contain one artwork group.');
+if (!artwork) throw new Error('Tenori source must contain one artwork group.');
 const reversed = artwork.replaceAll('#167C65', '#F6F7F2');
 const sizes = [16, 24, 32, 48, 64, 128, 256, 512, 1024];
 const output = path.join(root, 'build/icons');
-const temporary = await mkdtemp(path.join(tmpdir(), 'palmdesk-icons-'));
+const temporary = await mkdtemp(path.join(tmpdir(), 'tenori-icons-'));
 
 function tile(desktop) {
   // Desktop icons need outer transparent space. Browser icons use the full tile.
@@ -36,7 +35,7 @@ function tile(desktop) {
     : 'translate(12.8 11.2) scale(.8)';
   const fill = desktop ? 'url(#forest)' : '#167C65';
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <title>PalmDesk</title>
+  <title>Tenori</title>
   <desc>A desktop window resting in an open palm</desc>
   ${desktop ? '<defs><linearGradient id="forest" x1="0" y1="0" x2="0.8" y2="1"><stop stop-color="#218D73"/><stop offset=".55" stop-color="#167C65"/><stop offset="1" stop-color="#116B57"/></linearGradient></defs>' : ''}<rect x="${inset}" y="${inset}" width="${width}" height="${width}" rx="${radius}" fill="${fill}"/>
   <g transform="${transform}">${reversed}</g>
@@ -55,11 +54,11 @@ try {
   const favicon = tile(false);
   await mkdir(output, { recursive: true });
   await copyFile(
-    path.join(root, 'build/source/palmdesk-mark.svg'),
-    path.join(root, 'src/assets/img/palmdesk-mark.svg')
+    path.join(root, 'build/source/tenori-mark.svg'),
+    path.join(root, 'src/assets/img/tenori-mark.svg')
   );
-  await writeFile(path.join(root, 'build/source/palmdesk.svg'), app);
-  await writeFile(path.join(root, 'build/source/palmdesk.png'), png(app, 1024));
+  await writeFile(path.join(root, 'build/source/tenori.svg'), app);
+  await writeFile(path.join(root, 'build/source/tenori.png'), png(app, 1024));
   await writeFile(path.join(root, 'public/favicon.svg'), favicon);
   // Render each size from vectors, without resampling a large bitmap.
   await Promise.all(

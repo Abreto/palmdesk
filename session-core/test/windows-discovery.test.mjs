@@ -24,7 +24,7 @@ function environment(t, values) {
   }
 }
 const message = (uuid, i) => JSON.stringify({
-  sessionId: uuid, cwd: 'C:\\项目 空间\\PalmDesk', type: i % 2 ? 'assistant' : 'user',
+  sessionId: uuid, cwd: 'C:\\项目 空间\\Tenori', type: i % 2 ? 'assistant' : 'user',
   uuid: `message-${i}`, timestamp: new Date(now + i).toISOString(),
   message: { content: `Windows 回复 ${i}`, stop_reason: i % 2 ? 'end_turn' : null },
 });
@@ -33,17 +33,17 @@ async function put(file, text) {
   await writeFile(file, text);
 }
 async function setup(t) {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-windows-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-windows-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const codexHome = path.join(directory, '用户 空间', 'Codex data');
   const claudeConfigDir = path.join(directory, '用户 空间', 'Claude CLI');
   const claudeDesktopDataDir = path.join(directory, '用户 空间', 'Claude Desktop');
   const org = path.join(claudeDesktopDataDir, 'claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb');
-  const transcript = path.join(org, desktopId, '.claude', 'projects', 'C--项目-空间-PalmDesk', `${desktopUuid}.jsonl`);
+  const transcript = path.join(org, desktopId, '.claude', 'projects', 'C--项目-空间-Tenori', `${desktopUuid}.jsonl`);
   await cp(path.join(fixtures, 'codex-home'), codexHome, { recursive: true });
   await cp(path.join(fixtures, 'claude-config'), claudeConfigDir, { recursive: true });
   await put(path.join(org, `${desktopId}.json`), JSON.stringify({
-    sessionId: desktopId, cliSessionId: desktopUuid, cwd: 'C:\\项目 空间\\PalmDesk',
+    sessionId: desktopId, cliSessionId: desktopUuid, cwd: 'C:\\项目 空间\\Tenori',
     title: 'Windows Desktop 标题', createdAt: now, lastActivityAt: now,
   }));
   await put(transcript, Array.from({ length: 85 }, (_, i) => message(desktopUuid, i)).join('\r\n') + '\r\n');
@@ -82,7 +82,7 @@ test('environment overrides with spaces and non-ASCII paths discover all sources
   const oldest = await reader.read(id, older.nextCursor);
   assert.deepEqual([latest.items.length, older.items.length, oldest.items.length], [40, 40, 5]);
   assert.equal(latest.session.title, 'Windows Desktop 标题');
-  assert.equal(latest.session.projectPath, 'C:\\项目 空间\\PalmDesk');
+  assert.equal(latest.session.projectPath, 'C:\\项目 空间\\Tenori');
   assert.equal((await reader.list('Windows Desktop')).total, 1);
   const next = message(desktopUuid, 85);
   await appendFile(roots.transcript, next.slice(0, -4));
@@ -116,7 +116,7 @@ for (const relative of [
   ['claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb', desktopId],
   ['claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb', desktopId, '.claude'],
   ['claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb', desktopId, '.claude', 'projects'],
-  ['claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb', desktopId, '.claude', 'projects', 'C--项目-空间-PalmDesk'],
+  ['claude-code-sessions', 'aaaaaaaa', 'bbbbbbbb', desktopId, '.claude', 'projects', 'C--项目-空间-Tenori'],
 ]) {
   test(`Desktop rejects junctions at ${relative.at(-1)} after a cached read`, async (t) => {
     const roots = await setup(t);

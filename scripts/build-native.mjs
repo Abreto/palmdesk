@@ -27,8 +27,8 @@ if (process.platform === 'darwin') {
     );
   }
 } else if (process.platform === 'win32') {
-  const source = path.join(root, 'electron-main/native/palmdesk-window.cs');
-  const output = path.join(root, 'native-bin/palmdesk-window.exe');
+  const source = path.join(root, 'electron-main/native/tenori-window.cs');
+  const output = path.join(root, 'native-bin/tenori-window.exe');
   const existing = await stat(output).catch(() => null);
   if (!existing || existing.mtimeMs < (await stat(source)).mtimeMs) {
     const windows =

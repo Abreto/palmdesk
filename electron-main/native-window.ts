@@ -67,7 +67,7 @@ export function nativeHelperPath(
   const directory = resourcesDirectory
     ? path.join(resourcesDirectory, windows ? 'native' : '../MacOS')
     : path.join(mainDirectory, '../native-bin');
-  return path.join(directory, windows ? 'palmdesk-window.exe' : 'codex-window');
+  return path.join(directory, windows ? 'tenori-window.exe' : 'codex-window');
 }
 
 export class NativeWindowError extends Error {

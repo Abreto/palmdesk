@@ -3,7 +3,7 @@
     <PhonePortraitOutline
       class="item logo"
       role="img"
-      aria-label="PalmDesk"
+      aria-label="过目"
     />
     <div class="item name">{{ PRODUCT_NAME }}</div>
     <div class="item version">v{{ appStore.version }}</div>

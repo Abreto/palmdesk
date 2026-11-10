@@ -22,9 +22,9 @@ export const COMMON_URL = {
   payCoursesArticle: `https://www.hsslive.cn/article/151`,
 };
 
-export const PROJECT_NAME = 'palmdesk';
+export const PROJECT_NAME = 'tenori';
 
-export const APP_VERSION = PALMDESK_VERSION;
+export const APP_VERSION = TENORI_VERSION;
 
 export const NODE_ENV = process.env.NODE_ENV;
 
@@ -64,7 +64,7 @@ export const COOKIE_DOMAIN = undefined;
 
 export const THEME_COLOR = '#167c65';
 
-export const PRODUCT_NAME = 'PalmDesk';
+export const PRODUCT_NAME = '过目';
 
 export const NUT_KEY_MAP = {
   A: Key.A,

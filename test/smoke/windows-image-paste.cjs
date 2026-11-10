@@ -33,9 +33,9 @@ app
   .then(async () => {
     assert.equal(process.platform, 'win32');
     assert.equal(
-      process.env.PALMDESK_NATIVE_SMOKE,
+      process.env.TENORI_NATIVE_SMOKE,
       'true',
-      'Opt in to disposable window focus with PALMDESK_NATIVE_SMOKE=true'
+      'Opt in to disposable window focus with TENORI_NATIVE_SMOKE=true'
     );
     const directory = fs.mkdtempSync(path.join(output, 'windows-fixture-'));
     const executable = path.join(directory, 'Codex.exe');
@@ -46,11 +46,11 @@ app
       )
       .find(fs.existsSync);
     const native = new NativeWindowBridge(
-      path.join(root, 'native-bin/palmdesk-window.exe')
+      path.join(root, 'native-bin/tenori-window.exe')
     );
     const fixture = new NativeWindowBridge(executable);
     const saved = await saveClipboard(clipboard);
-    const marker = `PalmDesk clipboard smoke ${Date.now()}`;
+    const marker = `Tenori clipboard smoke ${Date.now()}`;
     let lastImage;
     let writes = 0;
     try {

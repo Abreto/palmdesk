@@ -105,7 +105,7 @@ export function externalLinkUrl(
 }
 
 export type RendererPermissionRequest = {
-  /** The request comes from the top-level app document of a PalmDesk window. */
+  /** The request comes from the top-level app document of a Tenori window. */
   trusted: boolean;
   /** The request comes from the host window that owns capture and input. */
   mainWindow: boolean;
@@ -117,7 +117,7 @@ export type RendererPermissionRequest = {
 };
 
 /**
- * Chromium permissions are denied unless PalmDesk uses them: window capture
+ * Chromium permissions are denied unless Tenori uses them: window capture
  * on the host, clipboard access and fullscreen in the controller view.
  */
 export function isPermissionAllowed(

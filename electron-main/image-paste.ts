@@ -147,7 +147,7 @@ export async function pasteWindowsClipboardImage(
     if (error instanceof NativeWindowError) {
       const blocked: Record<string, string> = {
         permission:
-          'Windows 不允许控制此窗口，请使用相同权限级别运行 Codex 和 PalmDesk 后重试',
+          'Windows 不允许控制此窗口，请使用相同权限级别运行 Codex 和过目后重试',
         focus:
           'Codex 窗口不在前台或被对话框阻挡，请在电脑上切回目标窗口后重试控制',
         input_busy: '电脑上仍有输入按下，请释放所有按键和鼠标按钮后手动重试',

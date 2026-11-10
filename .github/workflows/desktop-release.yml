@@ -100,21 +100,21 @@ jobs:
           APP_DIRECTORY: ${{ matrix.app_directory }}
           NATIVE_ARCH: ${{ matrix.native_arch }}
         run: |
-          app="electron-release/$RELEASE_VERSION/$APP_DIRECTORY/PalmDesk.app"
-          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.abreto.palmdesk'
-          test "$(/usr/libexec/PlistBuddy -c 'Print :PalmDeskBuildChannel' "$app/Contents/Info.plist")" = 'release'
-          lipo "$app/Contents/MacOS/PalmDesk" -verify_arch "$NATIVE_ARCH"
+          app="electron-release/$RELEASE_VERSION/$APP_DIRECTORY/Tenori.app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Contents/Info.plist")" = 'io.github.abreto.tenori'
+          test "$(/usr/libexec/PlistBuddy -c 'Print :TenoriBuildChannel' "$app/Contents/Info.plist")" = 'release'
+          lipo "$app/Contents/MacOS/Tenori" -verify_arch "$NATIVE_ARCH"
           lipo "$app/Contents/MacOS/codex-window" -verify_arch "$NATIVE_ARCH"
           node scripts/verify-macos-signing.cjs "$app"
       - name: Remove temporary macOS signing keychain
-        if: always() && runner.os == 'macOS' && env.PALMDESK_SIGNING_DIR != ''
+        if: always() && runner.os == 'macOS' && env.TENORI_SIGNING_DIR != ''
         run: node scripts/prepare-macos-signing.cjs cleanup
       - name: Verify Windows helper is packaged
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $app = "electron-release/$env:RELEASE_VERSION/win-unpacked"
-          foreach ($file in @('PalmDesk.exe', 'resources/native/palmdesk-window.exe')) {
+          foreach ($file in @('Tenori.exe', 'resources/native/tenori-window.exe')) {
             if (!(Test-Path "$app/$file" -PathType Leaf)) {
               throw "Missing packaged file: $file"
             }
@@ -123,7 +123,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.platform }}-${{ matrix.arch }}
-          path: electron-release/${{ needs.validate.outputs.version }}/PalmDesk-${{ needs.validate.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.${{ matrix.extension }}
+          path: electron-release/${{ needs.validate.outputs.version }}/Tenori-${{ needs.validate.outputs.version }}-${{ matrix.platform }}-${{ matrix.arch }}.${{ matrix.extension }}
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -164,7 +164,7 @@ jobs:
             release-assets/SHA256SUMS.txt \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "PalmDesk $RELEASE_TAG (Preview)" \
+            --title "Tenori $RELEASE_TAG (Preview)" \
             --notes-file .github/desktop-prerelease-notes.md \
             --prerelease \
             --latest=false

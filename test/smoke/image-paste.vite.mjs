@@ -9,7 +9,7 @@ export default defineConfig({
   resolve: { alias: { '@': path.join(root, 'src') } },
   define: {
     'process.env': { NODE_ENV: 'development' },
-    PALMDESK_VERSION: JSON.stringify('0.0.0-smoke'),
+    TENORI_VERSION: JSON.stringify('0.0.0-smoke'),
   },
   css: {
     preprocessorOptions: {

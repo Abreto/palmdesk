@@ -19,7 +19,7 @@ const application = await _electron.launch({
   cwd: root,
   env: {
     ...process.env,
-    PALMDESK_APP_NAME: getDesktopIdentity(root, { development: true })
+    TENORI_APP_NAME: getDesktopIdentity(root, { development: true })
       .productName,
     ...(packaged
       ? {}
@@ -100,7 +100,7 @@ try {
   await page.screenshot({ path: path.join(artifacts, `${artifactName}.png`) });
   const result = {
     scope:
-      'Real PalmDesk Electron shell and guarded IPC; no target capture, focus, input, or permission changes',
+      'Real Tenori Electron shell and guarded IPC; no target capture, focus, input, or permission changes',
     identity,
     permissions: permissions.data,
     agents: discovery.data.agents,

@@ -58,7 +58,7 @@ async function fixture(title, color) {
   });
   ownWindows.push(window);
   await window.loadURL(
-    `data:text/html,<title>${title}</title><body style="background:${encodeURIComponent(color)}"><h1>PalmDesk temporary test window</h1></body>`
+    `data:text/html,<title>${title}</title><body style="background:${encodeURIComponent(color)}"><h1>Tenori temporary test window</h1></body>`
   );
   const source = await until(
     async () =>
@@ -114,8 +114,8 @@ app.whenReady().then(async () => {
       true,
       'grant accessibility to the test Electron app first'
     );
-    const normal = await fixture('PalmDesk normal test', '#147e67');
-    const fullscreen = await fixture('PalmDesk fullscreen test', '#b34b63');
+    const normal = await fixture('Tenori normal test', '#147e67');
+    const fullscreen = await fixture('Tenori fullscreen test', '#b34b63');
     fullscreen.window.setFullScreen(true);
     const offscreen = await until(
       async () =>
@@ -187,7 +187,7 @@ app.whenReady().then(async () => {
         (await list()).some((w) => w.id === normal.source.id && w.isOnScreen),
       'return to normal desktop'
     );
-    const sibling = await fixture('PalmDesk minimized sibling', '#b34b63');
+    const sibling = await fixture('Tenori minimized sibling', '#b34b63');
     sibling.window.minimize();
     normal.window.minimize();
     const minimized = await until(
@@ -205,12 +205,12 @@ app.whenReady().then(async () => {
     sibling.window.restore();
     sibling.window.setBounds(normal.window.getBounds());
     await sibling.window.webContents.executeJavaScript(
-      'document.title = "PalmDesk normal test"'
+      'document.title = "Tenori normal test"'
     );
-    sibling.window.setTitle('PalmDesk normal test');
+    sibling.window.setTitle('Tenori normal test');
     const identical = await until(async () => {
       const sources = (await list()).filter(
-        (w) => w.name === 'PalmDesk normal test' && w.isOnScreen
+        (w) => w.name === 'Tenori normal test' && w.isOnScreen
       );
       return sources.length === 2 ? sources : undefined;
     }, 'identical title and frame windows');

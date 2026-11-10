@@ -151,7 +151,7 @@ export default defineConfig(({ mode }) => {
         resolvers: [NaiveUiResolver()],
       }),
       {
-        name: 'palmdesk-content-security-policy',
+        name: 'tenori-content-security-policy',
         apply: 'build',
         transformIndexHtml: () => [
           {
@@ -166,7 +166,7 @@ export default defineConfig(({ mode }) => {
       },
     ],
     define: {
-      PALMDESK_VERSION: JSON.stringify(pkg.version),
+      TENORI_VERSION: JSON.stringify(pkg.version),
       // Compile i18n messages without eval, which the CSP blocks.
       __INTLIFY_JIT_COMPILATION__: true,
       'process.env': {

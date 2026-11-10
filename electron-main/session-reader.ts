@@ -71,7 +71,7 @@ export class DesktopSessionReader {
   }) {
     await this.ready;
     if (data.method === 'status') return await this.settings();
-    if (!this.enabled) throw new Error('请在电脑 PalmDesk 中开启「会话阅读」');
+    if (!this.enabled) throw new Error('请在电脑过目中开启「会话阅读」');
     const generation = this.generation;
     this.reader ||= createSessionReader({
       codexHome: this.codexHome,

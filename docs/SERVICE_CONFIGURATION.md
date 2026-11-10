@@ -2,7 +2,7 @@
 
 ## 组成
 
-手机端是普通网页。macOS 电脑运行本仓库的 Electron 客户端并捕获选定窗口。两端连接同一个 PalmDesk API/Socket.IO 服务，视频和输入走 WebRTC；无法直连时使用后端配置的 TURN 中继。
+手机端是普通网页。macOS 电脑运行本仓库的 Electron 客户端并捕获选定窗口。两端连接同一个 Tenori API/Socket.IO 服务，视频和输入走 WebRTC；无法直连时使用后端配置的 TURN 中继。
 
 这条链路不使用 Codex app-server。后端负责设备注册、密码校验和信令，不需要访问 Codex 会话目录。
 
@@ -12,9 +12,9 @@
 
 | 配置                   | 浏览器默认      | 打包后的 Electron 默认  |
 | ---------------------- | --------------- | ----------------------- |
-| `VITE_API_BASE_URL`    | `/api`          | `https://palmdesk.abreto.icu/api` |
-| `VITE_SIGNALING_URL`   | 当前网页 origin | `https://palmdesk.abreto.icu` |
-| `VITE_CLIENT_BASE_URL` | 空，手机端无需设置 | `https://palmdesk.abreto.icu/` |
+| `VITE_API_BASE_URL`    | `/api`          | `https://tenori.abreto.icu/api` |
+| `VITE_SIGNALING_URL`   | 当前网页 origin | `https://tenori.abreto.icu` |
+| `VITE_CLIENT_BASE_URL` | 空，手机端无需设置 | `https://tenori.abreto.icu/` |
 | `VITE_TURN_URL`        | 空，后端自动下发 | 空，后端自动下发        |
 | `VITE_TURN_USERNAME`   | 空              | 空                      |
 | `VITE_TURN_CREDENTIAL` | 空              | 空                      |
@@ -23,7 +23,15 @@
 
 信令地址填服务的 origin，例如 `https://remote.example.com`，Socket.IO 会使用 `/socket.io` 路径。API 地址可填同域的 `/api`，或完整的 `https://remote.example.com/api`。
 
-打包版 Electron 使用 `file:` 页面，默认连接 PalmDesk 公共服务。自部署时可覆盖完整 HTTPS API/信令地址及手机网页地址，两端必须使用同一个后端。开发时 Vite 继续使用本地同域代理。设置页之前保存的地址优先于新的默认值，需要清除或修改旧设置才会使用默认值。
+打包版 Electron 使用 `file:` 页面，默认连接 Tenori 公共服务。自部署时可覆盖完整 HTTPS API/信令地址及手机网页地址，两端必须使用同一个后端。开发时 Vite 继续使用本地同域代理。设置页之前保存的地址优先于新的默认值，需要清除或修改旧设置才会使用默认值。
+
+## Tenori（过目）域名过渡
+
+v0.0.9 预览版的默认服务地址改为 `https://tenori.abreto.icu`。发版前由 Abreto 在 Cloudflare 添加 DNS，并确认 HTTPS 和反向代理已配置完成。过渡期保留 `https://palmdesk.abreto.icu`，两个域名的网页、`/api/`、`/socket.io/`（含 WebSocket Upgrade）都指向同一部署及同一个后端进程；旧域名直接提供服务，不将 API 或 WebSocket 请求重定向到新域名。
+
+后端设置 `PUBLIC_ORIGIN=https://tenori.abreto.icu`，在 `EXTRA_ALLOWED_ORIGINS` 中加入 `https://palmdesk.abreto.icu` 并保留其他仍需使用的来源，继续使用 `ALLOW_ELECTRON_ORIGIN=true`。无需修改来源校验逻辑或放宽为任意来源。域名配置生效前不要发布依赖新默认地址的安装包。
+
+网页仍使用当前 origin，因此旧书签和旧二维码可以继续连接同一个后端；已有桌面端显式保存的服务地址也仍优先于新默认值。浏览器存储按 origin 隔离，切到新域名后可能需要重新连接设备及设置偏好。发版前人工检查两个域名各自的网页/API/WebSocket、旧桌面端配新网页端、新桌面端配旧网页端、扫码及 TURN。保留现有数据库、Redis、配置、密钥和数据卷，镜像名称迁移见[容器指南](../containers/README.md#migration-from-palmdesk)。本次改名只修改源码和配置模板，不执行 DNS、部署或线上迁移。
 
 ## 扫码连接
 

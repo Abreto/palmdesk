@@ -1,16 +1,20 @@
-# PalmDesk
+# Tenori
+
+**Your desktop AI agents, perched on your palm.** Chinese name: **过目** ("for your review"). Formerly PalmDesk.
 
 English | [简体中文](README.zh-CN.md)
 
 AI-native remote control for desktop apps: read local AI sessions and control one macOS or Windows window from your phone for agent-ready workflows.
 
-PalmDesk is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). Its AI-native design centers on how people use AI agents: discover agent applications, read supported local sessions, and continue working in the original application window. From a phone browser, interact with Codex, ChatGPT, Claude, Kimi, ZCode, or a terminal on macOS or Windows. A desktop browser can also act as the controller.
+Tenori is maintained by [Abreto](https://github.com/Abreto) and built on the open-source edition of [BilldDesk](https://github.com/galaxy-s10/billd-desk). Its AI-native design centers on how people use AI agents: discover agent applications, read supported local sessions, and continue working in the original application window. From a phone browser, interact with Codex, ChatGPT, Claude, Kimi, ZCode, or a terminal on macOS or Windows. A desktop browser can also act as the controller.
 
-**Status: experimental preview, with no stable release yet.** Packaged desktop builds connect to the official backend at [https://palmdesk.abreto.icu](https://palmdesk.abreto.icu) by default. After connecting, the controller opens session reading if enabled on the host; otherwise it opens the Agent directory. Window capture starts only after you select a window. Automatically reopening the last selected window is planned. Historical dependency audit results and release prerequisites are recorded in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
+**Migrating from PalmDesk:** the next v0.0.9 preview uses a new app identity. Re-grant macOS Screen Recording and Accessibility, remove the old app, and reapply your connection settings. Windows installs Tenori alongside PalmDesk; uninstall the old app separately. The old service hostname and published container images remain available during the transition. See the [migration notes](CHANGELOG.md#unreleased) and [self-hosting guide](containers/README.md#migration-from-palmdesk). Abreto must confirm the new hostname before release.
+
+**Status: experimental preview, with no stable release yet.** Packaged desktop builds connect to the official backend at [https://tenori.abreto.icu](https://tenori.abreto.icu) by default. After connecting, the controller opens session reading if enabled on the host; otherwise it opens the Agent directory. Window capture starts only after you select a window. Automatically reopening the last selected window is planned. Historical dependency audit results and release prerequisites are recorded in the [open-source readiness notes](docs/OPEN_SOURCE_READINESS.md).
 
 ## Session Reading Preview
 
-PalmDesk now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS and Windows**, listed together by last update with a source label.
+Tenori now embeds the session reader migrated from Glassline; no separate Glassline deployment is needed. It supports **the current user's local Codex, Claude Code and Claude Desktop Code sessions on macOS and Windows**, listed together by last update with a source label.
 
 | Local source | macOS host | Windows host |
 | --- | --- | --- |
@@ -21,7 +25,7 @@ PalmDesk now embeds the session reader migrated from Glassline; no separate Glas
 
 Codex reads from `CODEX_HOME` or `~/.codex`. Claude Code reads `projects/*/*.jsonl` under `CLAUDE_CONFIG_DIR` or `~/.claude`, including renamed sessions, text replies and tool results. On Windows, `~` is the current user's home (normally `%USERPROFILE%`). Claude Desktop uses `~/Library/Application Support/Claude` and `Claude-3p` on macOS; on Windows it checks `%APPDATA%\Claude`, `%LOCALAPPDATA%\Claude-3p`, legacy `%APPDATA%\Claude-3p`, and their packaged-app locations under `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache`. `CLAUDE_USER_DATA_DIR` selects a single custom Desktop directory. This covers global and per-session transcripts, preserves Desktop titles and deduplicates shared logs.
 
-Set custom directories in the environment that launches PalmDesk; spaces and non-ASCII names are supported. Reading stays local and read-only. WSL homes are not automatically searched, Desktop SSH/WSL indexes and nested subagent transcripts are excluded, and no cloud logs are fetched. A readable local transcript must exist. Linux hosts do not support session reading. Windows storage and automated checks are recorded in the [validation notes](docs/smoke-artifacts/windows-session-reading-2026-09-24.md); a physical Windows host + phone run for all three sources is still unvalidated.
+Set custom directories in the environment that launches Tenori; spaces and non-ASCII names are supported. Reading stays local and read-only. WSL homes are not automatically searched, Desktop SSH/WSL indexes and nested subagent transcripts are excluded, and no cloud logs are fetched. A readable local transcript must exist. Linux hosts do not support session reading. Windows storage and automated checks are recorded in the [validation notes](docs/smoke-artifacts/windows-session-reading-2026-09-24.md); a physical Windows host + phone run for all three sources is still unvalidated.
 
 Enable **会话阅读** (Session reading) on the desktop home page, then connect from your phone using the QR code or device credentials. The controller opens the **阅读** (Read) tab, which lists searchable sessions and renders Markdown, copyable replies, paginated history and collapsed tool output. Reading works without starting window capture or granting Screen Recording and Accessibility permissions. While visible, the reader checks the selected session for updates every eight seconds and offers a button to view new content without moving your reading position automatically.
 
@@ -58,7 +62,7 @@ Reading is disabled by default and enabled per desktop installation. Disabling i
 
 Connect to a macOS or Windows host and select its Codex window. Use the image picker or clipboard button below the text composer, or paste an image into the text field. The initial version accepts one PNG/JPEG at a time, up to 10 MiB, approximately 25 megapixels, and 16384 pixels per side. HEIC, GIF, and other files are unsupported. Original image bytes are transferred unchanged; the host decodes them for its image clipboard without resizing or lossy recompression. Windows identifies Codex by its executable/process identity, not the window title; other applications do not expose these controls.
 
-Tap the Codex prompt in the remote video first, then choose “粘贴到 Codex” (Paste into Codex). The host verifies the control session and window identity, writes the image to its system clipboard, and presses `Cmd+V` on macOS or `Ctrl+V` on Windows. Existing text drafts are preserved; confirm the attachment and send the message yourself. PalmDesk verifies window focus but does not locate the prompt or select a GUI task automatically. Pasting replaces the computer's clipboard with the image. On Windows, a changed window/process, lost foreground focus, held input, or insufficient permission stops the paste. Release held keys/buttons and return to the selected window before retrying; run Codex and PalmDesk at the same privilege level (normally both without administrator privileges).
+Tap the Codex prompt in the remote video first, then choose “粘贴到 Codex” (Paste into Codex). The host verifies the control session and window identity, writes the image to its system clipboard, and presses `Cmd+V` on macOS or `Ctrl+V` on Windows. Existing text drafts are preserved; confirm the attachment and send the message yourself. Tenori verifies window focus but does not locate the prompt or select a GUI task automatically. Pasting replaces the computer's clipboard with the image. On Windows, a changed window/process, lost foreground focus, held input, or insufficient permission stops the paste. Release held keys/buttons and return to the selected window before retrying; run Codex and Tenori at the same privilege level (normally both without administrator privileges).
 
 Images travel in chunks over a dedicated WebRTC channel on the authenticated connection, without cloud file storage. Switching to reading or watch-only mode, disconnecting, or ending capture cancels pending work. If the image connection closes, choose “重新连接图片” (Reconnect images), then retry manually; your selected image is retained. If the result is unconfirmed, inspect Codex's attachments before retrying to avoid duplicates; input already delivered to the OS cannot be undone. Reading the phone clipboard requires HTTPS and browser paste permission; use the image picker when unavailable. Update both clients to a version supporting this feature. Real Windows clipboard pixels, `Ctrl+V`, mixed Chinese/English draft preservation, cancellation and target rejection are covered by disposable native fixtures. Physical-phone testing with actual Codex attachments, including iOS Safari and elevated-target recovery, remains pending; see the [Windows image-paste validation record](docs/smoke-artifacts/windows-image-paste-2026-09-24.md).
 
@@ -66,9 +70,9 @@ Images travel in chunks over a dedicated WebRTC channel on the authenticated con
 
 ### Install a Preview
 
-Download an Apple Silicon Mac DMG or Windows x64 installer from [GitHub Releases](https://github.com/Abreto/palmdesk/releases). Installing a packaged client does not require Node.js, pnpm or development tools. Open the DMG and drag PalmDesk into Applications, or run the Windows installer, then connect from the phone web client using the desktop's QR code or device credentials.
+Download an Apple Silicon Mac DMG or Windows x64 installer from [GitHub Releases](https://github.com/Abreto/palmdesk/releases). Installing a packaged client does not require Node.js, pnpm or development tools. Open the DMG and drag Tenori into Applications, or run the Windows installer, then connect from the phone web client using the desktop's QR code or device credentials.
 
-The desktop app checks GitHub Releases once a day and shows a notice when a newer release is published, with a stronger prompt for security fixes. It never downloads or installs updates. To check now, choose “检查更新” (Check for updates) in the macOS app menu or use the check button in “高级设置” (Advanced settings), where the daily check can also be turned off; while it is off, PalmDesk sends no update requests.
+The desktop app checks GitHub Releases once a day and shows a notice when a newer release is published, with a stronger prompt for security fixes. It never downloads or installs updates. To check now, choose “检查更新” (Check for updates) in the macOS app menu or use the check button in “高级设置” (Advanced settings), where the daily check can also be turned off; while it is off, Tenori sends no update requests.
 
 Intel Mac installers are not provided. Mac previews require macOS 13 Ventura or later and are built on macOS 15; macOS 13 and 14 have not been validated. Windows requires Windows 10 1903 or later / Windows 11 x64 with Windows Graphics Capture available. macOS previews use a fixed self-signed certificate from v0.0.3 onward, without Developer ID signing or notarization; Windows installers are unsigned. See [installation and release details](docs/DESKTOP_RELEASES.md).
 
@@ -76,7 +80,7 @@ Intel Mac installers are not provided. Mac previews require macOS 13 Ventura or 
 
 Source development requires Node.js 22.16.0 or later and pnpm 11.19.0, as pinned in `package.json`. macOS desktop development requires Xcode Command Line Tools. On Windows, the helper uses the system .NET Framework 4.x compiler; Visual Studio is not required.
 
-Packaged desktop builds default to `https://palmdesk.abreto.icu`, including the phone invitation homepage. Browser builds use their current origin; development uses the local backend proxy. Both clients must connect to the same service. For self-hosting, the [container adapter](containers/README.md) builds the pinned BilldDesk backend with PalmDesk session authentication and Cloudflare/coturn credential issuance; MySQL and Redis are required. See the [local development guide](docs/LOCAL_DEVELOPMENT.md) and [service configuration](docs/SERVICE_CONFIGURATION.md).
+Packaged desktop builds default to `https://tenori.abreto.icu`, including the phone invitation homepage. Browser builds use their current origin; development uses the local backend proxy. Both clients must connect to the same service. For self-hosting, the [container adapter](containers/README.md) builds the pinned BilldDesk backend with Tenori session authentication and Cloudflare/coturn credential issuance; MySQL and Redis are required. See the [local development guide](docs/LOCAL_DEVELOPMENT.md) and [service configuration](docs/SERVICE_CONFIGURATION.md).
 
 ### Start the Desktop Client
 
@@ -86,7 +90,7 @@ cp .env.example .env.local
 pnpm dev:desktop
 ```
 
-In Windows PowerShell, copy the environment file with `Copy-Item .env.example .env.local`. The first launch compiles `native-bin/palmdesk-window.exe` and starts Electron. See the [Windows desktop guide](docs/LOCAL_DEVELOPMENT.md#windows-桌面) for development and testing. Use `pnpm dev:desktop:lan` to expose the development page to phones on the local network.
+In Windows PowerShell, copy the environment file with `Copy-Item .env.example .env.local`. The first launch compiles `native-bin/tenori-window.exe` and starts Electron. See the [Windows desktop guide](docs/LOCAL_DEVELOPMENT.md#windows-桌面) for development and testing. Use `pnpm dev:desktop:lan` to expose the development page to phones on the local network.
 
 With the default `.env.local`, device registration and connection require a backend on port `4300`; starting the desktop or web client does not start that backend. Configure alternative service addresses in `.env.local` or the client's connection settings. Saved settings take precedence over environment defaults. See the [service configuration guide](docs/SERVICE_CONFIGURATION.md) for API, signaling, HTTPS, and TURN settings.
 
@@ -94,11 +98,11 @@ On macOS, the development script compiles the Swift window helper and creates a 
 
 ```text
 .local/electron-dev/Electron.app
-name: PalmDesk Local <id> Dev
-bundle ID: io.github.abreto.palmdesk.local.<id>.dev
+name: Tenori Local <id> Dev
+bundle ID: io.github.abreto.tenori.local.<id>.dev
 ```
 
-Grant **Screen Recording** and **Accessibility** permissions to the current checkout's development app in macOS System Settings (`PalmDesk Local <id> Dev`, or `PalmDesk WT <id> Dev` for a linked worktree):
+Grant **Screen Recording** and **Accessibility** permissions to the current checkout's development app in macOS System Settings (`Tenori Local <id> Dev`, or `Tenori WT <id> Dev` for a linked worktree):
 
 - Screen Recording is required to view a window that is available for capture on the current desktop.
 - Accessibility is required to switch Spaces, restore windows, and send input. Automatic window activation needs this permission even in read-only mode.
@@ -126,7 +130,7 @@ Open the computer's reachable LAN IP and Vite port on the phone. `localhost` on 
 ### Connect and Select a Window
 
 1. Install a supported Agent on the computer, or open another application window you want to control. Agent windows can be on any macOS Space, or on the current Windows virtual desktop.
-2. Open the PalmDesk web client on your phone. The desktop and web clients must both use this version and connect to the same backend.
+2. Open the Tenori web client on your phone. The desktop and web clients must both use this version and connect to the same backend.
 3. Enter the device code and password displayed by the desktop client, or use its QR code.
 4. After authentication, session reading opens if enabled on the host. To control a window, switch to **窗口** (Window) and select it from the Agent directory. If the Agent is not open, choose **打开 Agent**, then select an installed application. When reading is disabled or unsupported, the directory opens by default. The host activates the selected window and starts capture once it is available.
 
@@ -140,41 +144,41 @@ To enable QR connections, configure the phone-accessible web client homepage in 
 
 ### Open an Agent from your phone
 
-The Agent directory offers **打开 Agent** (Open Agent) both when empty and when other Agents are open. It lists installed Codex, Claude, ChatGPT, Kimi and ZCode applications supported by the host. Selecting an app with existing native windows uses the normal window picker; otherwise PalmDesk explicitly launches or reopens it, refreshes the directory, and waits briefly for a window. Manually linked terminals remain accessible from the directory and do not prevent launching the desktop app. A single matching window enters the normal capture flow; multiple windows require selection. Apps can refuse to create a window: errors and timeouts retain refresh/retry and other-application access.
+The Agent directory offers **打开 Agent** (Open Agent) both when empty and when other Agents are open. It lists installed Codex, Claude, ChatGPT, Kimi and ZCode applications supported by the host. Selecting an app with existing native windows uses the normal window picker; otherwise Tenori explicitly launches or reopens it, refreshes the directory, and waits briefly for a window. Manually linked terminals remain accessible from the directory and do not prevent launching the desktop app. A single matching window enters the normal capture flow; multiple windows require selection. Apps can refuse to create a window: errors and timeouts retain refresh/retry and other-application access.
 
 Installed-app discovery runs independently of the window list, so existing windows remain selectable while it loads. The installed list is cached for 30 seconds; newly installed apps may take that long to appear after refreshing. Every explicit launch checks the installation again.
 
-macOS resolves installed `.app` bundles through Launch Services and sends the normal application open/reopen request. Windows discovers known executable names from the current user's installed MSIX packages and Windows App Paths registrations, launching packaged apps through their registered application ID. Unregistered portable/custom installations and CLI agents are not launch targets; open those on the computer first. Windows window selection remains limited to the current virtual desktop. Unsupported hosts and older PalmDesk versions explain why launching is unavailable. Update both host and controller.
+macOS resolves installed `.app` bundles through Launch Services and sends the normal application open/reopen request. Windows discovers known executable names from the current user's installed MSIX packages and Windows App Paths registrations, launching packaged apps through their registered application ID. Unregistered portable/custom installations and CLI agents are not launch targets; open those on the computer first. Windows window selection remains limited to the current virtual desktop. Unsupported hosts and older Tenori versions explain why launching is unavailable. Update both host and controller.
 
 Launch requests use the authenticated connection and a known Agent ID; paths and launch arguments are resolved only on the host. No apps are installed, prompts submitted, or tasks orchestrated. Disconnecting prevents pending launch work where it has not reached the operating system; an app already opened stays open. Reconnecting, switching to Read, or backgrounding the controller never replays the launch. Capture and input still require the existing permissions and native window identity checks. See the [launch validation record](docs/smoke-artifacts/agent-launch-2026-10-02.md) for tested behavior and remaining real-device checks.
 
 ## Window Selection and Session Behavior
 
-Window lists and session content travel over the authenticated connection's WebRTC DataChannels; the backend handles device authentication, signaling and TURN credentials. Self-hosting requires the PalmDesk-compatible backend described in the [container guide](containers/README.md). The window list includes regular application windows across the current user's macOS Spaces, or on the current Windows virtual desktop, and excludes PalmDesk itself, desktop elements, and entire displays.
+Window lists and session content travel over the authenticated connection's WebRTC DataChannels; the backend handles device authentication, signaling and TURN credentials. Self-hosting requires the Tenori-compatible backend described in the [container guide](containers/README.md). The window list includes regular application windows across the current user's macOS Spaces, or on the current Windows virtual desktop, and excludes Tenori itself, desktop elements, and entire displays.
 
 Windows on other Spaces, hidden windows, and minimized windows are marked as not visible on the current desktop. They remain selectable and may have thumbnails. On macOS 14 and later, ScreenCaptureKit fills in missing Electron previews using single-window snapshots without activating the window or switching Spaces. If the system cannot provide a preview, the selectable entry remains.
 
 Selecting a window activates it and, on macOS, switches Spaces as needed. If it is minimized, only the selected window is restored. Capture starts only when that window appears in the capture source list. Selection fails if the system or application rejects activation or the target cannot be uniquely identified.
 
-Refreshing the list does not switch Spaces. If the selected window closes, leaves the capturable desktop, or changes identity, the session ends. PalmDesk does not automatically select another window. Use the controller's disconnect-and-reselect action to fetch a new list while keeping the device connection details.
+Refreshing the list does not switch Spaces. If the selected window closes, leaves the capturable desktop, or changes identity, the session ends. Tenori does not automatically select another window. Use the controller's disconnect-and-reselect action to fetch a new list while keeping the device connection details.
 
 ### macOS Implementation Limits
 
 macOS Accessibility APIs may omit windows on other Spaces. When necessary, cross-Space activation dynamically uses private SkyLight APIs to identify Space membership, selects the target Space through Mission Control, and verifies visibility, identity, and focus. The host briefly displays Mission Control during this process.
 
-Native Accessibility window IDs distinguish windows with identical titles and sizes. If those APIs are unavailable, PalmDesk accepts only a unique title-and-bounds match. These APIs depend on the macOS version; selection stops with an error if validation cannot complete. Invisible, untitled windows without Accessibility information are filtered out.
+Native Accessibility window IDs distinguish windows with identical titles and sizes. If those APIs are unavailable, Tenori accepts only a unique title-and-bounds match. These APIs depend on the macOS version; selection stops with an error if validation cannot complete. Invisible, untitled windows without Accessibility information are filtered out.
 
 System input depends on foreground focus. Concurrent local use or system shortcuts can still change that focus.
 
 ## macOS Application Identity and Permissions
 
-All local builds use an identity specific to their checkout. The main workspace and ordinary clones use `PalmDesk Local <id> Dev` with bundle ID `io.github.abreto.palmdesk.local.<id>.dev` for development. Linked worktrees use `PalmDesk WT <id> Dev` and `io.github.abreto.palmdesk.worktree.<id>.dev`. Local packaged builds omit ` Dev` and `.dev`; only explicit `--release` builds use `PalmDesk` and `io.github.abreto.palmdesk`. Each identity has separate permissions and configuration. See the [application identity guide](docs/LOCAL_DEVELOPMENT.md#应用身份) for details and migration from older builds.
+All local builds use an identity specific to their checkout. The main workspace and ordinary clones use `Tenori Local <id> Dev` with bundle ID `io.github.abreto.tenori.local.<id>.dev` for development. Linked worktrees use `Tenori WT <id> Dev` and `io.github.abreto.tenori.worktree.<id>.dev`. Local packaged builds omit ` Dev` and `.dev`; only explicit `--release` builds use `Tenori` and `io.github.abreto.tenori`. Each identity has separate permissions and configuration. See the [application identity guide](docs/LOCAL_DEVELOPMENT.md#应用身份) for details and migration from older builds.
 
 Use `pnpm doctor:desktop` to check for older builds with conflicting identities. The macOS startup check also detects multiple registered copies of the same identity and reports their paths before exiting. Keep one runnable installation per identity; renaming an old `.app` alone does not remove the conflict.
 
 Starting with v0.0.3, macOS previews use a fixed self-signed certificate and a stable native helper signing identifier. Release builds fail if that certificate is missing or mismatched; ordinary local builds can still use ad-hoc signing. Self-signing does not replace Developer ID signing or notarization. See the [signing setup](docs/DESKTOP_RELEASES.md#固定-macos-签名).
 
-Rebuilding an ad-hoc signed application can invalidate existing permissions. Check both Accessibility and Screen Recording, then fully quit and restart PalmDesk after changing permissions. Closing the window or refreshing the window list may leave the old process and its permission state running. If access still fails, remove the old entry from the relevant permission list, add and authorize the current application bundle for that identity, then fully quit and restart again.
+Rebuilding an ad-hoc signed application can invalidate existing permissions. Check both Accessibility and Screen Recording, then fully quit and restart Tenori after changing permissions. Closing the window or refreshing the window list may leave the old process and its permission state running. If access still fails, remove the old entry from the relevant permission list, add and authorize the current application bundle for that identity, then fully quit and restart again.
 
 When migrating from the former Codex Remote development build, the application identity and local data directory have changed. Grant permissions again and reconfigure the connection services.
 
@@ -258,8 +262,8 @@ The detailed guides are currently in Chinese.
 
 ## Contributing and License
 
-Report bugs and suggestions through [PalmDesk Issues](https://github.com/Abreto/palmdesk/issues) and read the [contributing guide](.github/CONTRIBUTING.md). For security reports, follow [SECURITY.md](SECURITY.md). Do not publish device passwords, TURN credentials, or window screenshots containing sensitive information.
+Report bugs and suggestions through [Tenori Issues](https://github.com/Abreto/palmdesk/issues) and read the [contributing guide](.github/CONTRIBUTING.md). For security reports, follow [SECURITY.md](SECURITY.md). Do not publish device passwords, TURN credentials, or window screenshots containing sensitive information.
 
-PalmDesk uses the [MIT license](LICENSE.txt), retaining upstream shuisheng's copyright notice and adding attribution to Abreto. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution and dependency notices.
+Tenori uses the [MIT license](LICENSE.txt), retaining upstream shuisheng's copyright notice and adding attribution to Abreto. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for upstream attribution and dependency notices.
 
-The preserved [upstream open-source README](README_OpenSource.md) describes upstream products, services, and Pro features; those are not PalmDesk's feature set. PalmDesk is an independent project and is not affiliated with OpenAI, Anthropic, or the BilldDesk maintainers.
+The preserved [upstream open-source README](README_OpenSource.md) describes upstream products, services, and Pro features; those are not Tenori's feature set. Tenori is an independent project and is not affiliated with OpenAI, Anthropic, or the BilldDesk maintainers.

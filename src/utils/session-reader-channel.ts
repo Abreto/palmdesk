@@ -191,7 +191,7 @@ export class ReaderHost {
       generation === this.generation &&
       this.allowed(request.method);
     try {
-      if (!current()) throw new Error('请在电脑 PalmDesk 中开启「会话阅读」');
+      if (!current()) throw new Error('请在电脑过目中开启「会话阅读」');
       const result = await this.handle(request);
       if (!current()) return;
       const text = JSON.stringify(result);

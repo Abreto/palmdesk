@@ -3,7 +3,7 @@ import path from 'node:path';
 
 import type { IReleaseInfo, IReleaseStatus } from '../src/pure-interface';
 
-// Every PalmDesk build is a GitHub prerelease, which the "latest release"
+// Every Tenori build is a GitHub prerelease, which the "latest release"
 // endpoint ignores, so list recent releases instead.
 export const RELEASES_API =
   'https://api.github.com/repos/Abreto/palmdesk/releases?per_page=10';
@@ -15,7 +15,7 @@ type ReleaseStatus = IReleaseStatus;
 
 type Version = [number, number, number];
 
-/** Parses `v1.2.3` or `1.2.3`; any other tag is not a PalmDesk release. */
+/** Parses `v1.2.3` or `1.2.3`; any other tag is not a Tenori release. */
 export function parseVersion(value: unknown): Version | undefined {
   const match =
     typeof value === 'string' && /^v?(\d+)\.(\d+)\.(\d+)$/.exec(value.trim());

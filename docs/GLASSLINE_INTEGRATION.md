@@ -1,10 +1,10 @@
-# PalmDesk 会话阅读
+# Tenori 会话阅读
 
-Codex 首版实现于 2026-09-15，2026-09-16 扩展 Claude Code 和 Claude Desktop 本地 Code 会话。读取能力迁入 PalmDesk 仓库，Glassline 独立项目未作修改。
+Codex 首版实现于 2026-09-15，2026-09-16 扩展 Claude Code 和 Claude Desktop 本地 Code 会话。读取能力迁入 Tenori 仓库，Glassline 独立项目未作修改。
 
 ## 产品与代码归属
 
-PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/` 是仓库内独立模块，来自 Glassline 的固定提交 `63f7d3dd67f723f6f20fe3c91b8e04a725e3bfce`，包含 Codex 与 Claude Code 解析器、会话目录缓存、数据模型、Markdown 渲染器及相关测试。保留 Apache-2.0 LICENSE 和 NOTICE；后续修复直接在 PalmDesk 维护。
+Tenori 承接会话阅读与远程窗口操作的整合体验。`session-core/` 是仓库内独立模块，来自 Glassline 的固定提交 `63f7d3dd67f723f6f20fe3c91b8e04a725e3bfce`，包含 Codex 与 Claude Code 解析器、会话目录缓存、数据模型、Markdown 渲染器及相关测试。保留 Apache-2.0 LICENSE 和 NOTICE；后续修复直接在 Tenori 维护。
 
 不需要额外的 Glassline HTTP 服务、部署地址或第三个仓库。模块边界保留，后续确有其他消费者时再考虑发布共享包。
 
@@ -47,9 +47,9 @@ PalmDesk 承接会话阅读与远程窗口操作的整合体验。`session-core/
 | Claude Desktop · Code | 支持 | 支持原生本地 Code 日志 |
 | Desktop Chat/Cowork、云端/SSH/WSL 抓取 | 不支持 | 不支持 |
 
-Linux 主机不启用阅读。Windows 上 `~` 是当前用户主目录（通常为 `%USERPROFILE%`），Codex 默认使用其 `.codex`，Claude Code 使用 `.claude`；支持空格及非 ASCII 路径。WSL 主目录不自动搜索，不启动 WSL、SSH 或 Agent。环境变量必须设置在启动 PalmDesk 的环境中。
+Linux 主机不启用阅读。Windows 上 `~` 是当前用户主目录（通常为 `%USERPROFILE%`），Codex 默认使用其 `.codex`，Claude Code 使用 `.claude`；支持空格及非 ASCII 路径。WSL 主目录不自动搜索，不启动 WSL、SSH 或 Agent。环境变量必须设置在启动 Tenori 的环境中。
 
-按照 [Claude Code 会话文档](https://code.claude.com/docs/en/sessions)，读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`。自定义目录须出现在启动 PalmDesk 的环境中。只发现项目根会话文件，不递归读取嵌套子 Agent 日志，也不读取 Claude 网页聊天。
+按照 [Claude Code 会话文档](https://code.claude.com/docs/en/sessions)，读取 `CLAUDE_CONFIG_DIR` 或 `~/.claude` 下的 `projects/*/*.jsonl`。自定义目录须出现在启动 Tenori 的环境中。只发现项目根会话文件，不递归读取嵌套子 Agent 日志，也不读取 Claude 网页聊天。
 
 会话 ID 使用 `claude-code:session-file:<uuid>`，与 Codex 的相同 UUID 分开路由。标题优先使用 `custom-title`（用户重命名），其次为 `agent-name`、`ai-title` 和首条有效用户消息。存在有效 `last-prompt.leafUuid` 时沿当前父链读取，并接上标记之后的回复；缺失或损坏时退回有效文件顺序。Sidechain、thinking、图片和内部命令包装不展示。Bash 映射为命令，其他工具显示名称、输入和按 `tool_use_id` 匹配的结果。
 

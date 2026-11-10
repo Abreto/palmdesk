@@ -1,5 +1,5 @@
 export function serviceDefaults(protocol: string, origin: string) {
-  const publicOrigin = 'https://palmdesk.abreto.icu';
+  const publicOrigin = 'https://tenori.abreto.icu';
   return {
     api: protocol === 'file:' ? `${publicOrigin}/api` : '/api',
     signaling: protocol === 'file:' ? publicOrigin : origin,

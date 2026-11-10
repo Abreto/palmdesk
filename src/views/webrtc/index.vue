@@ -10,7 +10,7 @@
         <ArrowBackOutline />
       </button>
       <div class="heading">
-        <h1>PalmDesk</h1>
+        <h1>过目</h1>
         <span :title="selectedWindow?.name">{{
           (view === 'read' ? readingSession?.title : selectedWindow?.name) ||
           remoteDeskUserUuid ||
@@ -278,7 +278,7 @@ let installedRequest = '';
 let installedNeedsRetry = false;
 let installedTimer: ReturnType<typeof setTimeout>;
 const launchSupported = ref(false);
-const launchMessage = ref('请更新电脑端 PalmDesk 以支持打开 Agent');
+const launchMessage = ref('请更新电脑端过目以支持打开 Agent');
 const openingAgent = ref<AgentId>();
 const launchedAgent = ref<AgentId>();
 const launchError = ref('');
@@ -399,8 +399,7 @@ function requestInstalledAgents() {
   });
   installedTimer = setTimeout(() => {
     cancelInstalledRequest(false);
-    launchMessage.value =
-      '读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk';
+    launchMessage.value = '读取已安装 Agent 超时，请刷新重试或更新电脑端过目';
   }, 15000);
 }
 
@@ -825,7 +824,7 @@ function connect(preserve = false) {
   installedNeedsRetry = false;
   installedAgents.value = [];
   launchSupported.value = false;
-  launchMessage.value = '请更新电脑端 PalmDesk 以支持打开 Agent';
+  launchMessage.value = '请更新电脑端过目以支持打开 Agent';
   if (!preserve) recovery.reset(Date.now());
   recovery.started(Date.now());
   presenceRequests.clear();

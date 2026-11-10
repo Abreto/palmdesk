@@ -1,94 +1,45 @@
-Experimental PalmDesk desktop installers for testing. PalmDesk is an AI-native remote control for agent-ready workflows.
+Experimental Tenori desktop installers for testing. Tenori (Chinese: 过目) is an AI-native remote control for agent-ready workflows.
 
-Security: This release restricts desktop renderer privileges, updates the Electron runtime and vulnerable dependencies, and ends existing remote sessions when the temporary password changes. Update the desktop app, web frontend and backend together.
+## v0.0.9 preview draft: migrating from PalmDesk
 
-## What's new in v0.0.8
+- **New name:** PalmDesk becomes **Tenori**, or **过目** in Chinese. Your desktop AI agents, perched on your palm. The existing artwork is retained with updated names and text. ([#93](https://github.com/Abreto/palmdesk/issues/93))
+- **macOS:** the bundle ID is now `io.github.abreto.tenori`, including new helper identities. Fully quit PalmDesk, install `Tenori.app` (displayed as 过目 in Chinese), and grant **Screen Recording** and **Accessibility** again. Restart Tenori after granting permissions and remove the old `PalmDesk.app`. The existing fixed signing certificate does not preserve permissions across the new bundle ID.
+- **Windows:** the new app ID changes the installer identity. Tenori installs **side by side** with PalmDesk instead of upgrading it. Quit and uninstall PalmDesk separately after installing Tenori.
+- **Settings:** Tenori has a new application data directory on both platforms. Reconnect devices and reapply custom service settings. Keep your self-hosted server database, Redis, secrets and persistent data.
+- **Service address:** new desktop builds default to **https://tenori.abreto.icu** for API, signaling and phone invitations. **https://palmdesk.abreto.icu** remains available as an alias during the transition. Both hostnames must serve the same web frontend and backend, including WebSocket upgrades, without redirecting API or signaling requests. Explicit saved service addresses still take priority. Browser preferences are separate on the new origin.
+- **Self-hosting:** new images are `ghcr.io/abreto/tenori-web` and `ghcr.io/abreto/tenori-backend`. Previously published `palmdesk-*` images remain available during the transition; future builds use the new names. Switch both images to matching immutable commit tags after publication. No database rename or migration is required. See the [container guide](https://github.com/Abreto/palmdesk/blob/main/containers/README.md#migration-from-palmdesk).
 
-- A successful temporary-password change disconnects existing controllers and stops capture. The updated backend also revokes session tokens and rejects connection attempts authenticated with the old password that were still being established. The updated controller explains the disconnection and requires the new password to reconnect. ([#65](https://github.com/Abreto/palmdesk/pull/65), [#83](https://github.com/Abreto/palmdesk/pull/83))
-- Harden the desktop renderer with approved IPC channels, trusted app-frame checks, navigation restrictions, HTTPS GitHub links, permission restrictions and a Content Security Policy. Remove server-provided HTML update dialogs, credentials from controller-window URLs and sensitive payloads from logs. ([#61](https://github.com/Abreto/palmdesk/pull/61))
-- Upgrade Electron 33.2.1 to 44.9.3 and vulnerable dependencies, and adapt image paste to the asynchronous clipboard API. **macOS now requires version 13 Ventura or later; macOS 12 is no longer supported.** ([#62](https://github.com/Abreto/palmdesk/pull/62))
-- Remove the per-character delay from macOS remote text input. Stop subsequent text chunks when focus is lost or control ends, and recheck focus before image paste. The current chunk can finish; input already delivered to the operating system cannot be undone. ([#63](https://github.com/Abreto/palmdesk/pull/63))
-- Show newer-release notices, with a stronger notice for security updates. Check manually from the macOS menu or Advanced settings, or turn off daily checks. Updates are downloaded and installed manually. This notice is new in v0.0.8; v0.0.7 users need to download this release themselves. ([#66](https://github.com/Abreto/palmdesk/pull/66))
+## Before publishing this draft
 
-## Update the desktop, web frontend and backend
+Abreto must confirm DNS for `tenori.abreto.icu` in Cloudflare, HTTPS and proxy routing for both hostnames, and backend origins (`PUBLIC_ORIGIN=https://tenori.abreto.icu`, `EXTRA_ALLOWED_ORIGINS=https://palmdesk.abreto.icu`, retaining other needed origins). Verify old/new desktop and web client combinations, QR invitations and TURN. This rename PR does not deploy or publish images, rename the GitHub repository, or create a release. The package version remains unchanged until release preparation.
 
-- **Desktop:** install the v0.0.8 package below.
-- **Web frontend:** deploy the matching `ghcr.io/abreto/palmdesk-web` image, then reload the phone page.
-- **Backend:** deploy the matching `ghcr.io/abreto/palmdesk-backend` image and restart the backend for server-side session revocation. The deployment adapter changed even though the upstream commit in `backend.lock.json` did not. With an older backend, disconnection relies on the updated desktop client.
-- **Database:** no schema migration is required. Keep the existing database, Redis, configuration and persistent data.
-
-Use the `sha-<full-commit>` image tags for the commit referenced by `v0.0.8`; the current workflow publishes commit tags and `latest`, not version tags. Publishing a release or image does not deploy the running service. Hosted-service users install the desktop app and reload the phone page; the operator updates the web frontend and backend. See the [container guide](https://github.com/Abreto/palmdesk/blob/v0.0.8/containers/README.md).
-
-Source checks, browser smoke tests and dependency auditing run in CI. Release checks cover both installers, macOS signing identity and packaged native helpers. Complete real-device acceptance of Electron 44 remains pending, including Windows clipboard behavior, real window capture and input, long-text focus changes, permission recovery, mobile browsers and cross-network TURN. See the [Electron upgrade record](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/smoke-artifacts/electron-44-upgrade-2026-10-21.md) and [usage guide](https://github.com/Abreto/palmdesk/blob/v0.0.8/README.md).
-
-[Changes since v0.0.7](https://github.com/Abreto/palmdesk/compare/v0.0.7...v0.0.8)
+Complete real-device acceptance of the new identity, Chinese app display name, permissions after installation, Windows side-by-side installation/uninstallation, capture/input, mobile browsers and cross-network TURN before release. This draft makes no claim that those checks have passed.
 
 ## Installation
 
-| Download            | Computer                          |
-| ------------------- | --------------------------------- |
-| `*-mac-arm64.dmg`   | Apple Silicon Mac                 |
-| `*-windows-x64.exe` | Windows 10 1903+ / Windows 11 x64 |
+| Download | Computer |
+| --- | --- |
+| `Tenori-<version>-mac-arm64.dmg` | Apple Silicon Mac, macOS 13 Ventura or later |
+| `Tenori-<version>-windows-x64.exe` | Windows 10 1903+ / Windows 11 x64 |
 
-Open the DMG and drag PalmDesk into Applications, or run the Windows installer.
-Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer.
+Open the DMG and drag Tenori into Applications, or run the Windows installer. Node.js, pnpm, Xcode and Visual Studio are not needed on the user's computer. Intel Macs are not supported; macOS 13 and 14 remain unvalidated.
 
-- macOS builds use the same fixed self-signed certificate introduced in v0.0.3, without Developer ID signing or notarization. Gatekeeper may still block opening them. Screen Recording and Accessibility permissions are required for remote control.
-- **Upgrading from v0.0.2 or earlier:** the signing identity changes once. Fully quit PalmDesk, install this version, and reauthorize Screen Recording and Accessibility if needed. If the old entries remain ineffective, remove them and add `/Applications/PalmDesk.app` again, then restart. Later builds using the same certificate retain a stable signing identity; actual permission retention still needs validation on your macOS version. Users do not need the signing private key.
-- Windows installers are unsigned. SmartScreen or organization policies may warn or block installation.
-- The macOS package is for Apple Silicon only, requires macOS 13 Ventura or later and is built on macOS 15. Intel Macs are not supported by this prerelease. macOS 13 and 14 have not been validated.
-- The desktop app connects to https://palmdesk.abreto.icu by default. The phone web client and desktop must use the same service. The installer does not include the backend.
-- PalmDesk shows a notice when a newer release is published, but it does not download or install updates. Install the new release yourself; the daily check can be turned off in 高级设置 (Advanced settings).
+macOS builds use the existing fixed self-signed certificate, without Developer ID signing or notarization. Gatekeeper may block opening them. Windows installers are unsigned; SmartScreen or organization policies may warn or block installation. Users do not need signing private keys.
 
-These builds pass source checks and packaging verification in CI. Real screen capture, input, permission recovery and phone/network behavior still require testing on physical devices.
+The phone web client and desktop app must use the same backend. The installer does not include the backend. Tenori shows newer-release notices but does not download or install updates; daily checks can be disabled in Advanced settings.
 
-`SHA256SUMS.txt` contains SHA256 hashes of the two installers.
-Remaining dependency exceptions, development-tool advisories and license review items are documented in [release prerequisites](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md).
+`SHA256SUMS.txt` will contain the hashes of the published installers. See [release prerequisites](https://github.com/Abreto/palmdesk/blob/main/docs/OPEN_SOURCE_READINESS.md) for dependency and validation limitations.
 
-## 中文说明
+## 中文说明：v0.0.9 预览版草案
 
-供测试使用的 PalmDesk 桌面安装包。PalmDesk 是面向 agent-ready workflows（便于衔接 Agent 工作流）的 AI-native（围绕 AI Agent 使用流程设计）远程控制工具。
+PalmDesk 更名为**过目（Tenori）**，取自「请您过目」。过目是面向 agent-ready workflows（便于衔接 Agent 工作流）的 AI-native（围绕 AI Agent 使用流程设计）远程控制工具，保留现有掌中窗口图形。
 
-**安全更新：** 本版收紧桌面渲染页面权限，更新 Electron 及存在安全公告的依赖，并在修改临时密码后结束已有远控会话。请同步更新桌面端、网页前端和后端。
+- **macOS：** 应用标识改为 `io.github.abreto.tenori`。完全退出旧 PalmDesk，安装 `Tenori.app`（中文显示名「过目」），重新授予**屏幕录制**和**辅助功能**权限，重启后移除旧 `PalmDesk.app`。沿用原签名证书也不能保留旧 bundle ID 的权限。
+- **Windows：** 新应用身份会与 PalmDesk **并排安装**，不会覆盖升级。安装过目后，请退出并单独卸载旧 PalmDesk。
+- **设置：** 两平台都使用新的应用数据目录，需要重新连接设备、设置自托管服务地址。不要删除服务端数据库、Redis、密钥或数据卷。
+- **新服务地址：** 默认使用 **https://tenori.abreto.icu**，旧 **https://palmdesk.abreto.icu** 在过渡期作为同一服务的别名保留。手机网页与桌面端必须连接同一个后端；切换网页域名后可能需要重新连接及设置偏好。
+- **自托管：** 镜像改为 `ghcr.io/abreto/tenori-web` 和 `ghcr.io/abreto/tenori-backend`。旧 `palmdesk-*` 镜像和已有标签在过渡期仍可用。新镜像发布后再同时切换到对应提交标签，保留现有数据库、配置与数据，无需迁移表结构。
 
-### v0.0.8 更新内容
+发版前由 Abreto 确认新 DNS、两域名的 HTTPS/代理、来源白名单，以及新旧客户端组合、扫码和 TURN。仍需实机验收中文显示名、重新授权、Windows 并排安装与卸载、窗口捕获及输入。本次改名不执行部署、推镜像、仓库改名或 Release，包版本号留待正式准备 v0.0.9 时更新。
 
-- 成功修改临时密码后，断开已有控制端并停止捕获。新版后端还会撤销会话令牌，拒绝已通过旧密码认证但尚未完成建立的连接。新版控制端提示密码已更改，要求使用新密码重新连接。([#65](https://github.com/Abreto/palmdesk/pull/65)、[#83](https://github.com/Abreto/palmdesk/pull/83))
-- 加固桌面渲染页面：限定 IPC 通道和可信应用页面，限制导航跳转、外部链接及权限，并启用内容安全策略。移除服务端 HTML 更新弹窗、控制窗口 URL 中的凭据及日志中的敏感载荷。([#61](https://github.com/Abreto/palmdesk/pull/61))
-- Electron 从 33.2.1 升级到 44.9.3，并更新存在安全公告的依赖；图片粘贴适配新的异步剪贴板接口。**macOS 最低版本升至 13 Ventura，不再支持 macOS 12。** ([#62](https://github.com/Abreto/palmdesk/pull/62))
-- 去掉 macOS 远程文字输入的逐字延迟；失去焦点或控制结束后停止后续文字块，粘贴图片前再次核验焦点。当前文字块可能完成，已交给操作系统的输入无法撤回。([#63](https://github.com/Abreto/palmdesk/pull/63))
-- 发现新版本时显示通知，安全更新提示更醒目。可在 macOS 菜单或“高级设置”手动检查，也可关闭每日检查；更新仍需手动下载安装。此功能从 v0.0.8 开始提供，v0.0.7 用户需自行下载本次更新。([#66](https://github.com/Abreto/palmdesk/pull/66))
-
-### 桌面端、网页前端和后端更新
-
-- **桌面端：** 安装下方 v0.0.8 安装包。
-- **网页前端：** 部署对应的 `ghcr.io/abreto/palmdesk-web` 镜像，再刷新手机页面。
-- **后端：** 部署对应的 `ghcr.io/abreto/palmdesk-backend` 镜像并重启后端，启用服务端会话撤销。虽然 `backend.lock.json` 固定的上游提交未变，后端部署适配器已有改动；使用旧后端时，断连依赖新版桌面端。
-- **数据库：** 无需迁移表结构，保留现有数据库、Redis、配置及持久化数据。
-
-两个镜像均使用 `v0.0.8` 对应完整提交的 `sha-<full-commit>` 标签；当前工作流发布提交标签和 `latest`，不发布版本号标签。发布 Release 或镜像不会自动更新运行中的服务。托管服务用户安装桌面端并刷新手机网页，服务维护者负责更新网页前端和后端。详见[容器说明](https://github.com/Abreto/palmdesk/blob/v0.0.8/containers/README.md)。
-
-CI 运行源码检查、浏览器烟测和依赖审计；发布检查覆盖两平台安装包、macOS 签名身份及包内原生辅助程序。Electron 44 的完整实机验收仍待完成，包括 Windows 剪贴板、真实窗口捕获和输入、长文本输入时焦点变化、权限恢复、手机浏览器和跨网络 TURN。详见 [Electron 升级记录](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/smoke-artifacts/electron-44-upgrade-2026-10-21.md)和[使用指南](https://github.com/Abreto/palmdesk/blob/v0.0.8/README.zh-CN.md)。
-
-[查看自 v0.0.7 以来的改动](https://github.com/Abreto/palmdesk/compare/v0.0.7...v0.0.8)
-
-### 安装说明
-
-| 下载                | 适用设备                                |
-| ------------------- | --------------------------------------- |
-| `*-mac-arm64.dmg`   | Apple Silicon Mac                       |
-| `*-windows-x64.exe` | Windows 10 1903 及以上 / Windows 11 x64 |
-
-打开 DMG 后将 PalmDesk 拖入“应用程序”，或运行 Windows 安装程序。用户电脑无需安装 Node.js、pnpm、Xcode 或 Visual Studio。
-
-- macOS 构建沿用 v0.0.3 引入的固定自签名证书，没有 Developer ID 签名，也没有经过公证。Gatekeeper 仍可能阻止打开；远程控制需要授予“屏幕录制”和“辅助功能”权限。
-- **从 v0.0.2 或更早版本升级：** 本次签名身份会变化。请完全退出 PalmDesk，安装本版本，按需重新授予两项权限。若旧条目仍不生效，请移除后重新添加 `/Applications/PalmDesk.app`，然后重启应用。后续使用同一证书的构建保持稳定签名身份；实际权限保留仍需在所用 macOS 版本上验证。普通用户无需导入签名私钥。
-- Windows 安装包未签名，SmartScreen 或组织安全策略可能发出警告或阻止安装。
-- macOS 安装包仅支持 Apple Silicon，需要 macOS 13 Ventura 及以上，使用 macOS 15 构建；本测试版不支持 Intel Mac，尚未验证 macOS 13 和 14。
-- 桌面端默认连接 https://palmdesk.abreto.icu。手机网页端和桌面端必须使用同一个服务；安装包不包含后端服务。
-- 发现新版本时 PalmDesk 会显示提示，但不会自动下载或安装。请自行下载并安装新版本；每日检查可在“高级设置”关闭。
-
-这些构建已通过 CI 中的源码检查和打包验证。真实的屏幕捕获、输入、权限恢复以及手机和网络行为仍需在实体设备上测试。
-
-`SHA256SUMS.txt` 包含两个安装包的 SHA256 校验和。
-剩余依赖例外、开发工具链安全公告及许可证审查事项见[发行前提](https://github.com/Abreto/palmdesk/blob/v0.0.8/docs/OPEN_SOURCE_READINESS.md)。
+Mac 安装包仅支持 Apple Silicon、macOS 13 Ventura 及以上，使用固定自签名证书，未经 Developer ID 签名和公证；Windows 安装包未签名。系统仍可能阻止安装或启动。应用只提示更新，不自动下载安装，用户无需 Node.js、pnpm 或签名私钥。

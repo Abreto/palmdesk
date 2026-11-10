@@ -14,16 +14,16 @@ const record = (payload, type = 'response_item') => JSON.stringify({
 const message = (index) => record({ type: 'message', role: index % 2 ? 'assistant' : 'user', content: [{ type: 'output_text', text: `手机阅读消息 ${index}` }] });
 
 test('read facade paginates persisted desktop-style messages and observes appended results', async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(path.join(directory, 'sessions'));
   const file = path.join(directory, 'sessions', `rollout-${uuid}.jsonl`);
   await writeFile(file, [
-    record({ id: uuid, cwd: '/repo/palmdesk' }, 'session_meta'),
+    record({ id: uuid, cwd: '/repo/tenori' }, 'session_meta'),
     ...Array.from({ length: 85 }, (_, index) => message(index)),
   ].join('\n') + '\n');
   const reader = createSessionReader({ codexHome: directory, claudeConfigDir: path.join(directory, 'no-claude'), claudeDesktopDataDir: '' });
-  const list = await reader.list('palmdesk');
+  const list = await reader.list('tenori');
   assert.equal(list.sessions.length, 1);
   assert.equal(list.sessions[0].turnState, 'unknown');
   assert.equal(list.sessions[0].recentMessage, '手机阅读消息 84');
@@ -52,7 +52,7 @@ test('read facade paginates persisted desktop-style messages and observes append
 });
 
 test('identical prompts in separate turns remain readable while mirrored records are deduplicated', async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-turns-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-turns-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(path.join(directory, 'sessions'));
   await writeFile(path.join(directory, 'sessions', `rollout-${uuid}.jsonl`), [
@@ -69,7 +69,7 @@ test('identical prompts in separate turns remain readable while mirrored records
 });
 
 test('oversized session logs stay discoverable but cannot trigger an unbounded detail read', async (t) => {
-  const directory = await mkdtemp(path.join(os.tmpdir(), 'palmdesk-reader-size-'));
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'tenori-reader-size-'));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(path.join(directory, 'sessions'));
   const file = path.join(directory, 'sessions', `rollout-${uuid}.jsonl`);

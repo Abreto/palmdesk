@@ -148,7 +148,7 @@ test('quitting waits for input to stop, but not longer than the quit timeout', a
     electron: {
       app: {
         isPackaged: false,
-        getName: () => 'PalmDesk Dev',
+        getName: () => 'Tenori Dev',
         setName() {},
         getPath: () => '/tmp',
         setPath() {},
@@ -204,7 +204,7 @@ test('startup turns off the nut-js delay before every typed character and key pr
     electron: {
       app: {
         isPackaged: false,
-        getName: () => 'PalmDesk Dev',
+        getName: () => 'Tenori Dev',
         setName() {},
         getPath: () => '/tmp',
         setPath() {},

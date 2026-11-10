@@ -29,7 +29,7 @@ function git(root, ...args) {
 }
 test.before(() => {
   temporary = realpathSync(
-    mkdtempSync(path.join(os.tmpdir(), 'palmdesk-identity-'))
+    mkdtempSync(path.join(os.tmpdir(), 'tenori-identity-'))
   );
   main = path.join(temporary, 'main checkout');
   first = path.join(temporary, 'worktree one');
@@ -59,9 +59,9 @@ test('the primary checkout isolates local packages and development from the rele
   const packaged = getDesktopIdentity(main);
   assert.match(
     packaged.appId,
-    /^io\.github\.abreto\.palmdesk\.local\.[a-f0-9]{10}$/
+    /^io\.github\.abreto\.tenori\.local\.[a-f0-9]{10}$/
   );
-  assert.equal(packaged.productName, `PalmDesk Local ${packaged.checkoutId}`);
+  assert.equal(packaged.productName, `Tenori Local ${packaged.checkoutId}`);
   assert.equal(packaged.worktreeId, '');
   assert.equal(
     getDesktopIdentity(main, { development: true }).appId,
@@ -95,7 +95,7 @@ test('checkouts, clones and build modes have distinct app IDs and names', () => 
   );
   assert.match(
     identities[1].appId,
-    /^io\.github\.abreto\.palmdesk\.worktree\.[a-f0-9]{10}$/
+    /^io\.github\.abreto\.tenori\.worktree\.[a-f0-9]{10}$/
   );
   assert.deepEqual(getDesktopIdentity(first), identities[1]);
 });
@@ -103,8 +103,8 @@ test('checkouts, clones and build modes have distinct app IDs and names', () => 
 test('only explicit release builds use the same production identity in every checkout', () => {
   for (const checkout of [main, first, second, clone]) {
     assert.deepEqual(getDesktopIdentity(checkout, { release: true }), {
-      appId: 'io.github.abreto.palmdesk',
-      productName: 'PalmDesk',
+      appId: 'io.github.abreto.tenori',
+      productName: 'Tenori',
       checkoutId: '',
       worktreeId: '',
     });
@@ -144,7 +144,7 @@ test('source archives get isolated local identities but broken Git metadata fail
   mkdirSync(another);
   assert.match(
     getDesktopIdentity(archive).appId,
-    /^io\.github\.abreto\.palmdesk\.local\.[a-f0-9]{10}$/
+    /^io\.github\.abreto\.tenori\.local\.[a-f0-9]{10}$/
   );
   assert.notEqual(
     getDesktopIdentity(archive).appId,
@@ -152,11 +152,11 @@ test('source archives get isolated local identities but broken Git metadata fail
   );
   assert.equal(
     getDesktopIdentity(archive, { release: true }).appId,
-    'io.github.abreto.palmdesk'
+    'io.github.abreto.tenori'
   );
   writeFileSync(
     path.join(archive, '.git'),
-    'gitdir: /nonexistent-palmdesk-git-directory\n'
+    'gitdir: /nonexistent-tenori-git-directory\n'
   );
   assert.throws(() => getDesktopIdentity(archive));
 });
@@ -186,14 +186,14 @@ test('builder configuration isolates local artifacts and reserves the production
           ],
           {
             encoding: 'utf8',
-            env: { ...process.env, PALMDESK_BUILD_CHANNEL: channel },
+            env: { ...process.env, TENORI_BUILD_CHANNEL: channel },
           }
         )
       );
       assert.equal(config.appId, expected.appId);
       assert.equal(config.productName, expected.productName);
       assert.equal(config.extraMetadata.productName, expected.productName);
-      assert.equal(config.mac.extendInfo.PalmDeskBuildChannel, channel);
+      assert.equal(config.mac.extendInfo.TenoriBuildChannel, channel);
       assert.equal(
         config.mac.identity,
         channel === 'release'
@@ -223,7 +223,7 @@ test(
       );
       return directory;
     }
-    const release = 'electron-release/0.0.1/mac-arm64/PalmDesk.app';
+    const release = 'electron-release/0.0.1/mac-arm64/Tenori.app';
     const productionId = getDesktopIdentity(main, { release: true }).appId;
     const legacyMain = bundle(main, release, productionId);
     const legacyMainDev = bundle(
@@ -234,27 +234,27 @@ test(
     for (const checkout of [main, first])
       bundle(
         checkout,
-        'electron-release/0.0.2/mac-arm64/PalmDesk.app',
+        'electron-release/0.0.2/mac-arm64/Tenori.app',
         productionId,
         {
-          PalmDeskBuildChannel: 'release',
+          TenoriBuildChannel: 'release',
         }
       );
     const legacy = bundle(first, release, productionId);
     const renamed = bundle(
       first,
-      '.local/PalmDesk-before-isolation.app.disabled',
+      '.local/Tenori-before-isolation.app.disabled',
       productionId
     );
     bundle(
       first,
       '.local/FocusFixture.app',
-      'io.github.abreto.palmdesk.focus-fixture'
+      'io.github.abreto.tenori.focus-fixture'
     );
     const isolated = getDesktopIdentity(first);
     bundle(
       first,
-      `electron-release/0.0.1/worktree-${isolated.worktreeId}/PalmDesk.app`,
+      `electron-release/0.0.1/worktree-${isolated.worktreeId}/Tenori.app`,
       isolated.appId
     );
     bundle(second, release, getDesktopIdentity(second).appId);

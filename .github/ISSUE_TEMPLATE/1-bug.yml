@@ -1,14 +1,14 @@
 name: Bug Report
-description: Report a reproducible PalmDesk problem.
+description: Report a reproducible Tenori problem.
 body:
   - type: markdown
     attributes:
       value: |
-        PalmDesk is experimental. Do not include device passwords, TURN credentials, or private window contents. For vulnerabilities, see SECURITY.md.
+        Tenori is experimental. Do not include device passwords, TURN credentials, or private window contents. For vulnerabilities, see SECURITY.md.
   - type: input
     id: version
     attributes:
-      label: PalmDesk version or commit
+      label: Tenori version or commit
       placeholder: 0.0.1 or commit hash
     validations:
       required: true

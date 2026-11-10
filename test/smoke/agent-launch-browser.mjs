@@ -304,7 +304,7 @@ try {
   });
   await page.getByRole('button', { name: '刷新 Agent 和窗口' }).click();
   const catalogTimeout = page.getByText(
-    '读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk',
+    '读取已安装 Agent 超时，请刷新重试或更新电脑端过目',
     { exact: true }
   );
   await catalogTimeout.waitFor({ timeout: 20000 });
@@ -354,7 +354,7 @@ try {
     .last()
     .click();
   await page
-    .getByText('读取已安装 Agent 超时，请刷新重试或更新电脑端 PalmDesk', {
+    .getByText('读取已安装 Agent 超时，请刷新重试或更新电脑端过目', {
       exact: true,
     })
     .waitFor();

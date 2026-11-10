@@ -35,13 +35,13 @@ function harness(env = {}) {
 
 const packager = (options = {}) => ({
   platformSpecificBuildOptions: {},
-  appInfo: { id: 'io.github.abreto.palmdesk' },
+  appInfo: { id: 'io.github.abreto.tenori' },
   ...options,
 });
 
 test('fixed self-signing preserves entitlements and gives rebuilt native helpers a stable identifier', async () => {
-  const { sign, calls } = harness({ PALMDESK_BUILD_CHANNEL: 'release' });
-  const app = path.resolve('/tmp/PalmDesk.app');
+  const { sign, calls } = harness({ TENORI_BUILD_CHANNEL: 'release' });
+  const app = path.resolve('/tmp/Tenori.app');
   await sign(
     {
       app,
@@ -68,7 +68,7 @@ test('fixed self-signing preserves entitlements and gives rebuilt native helpers
   assert.deepEqual(Array.from(helper.additionalArguments), [
     '--verbose',
     '--identifier',
-    'io.github.abreto.palmdesk.window-helper',
+    'io.github.abreto.tenori.window-helper',
   ]);
   assert.deepEqual(
     Array.from(options.optionsForFile(app).additionalArguments),
@@ -78,7 +78,7 @@ test('fixed self-signing preserves entitlements and gives rebuilt native helpers
 
 test('release refuses absent, ad-hoc, or different signing identities', async () => {
   for (const identity of [undefined, '-', 'another-certificate']) {
-    const { sign, calls } = harness({ PALMDESK_BUILD_CHANNEL: 'release' });
+    const { sign, calls } = harness({ TENORI_BUILD_CHANNEL: 'release' });
     await assert.rejects(
       sign({ identity, platform: 'darwin' }, packager()),
       /require the fixed/
@@ -100,7 +100,7 @@ test('local signing covers the bundle while preserving per-file entitlements', a
   const { sign, calls } = harness();
   await sign(
     {
-      app: '/tmp/PalmDesk.app',
+      app: '/tmp/Tenori.app',
       platform: 'darwin',
       optionsForFile: (file) => ({
         entitlements: `${file}.plist`,
@@ -110,7 +110,7 @@ test('local signing covers the bundle while preserving per-file entitlements', a
     packager()
   );
   assert.equal(calls.length, 1);
-  assert.equal(calls[0].app, '/tmp/PalmDesk.app');
+  assert.equal(calls[0].app, '/tmp/Tenori.app');
   assert.equal(calls[0].identity, '-');
   const fileOptions = calls[0].optionsForFile('helper');
   assert.equal(fileOptions.entitlements, 'helper.plist');

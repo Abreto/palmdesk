@@ -13,7 +13,7 @@ app.setPath(
 app.whenReady().then(async () => {
   const window = new BrowserWindow({ width: 500, height: 360, show: false });
   await window.loadURL(
-    'data:text/html,<title>PalmDesk other application fixture</title><p>PalmDesk temporary focus fixture</p>'
+    'data:text/html,<title>Tenori other application fixture</title><p>Tenori temporary focus fixture</p>'
   );
   // The test activates this window through the native helper.
   window.showInactive();

@@ -1,8 +1,11 @@
-# PalmDesk · Palm Window
+# Tenori · 过目
 
-<img src="../build/source/palmdesk.png" width="256" alt="PalmDesk application icon: a window resting in an open palm" />
+<img src="../build/source/tenori.png" width="256" alt="Tenori application icon: a window resting in an open palm" />
 
-Palm Window expresses “desktop work, in your hand.” The open palm is one
+Tenori (手乗り) describes a small pet perched on a hand. The Chinese name 过目
+comes from 请您过目 ("for your review"). The tagline is “Your desktop AI agents,
+perched on your palm.” The existing window-in-a-palm artwork expresses “desktop
+work, in your hand”; this rename does not redesign it. The open palm is one
 continuous silhouette, with a curved cut between the fingers and thumb. The
 window has a rounded frame, a quiet title bar, and an open working area.
 
@@ -13,7 +16,7 @@ connection arrows, or extra details inside the window.
 
 ## Source and exports
 
-Edit **[build/source/palmdesk-mark.svg](../build/source/palmdesk-mark.svg)**,
+Edit **[build/source/tenori-mark.svg](../build/source/tenori-mark.svg)**,
 then run:
 
 ```sh
@@ -27,9 +30,9 @@ requiring platform image tools. Commit the generated files with source changes.
 
 | Asset                                      | Use                                                                 |
 | ------------------------------------------ | ------------------------------------------------------------------- |
-| `src/assets/img/palmdesk-mark.svg`         | Single-color mark in the desktop sidebar and mobile header          |
-| `build/source/palmdesk.svg`                | Application tile, with a transparent outer margin                   |
-| `build/source/palmdesk.png`                | 1024px application artwork                                          |
+| `src/assets/img/tenori-mark.svg`         | Single-color mark in the desktop sidebar and mobile header          |
+| `build/source/tenori.svg`                | Application tile, with a transparent outer margin                   |
+| `build/source/tenori.png`                | 1024px application artwork                                          |
 | `build/icons/*x*.png`                      | Application images at 16, 24, 32, 48, 64, 128, 256, 512, and 1024px |
 | `build/icons/icon.icns`                    | macOS application icon                                              |
 | `build/icons/icon.ico`                     | Windows application icon, including 16–256px frames                 |

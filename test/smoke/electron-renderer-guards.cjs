@@ -61,7 +61,7 @@ function stubIpc(senders, opened) {
     screen: 'denied',
     accessibility: false,
     platform: process.platform,
-    appName: 'PalmDesk guard smoke',
+    appName: 'Tenori guard smoke',
     packaged: false,
     targetApps: [],
   });

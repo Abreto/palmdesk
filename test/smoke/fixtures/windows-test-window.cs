@@ -132,7 +132,7 @@ internal sealed class TestWindow : Form
 
     internal TestWindow(Rectangle bounds, Color color)
     {
-        Text = "PalmDesk native smoke fixture";
+        Text = "Tenori native smoke fixture";
         AutoScaleMode = AutoScaleMode.None;
         StartPosition = FormStartPosition.Manual;
         Bounds = bounds;
@@ -224,7 +224,7 @@ internal sealed class FixtureContext : ApplicationContext
             {
                 nativeId = handles[index],
                 ownerPid = ownerPid,
-                name = "PalmDesk native smoke fixture",
+                name = "Tenori native smoke fixture",
                 closed = closed,
                 isMinimized = !closed && NativeMethods.IsIconic(window.Handle),
                 isVisible = !closed && NativeMethods.IsWindowVisible(window.Handle),

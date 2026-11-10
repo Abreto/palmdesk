@@ -50,7 +50,7 @@ const options = {
   env: {
     ...process.env,
     VITE_APP_RELEASE_PROJECT_ISWEB: 'false',
-    PALMDESK_BUILD_CHANNEL: flags.release ? 'release' : 'local',
+    TENORI_BUILD_CHANNEL: flags.release ? 'release' : 'local',
   },
 };
 

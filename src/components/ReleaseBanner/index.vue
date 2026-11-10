@@ -6,7 +6,7 @@
     role="status"
   >
     <span class="text">
-      <strong>PalmDesk v{{ latest.version }} 已发布</strong>
+      <strong>过目 v{{ latest.version }} 已发布</strong>
       <span>{{
         latest.security
           ? '此版本包含安全修复，请尽快更新。'

@@ -108,16 +108,16 @@ test('only the bundled document or the dev server counts as the app', () => {
     pathToFileURL(path.join(root, 'dist/index.html/../../README.md')).href,
     'file:///etc/passwd',
     'file://evil.example/index.html',
-    'https://palmdesk.abreto.icu/',
+    'https://tenori.abreto.icu/',
     'data:text/html,<p>x</p>',
     'about:blank',
     'not a url',
   ].forEach((url) => assert.equal(isAppDocumentUrl(url, appUrl), false, url));
 
   const windows =
-    'file:///C:/Program%20Files/PalmDesk/resources/app.asar/dist/index.html';
+    'file:///C:/Program%20Files/Tenori/resources/app.asar/dist/index.html';
   const loaded =
-    'file:///c:/program%20files/palmdesk/resources/app.asar/dist/index.html#/remote';
+    'file:///c:/program%20files/tenori/resources/app.asar/dist/index.html#/remote';
   assert.equal(isAppDocumentUrl(loaded, windows, true), true);
   assert.equal(isAppDocumentUrl(loaded, windows, false), false);
 
@@ -147,7 +147,7 @@ test('openExternal accepts only credential-free https links to allowed hosts', (
     'https://github.com:8443/',
     'https://github.com.evil.example/',
     'https://evil.example/github.com',
-    'https://palmdesk.abreto.icu/',
+    'https://tenori.abreto.icu/',
     '//github.com/Abreto',
     'github.com/Abreto',
     `https://github.com/${'a'.repeat(2048)}`,
@@ -163,7 +163,7 @@ test('openExternal accepts only credential-free https links to allowed hosts', (
   );
 });
 
-test('permissions are denied unless a trusted PalmDesk page needs them', () => {
+test('permissions are denied unless a trusted Tenori page needs them', () => {
   const host = { trusted: true, mainWindow: true };
   const controller = { trusted: true, mainWindow: false };
   const foreign = { trusted: false, mainWindow: true };
@@ -321,7 +321,7 @@ function desktop({ packaged = false } = {}) {
         app: {
           isPackaged: packaged,
           commandLine: {},
-          getName: () => 'PalmDesk Test',
+          getName: () => 'Tenori Test',
           getVersion: () => '0.0.7',
           setName() {},
           getPath: () => '/tmp',
@@ -417,7 +417,7 @@ function desktop({ packaged = false } = {}) {
   };
 }
 
-test('main-process IPC accepts only the app document of a PalmDesk window', async () => {
+test('main-process IPC accepts only the app document of a Tenori window', async () => {
   const app = desktop();
   await app.ready();
   const [main] = app.windows;

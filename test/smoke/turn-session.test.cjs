@@ -9,12 +9,28 @@ const config = (now) => ({ iceServers: [{ urls: 'turn:turn.test:3478', username:
 test('desktop defaults include API, signaling and the phone homepage; web stays same-origin', () => {
   const { serviceDefaults } = loadSource('src/utils/service-defaults.ts');
   assert.deepEqual(serviceDefaults('file:', 'null'), {
-    api: 'https://palmdesk.abreto.icu/api', signaling: 'https://palmdesk.abreto.icu', client: 'https://palmdesk.abreto.icu/',
+    api: 'https://tenori.abreto.icu/api',
+    signaling: 'https://tenori.abreto.icu',
+    client: 'https://tenori.abreto.icu/',
   });
   assert.deepEqual(serviceDefaults('https:', 'https://selfhost.test'), {
-    api: '/api', signaling: 'https://selfhost.test', client: '',
+    api: '/api',
+    signaling: 'https://selfhost.test',
+    client: '',
   });
-  assert.equal(serviceDefaults('http:', 'http://localhost:5173').signaling, 'http://localhost:5173');
+  ['https://tenori.abreto.icu', 'https://palmdesk.abreto.icu'].forEach(
+    (origin) => {
+      assert.deepEqual(serviceDefaults('https:', origin), {
+        api: '/api',
+        signaling: origin,
+        client: '',
+      });
+    }
+  );
+  assert.equal(
+    serviceDefaults('http:', 'http://localhost:5173').signaling,
+    'http://localhost:5173'
+  );
 });
 
 test('client coalesces credential requests, refreshes early and rejects expired fallback', async (t) => {

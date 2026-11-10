@@ -11,6 +11,8 @@ RUN node compile.cjs && pnpm prune --prod --ignore-scripts
 RUN node runtime/verify-build.cjs
 
 FROM ${NODE_IMAGE}
+# This upstream project label is also the existing Redis key prefix.
+# Keep it stable when switching from the PalmDesk image to Tenori.
 ENV NODE_ENV=production \
     NODE_APP_RELEASE_PROJECT_ENV=prod \
     NODE_APP_RELEASE_PROJECT_NAME=palmdesk-server \

@@ -64,7 +64,7 @@ for (const failure of [undefined, 'delete-keychain']) {
       {
         GITHUB_ACTIONS: 'true',
         RUNNER_ENVIRONMENT: 'github-hosted',
-        PALMDESK_SIGNING_DIR: directory,
+        TENORI_SIGNING_DIR: directory,
       },
       failure
     );

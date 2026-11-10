@@ -83,7 +83,7 @@ async function verifyDuplicateDetection(
       info,
       JSON.stringify({
         CFBundleIdentifier: identity.appId,
-        CFBundleName: 'PalmDesk Duplicate Test',
+        CFBundleName: 'Tenori Duplicate Test',
         CFBundleExecutable: 'probe',
         CFBundlePackageType: 'APPL',
         CFBundleVersion: '1',
@@ -178,7 +178,7 @@ for (const development of [true, false]) {
     cwd: root,
     env: {
       ...process.env,
-      PALMDESK_APP_NAME: identity.productName,
+      TENORI_APP_NAME: identity.productName,
       // Load an inert page so identity verification never requests capture or input permission.
       VITE_DEV_SERVER_URL:
         'data:text/html,<title>Desktop identity verification</title>',

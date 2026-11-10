@@ -61,7 +61,7 @@ createApp(defineComponent({
         context.fillStyle = '#a9c3b3'; context.font = '28px sans-serif';
         context.fillText('Codex · 合成窗口', 55, 65);
         context.fillStyle = '#eef7f1'; context.font = '36px sans-serif';
-        context.fillText('PalmDesk 会话阅读', 55, 190);
+        context.fillText('Tenori 会话阅读', 55, 190);
         context.font = '25px sans-serif'; context.fillStyle = '#a9c3b3';
         context.fillText('返回阅读页时，键盘输入不应发往这个窗口。', 55, 255);
         context.strokeStyle = '#789785'; context.strokeRect(50, 495, 1000, 110);
@@ -98,7 +98,7 @@ createApp(defineComponent({
         error.value,
       ]),
       h('section', { class: 'phone' }, [
-        h('header', { class: 'brand' }, [h('strong', 'PalmDesk'), h('span', connected.value ? '已连接' : '正在连接')]),
+        h('header', { class: 'brand' }, [h('strong', 'Tenori'), h('span', connected.value ? '已连接' : '正在连接')]),
         h('nav', [h('button', { 'aria-pressed': mode.value === 'read', onClick: () => changeMode('read') }, '阅读'), h('button', { 'aria-pressed': mode.value === 'window', onClick: () => changeMode('window') }, '窗口')]),
         h(Reader, { client: client.value, revision: revision.value, active: mode.value === 'read', style: mode.value === 'read' ? '' : 'display:none', onSelect: (session) => { currentSession.value = session?.id || ''; }, onOpenWindow: () => changeMode('window') }),
         h(Viewport, { video: video.value, connected: connected.value, inputBlocked: mode.value !== 'window', style: mode.value === 'window' ? '' : 'display:none', onBehavior: (data) => { events.push(data); if (data.type !== BilldDeskBehaviorEnum.releaseAll) inputCount.value += 1; } }),

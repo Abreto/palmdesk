@@ -4,7 +4,7 @@
 
 客户端使用 Node.js 22.16.0 及以上和 `package.json` 固定的 pnpm 版本；macOS 主机还需要 Xcode Command Line Tools。Windows 10 1903 及以上 / Windows 11 x64 使用系统 .NET Framework 4.x 编译器。浏览器前端可以独立启动，但设备注册和连接必须有后端。
 
-1. 在独立目录部署 PalmDesk 维护的 [billd-desk-server fork](https://github.com/Abreto/billd-desk-server)。当前固定提交为 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，参见 [对应服务端说明](https://github.com/Abreto/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)。
+1. 在独立目录部署 Tenori 维护的 [billd-desk-server fork](https://github.com/Abreto/billd-desk-server)。当前固定提交为 `c73983e543341c08ce9e4fb7c52446be50b6c6a2`，参见 [对应服务端说明](https://github.com/Abreto/billd-desk-server/tree/c73983e543341c08ce9e4fb7c52446be50b6c6a2)。
 2. 按服务端文档配置 MySQL、Redis 和服务端密钥，初始化数据库及 live 配置。服务端密钥留在服务端目录，不写入客户端的 `VITE_*` 变量。
 3. 将开发后端监听地址配置为 `127.0.0.1:4300`，并允许实际前端 origin。改用其他地址时，调整本项目 `vite.config.ts` 的开发代理或显式配置 API / 信令 URL。
 4. 在本仓库运行以下命令，再按 [服务配置](SERVICE_CONFIGURATION.md) 连接手机。
@@ -39,7 +39,7 @@ macOS 和 Windows 上另可运行 `pnpm build:native` 和 `pnpm build:desktop`�
 
 ## 桌面渲染进程边界
 
-渲染进程只能通过 `electron-main/preload.ts` 暴露的 `invoke`、`send` 和 `on` 访问主进程，可用通道列在 `electron-main/renderer-security.ts`。新增 IPC 时需同时更新该列表，并在 `electron-main/index.ts` 中用 `handle` 或 `listen` 注册，注明只允许主窗口（`main`）还是任一 PalmDesk 窗口（`any`）调用。主进程只接受应用自身页面顶层框架发出的消息；捕获、输入、会话阅读和创建窗口仅限主窗口。
+渲染进程只能通过 `electron-main/preload.ts` 暴露的 `invoke`、`send` 和 `on` 访问主进程，可用通道列在 `electron-main/renderer-security.ts`。新增 IPC 时需同时更新该列表，并在 `electron-main/index.ts` 中用 `handle` 或 `listen` 注册，注明只允许主窗口（`main`）还是任一 Tenori 窗口（`any`）调用。主进程只接受应用自身页面顶层框架发出的消息；捕获、输入、会话阅读和创建窗口仅限主窗口。
 
 - 窗口：渲染进程只能请求 `about`、`version` 或 `webrtc` 窗口，尺寸、路由和窗口身份由主进程决定。远控窗口的连接凭据在页面加载后经 IPC 取回一次，不写入 URL。
 - 导航：页面不能打开新窗口、跳转到应用以外的地址或嵌入 `<webview>`。`shellOpenExternal` 只打开 `github.com` 的 HTTPS 链接。
@@ -68,7 +68,7 @@ pnpm exec electron test/smoke/electron-renderer-guards.cjs
 | Claude Desktop · Code | 支持 | 支持原生本地 Code 日志 |
 | Desktop Chat/Cowork、云端/SSH/WSL 抓取 | 不支持 | 不支持 |
 
-Windows 默认读取 `%USERPROFILE%\.codex`、`%USERPROFILE%\.claude`；`CODEX_HOME`、`CLAUDE_CONFIG_DIR` 可覆盖。Desktop 检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下的 `Roaming\Claude`、`Local\Claude-3p`、`Roaming\Claude-3p`。macOS 默认读取 `~/.codex`、`~/.claude`、`~/Library/Application Support/Claude` 与 `Claude-3p`。`CLAUDE_USER_DATA_DIR` 仅使用指定的 Desktop 目录。自定义变量需在启动 PalmDesk 前设置，支持空格和非 ASCII 路径。
+Windows 默认读取 `%USERPROFILE%\.codex`、`%USERPROFILE%\.claude`；`CODEX_HOME`、`CLAUDE_CONFIG_DIR` 可覆盖。Desktop 检查 `%APPDATA%\Claude`、`%LOCALAPPDATA%\Claude-3p`、旧版 `%APPDATA%\Claude-3p`，以及 `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache` 下的 `Roaming\Claude`、`Local\Claude-3p`、`Roaming\Claude-3p`。macOS 默认读取 `~/.codex`、`~/.claude`、`~/Library/Application Support/Claude` 与 `Claude-3p`。`CLAUDE_USER_DATA_DIR` 仅使用指定的 Desktop 目录。自定义变量需在启动 Tenori 前设置，支持空格和非 ASCII 路径。
 
 Linux 主机不启用阅读。WSL 主目录不自动发现，Desktop 的 SSH/WSL 索引也不读取；本功能不会启动 Agent、抓取云端日志或自动选择 GUI 任务。日志布局不是稳定 API，Windows 格式核对、已运行检查及真实手机验收缺口见 [Windows 会话阅读验证记录](smoke-artifacts/windows-session-reading-2026-09-24.md)。
 
@@ -80,11 +80,11 @@ Copy-Item .env.example .env.local
 pnpm dev:desktop
 ```
 
-`build:native` 和开发脚本使用 `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`，缺失时尝试 `Framework` 目录。辅助程序通过 Win32 API 枚举窗口、查询进程身份、读取物理边界和校验前台焦点。开发输出为 `native-bin/palmdesk-window.exe`，打包后位于 `resources/native/palmdesk-window.exe`，运行时不会打开控制台窗口。
+`build:native` 和开发脚本使用 `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe`，缺失时尝试 `Framework` 目录。辅助程序通过 Win32 API 枚举窗口、查询进程身份、读取物理边界和校验前台焦点。开发输出为 `native-bin/tenori-window.exe`，打包后位于 `resources/native/tenori-window.exe`，运行时不会打开控制台窗口。
 
-手机选窗、视频和键鼠输入的操作流程与 macOS 相同。窗口列表覆盖当前虚拟桌面可见或最小化的普通应用窗口，排除任务栏、桌面、工具窗口、其他虚拟桌面的隐藏窗口及 PalmDesk 自身。选择最小化窗口时仅还原该窗口。Windows 版本不自动切换虚拟桌面。
+手机选窗、视频和键鼠输入的操作流程与 macOS 相同。窗口列表覆盖当前虚拟桌面可见或最小化的普通应用窗口，排除任务栏、桌面、工具窗口、其他虚拟桌面的隐藏窗口及 Tenori 自身。选择最小化窗口时仅还原该窗口。Windows 版本不自动切换虚拟桌面。
 
-Windows 默认以当前用户权限运行，不要求管理员授权。系统不允许普通进程向权限级别更高的程序注入输入，此时视频会保留，控制暂停并提示权限问题。使用相同权限级别运行目标应用和 PalmDesk 后可重试。UAC 安全桌面、锁屏及受保护内容不属于可控制窗口。系统拒绝前台切换或目标被模态对话框禁用时，也会暂停输入，需在电脑上处理后重试。
+Windows 默认以当前用户权限运行，不要求管理员授权。系统不允许普通进程向权限级别更高的程序注入输入，此时视频会保留，控制暂停并提示权限问题。使用相同权限级别运行目标应用和 Tenori 后可重试。UAC 安全桌面、锁屏及受保护内容不属于可控制窗口。系统拒绝前台切换或目标被模态对话框禁用时，也会暂停输入，需在电脑上处理后重试。
 
 “发送文字”通过 Windows `SendInput` 的 Unicode 事件输入原文，不经过键盘布局或中文输入法的拼音转换，不写入系统剪贴板。发送前再次校验目标 HWND、进程身份、前台焦点和权限；常用按键与硬件键盘仍使用正常键盘事件。
 
@@ -96,27 +96,27 @@ Windows 主机启用 Chromium 的 WGC 窗口捕获，并检查系统的 `Graphic
 pnpm build:desktop:win
 ```
 
-主工作区的本地构建输出在 `electron-release/<version>/local-<id>/win-unpacked/`，可运行其中的 `PalmDesk Local <id>.exe`；linked worktree 使用 `worktree-<id>/win-unpacked/PalmDesk WT <id>.exe`。构建不发布安装包；发行签名和安装包分发需要另外配置。配置位于 `%APPDATA%\<应用名称>`，热开发应用的名称再加 ` Dev`，各身份均独立于正式版 `%APPDATA%\PalmDesk`。
+主工作区的本地构建输出在 `electron-release/<version>/local-<id>/win-unpacked/`，可运行其中的 `Tenori Local <id>.exe`；linked worktree 使用 `worktree-<id>/win-unpacked/Tenori WT <id>.exe`。构建不发布安装包；发行签名和安装包分发需要另外配置。配置位于 `%APPDATA%\<应用名称>`，热开发应用的名称再加 ` Dev`，各身份均独立于正式版 `%APPDATA%\Tenori`。
 
 原生集成烟测会创建两个临时同名窗口，检查 HWND 身份、边界刷新、指定窗口聚焦、最小化还原、失效身份和关闭窗口后的拒绝。它会短暂改变前台窗口，结束后清理测试窗口；只在解锁的交互式 Windows 会话中显式运行：
 
 ```powershell
 pnpm build:native
-$env:PALMDESK_NATIVE_SMOKE = 'true'
+$env:TENORI_NATIVE_SMOKE = 'true'
 node --test test/smoke/native-window-windows.test.cjs
-Remove-Item Env:PALMDESK_NATIVE_SMOKE
+Remove-Item Env:TENORI_NATIVE_SMOKE
 ```
 
 普通 `pnpm test:smoke` 不操作 Windows 前台窗口。原生烟测验证 Win32 适配器，不替代手机实机、真实 WebRTC 视频和系统输入的完整验收。
 
-开发程序仍在运行时，未修改原生源码的构建会复用已有辅助程序。修改了 C# 源码后，先退出开发版 PalmDesk 再编译，避免 Windows 的可执行文件占用限制。
+开发程序仍在运行时，未修改原生源码的构建会复用已有辅助程序。修改了 C# 源码后，先退出开发版 Tenori 再编译，避免 Windows 的可执行文件占用限制。
 
-打包版的窗口视频和输入烟测不需要后端。先执行 `pnpm build:desktop:win`，完全退出同一应用身份的 PalmDesk 打包版，然后运行：
+打包版的窗口视频和输入烟测不需要后端。先执行 `pnpm build:desktop:win`，完全退出同一应用身份的 Tenori 打包版，然后运行：
 
 ```powershell
-$env:PALMDESK_NATIVE_SMOKE = 'true'
+$env:TENORI_NATIVE_SMOKE = 'true'
 node test/smoke/electron-window-windows.mjs
-Remove-Item Env:PALMDESK_NATIVE_SMOKE
+Remove-Item Env:TENORI_NATIVE_SMOKE
 ```
 
 该测试创建两个开启输入法的临时测试窗口，验证打包版主进程、原生窗口源、解码像素与尺寸、鼠标点击、中英文混合文字和无效会话拒绝；结束后停止视频并关闭测试进程。Windows 的 Electron 应用配置路径不受测试进程的 `APPDATA` / `LOCALAPPDATA` 环境变量覆盖影响，打包测试沿用该应用身份的配置目录；已有同身份实例会使测试实例因单实例锁而提前退出。可用 `SMOKE_ELECTRON_EXECUTABLE` 指定其他打包版路径；`SMOKE_DESKTOP_DEV=true` 使用已构建的开发版主进程、本地辅助程序和独立的测试应用名。它不覆盖手机浏览器、网络传输或混合缩放的多显示器实机组合。
@@ -182,16 +182,16 @@ Windows 图片粘贴复用相同的手机选图、预览和认证传输，只对
 
 ```powershell
 pnpm build:native
-$env:PALMDESK_NATIVE_SMOKE = 'true'
+$env:TENORI_NATIVE_SMOKE = 'true'
 Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
 node --test test/smoke/native-window-windows.test.cjs
 node node_modules/electron/cli.js test/smoke/windows-image-paste.cjs
-Remove-Item Env:PALMDESK_NATIVE_SMOKE
+Remove-Item Env:TENORI_NATIVE_SMOKE
 ```
 
 该测试读取剪贴板的 PNG 格式（保留透明度），逐像素比较 PNG/JPEG 解码内容，验证 `Ctrl+V`、中英文混合草稿、按键释放、取消、过期进程身份、焦点变化和关闭目标；不会把 Windows Forms 的旧式 DIB 格式当作 Chromium 的 PNG 附件。测试还让独立进程锁定剪贴板，确认 Electron 静默写入失败时不会发送粘贴快捷键，释放锁后允许显式重试。测试结束且剪贴板仍是测试内容时恢复常用剪贴板格式，结果写入 `.local/image-paste/windows-result.json`。浏览器烟测另覆盖原始字节传输、阅读/仅观看取消和图片通道重连。两者均不能替代手机连接真实 Codex 的附件验收；记录和待验收步骤见 [Windows 图片粘贴验证记录](smoke-artifacts/windows-image-paste-2026-09-24.md)。
 
-Windows 权限错误需要以相同权限级别运行 Codex 与 PalmDesk，通常关闭目标的「以管理员身份运行」即可；前台焦点错误需要关闭阻挡的对话框并切回所选窗口。按键占用错误需释放所有按键和鼠标按钮。处理后手动点击粘贴即可重新校验；其他应用、HEIC/GIF、多图、任意文件、裁剪和标注仍不在本功能范围内。
+Windows 权限错误需要以相同权限级别运行 Codex 与 Tenori，通常关闭目标的「以管理员身份运行」即可；前台焦点错误需要关闭阻挡的对话框并切回所选窗口。按键占用错误需释放所有按键和鼠标按钮。处理后手动点击粘贴即可重新校验；其他应用、HEIC/GIF、多图、任意文件、裁剪和标注仍不在本功能范围内。
 
 窗口画质回归测试不需要后端，只捕获测试程序自己创建的文字窗口，验证旧 1080P 约束与新默认画质的实际尺寸、先建立 DataChannel 再添加视频时的编码参数，以及 720P 降档后恢复原始尺寸。macOS 上使用当前工作区的隔离开发应用运行：
 
@@ -228,7 +228,7 @@ node test/smoke/mobile-resume.mjs
 
 覆盖后台／阅读暂停视频、未送达状态消息后的主机超时暂停、断线重认证、阅读位置与草稿保留、恢复原窗口及关闭窗口后的拒绝恢复。页面可见性由测试事件模拟，不能代替 iOS Safari 切换应用、锁屏以及 Wi-Fi／蜂窝切换的实机验收。
 
-Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 PalmDesk 实例占用单实例锁：
+Electron 外壳烟测要求已构建 `electron-dist/`，通过 `pnpm dev:desktop` 生成了独立开发应用，前端及后端仍在运行，并且没有其他 Tenori 实例占用单实例锁：
 
 ```bash
 node test/smoke/desktop-shell.mjs
@@ -268,25 +268,25 @@ node test/smoke/business-flow.mjs
 
 | 构建                            | Bundle ID                                     | 应用名称                  |
 | ------------------------------- | --------------------------------------------- | ------------------------- |
-| 主工作区或普通 clone 的本地打包 | `io.github.abreto.palmdesk.local.<id>`        | `PalmDesk Local <id>`     |
-| 主工作区或普通 clone 的热开发   | `io.github.abreto.palmdesk.local.<id>.dev`    | `PalmDesk Local <id> Dev` |
-| linked worktree 的本地打包      | `io.github.abreto.palmdesk.worktree.<id>`     | `PalmDesk WT <id>`        |
-| linked worktree 的热开发        | `io.github.abreto.palmdesk.worktree.<id>.dev` | `PalmDesk WT <id> Dev`    |
-| 显式 `--release` 打包           | `io.github.abreto.palmdesk`                   | `PalmDesk`                |
+| 主工作区或普通 clone 的本地打包 | `io.github.abreto.tenori.local.<id>`        | `Tenori Local <id>`     |
+| 主工作区或普通 clone 的热开发   | `io.github.abreto.tenori.local.<id>.dev`    | `Tenori Local <id> Dev` |
+| linked worktree 的本地打包      | `io.github.abreto.tenori.worktree.<id>`     | `Tenori WT <id>`        |
+| linked worktree 的热开发        | `io.github.abreto.tenori.worktree.<id>.dev` | `Tenori WT <id> Dev`    |
+| 显式 `--release` 打包           | `io.github.abreto.tenori`                   | `Tenori`                |
 
 `<id>` 根据各自 Git 管理目录的真实路径生成，不同 clone 和 worktree 不共享身份。重复构建、切换分支和 linked worktree 的 `git worktree move` 不会改变它，符号链接也不会产生新身份。源码压缩包没有 Git 元数据时使用源码目录的真实路径；移动整个仓库或源码目录会产生新身份。已有 linked worktree 的 bundle ID 保持兼容。
 
 构建配置为 `electron-builder.cjs`，会同时设置 bundle ID、应用名称和包内运行时名称。`pnpm dev:desktop` 同样隔离主应用及 Electron Helper 的标识。各身份的配置、浏览器存储和单实例锁位于各自的 `~/Library/Application Support/<应用名称>` 目录。每个新身份需单独授予屏幕录制和辅助功能权限；主工作区迁移到新身份后，需要重新配置连接服务。
 
-`--release` 适用于 `build:desktop` 和 `dist:*`，无论从主工作区、clone 还是 worktree 执行，都使用固定的正式身份。只在准备发行产物时使用，例如 `pnpm dist:mac --release`。发布脚本将选择显式传给打包器；普通构建会覆盖继承的 `PALMDESK_BUILD_CHANNEL`，避免终端环境意外把开发包变成正式身份。直接调用 electron-builder 时默认仍为本地身份，只有 `PALMDESK_BUILD_CHANNEL=release` 才选择正式身份。
+`--release` 适用于 `build:desktop` 和 `dist:*`，无论从主工作区、clone 还是 worktree 执行，都使用固定的正式身份。只在准备发行产物时使用，例如 `pnpm dist:mac --release`。发布脚本将选择显式传给打包器；普通构建会覆盖继承的 `TENORI_BUILD_CHANNEL`，避免终端环境意外把开发包变成正式身份。直接调用 electron-builder 时默认仍为本地身份，只有 `TENORI_BUILD_CHANNEL=release` 才选择正式身份。
 
 `node scripts/dev.mjs --prepare-only` 可只生成开发应用，用于核对 `Info.plist` 和签名，不启动窗口或申请权限。原生及桌面烟测应使用当前 worktree 的开发应用，不能借用主工作区的 Electron，否则权限申请仍会归属被借用的应用。
 
 主工作区的本地打包产物位于 `electron-release/<version>/local-<id>/`，worktree 使用 `electron-release/<version>/worktree-<id>/`，显式发布构建使用 `electron-release/<version>/`。主工作区和 linked worktree 都可在准备开发应用并完成本地打包后，运行 `node test/smoke/desktop-identity.mjs` 验证两种构建的主应用、Helper 标识、签名和运行时数据目录。测试会短暂注册并清理一个开发版身份的重复包，覆盖 `.app.disabled` 改名场景；只加载空白页面，不申请屏幕录制或辅助功能权限。
 
-隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；仅重置 TCC 不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。无 Git 元数据时检查当前源码目录。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留；显式发布构建写入 `PalmDeskBuildChannel=release`，用于与旧的本地正式身份产物区分。
+隔离规则不会改写已经生成的 `.app`。旧分支即使不再运行，其产物仍可能被 LaunchServices 注册为正式版；仅重置 TCC 不会移除这些副本。`pnpm doctor:desktop` 会检查本仓库所有 Git worktree 的 `electron-release` 和 `.local`，列出身份不匹配的完整路径，macOS 打包也会执行此检查。无 Git 元数据时检查当前源码目录。检查读取 `Contents/Info.plist`，同时覆盖 `.app.disabled` 等改名残留；显式发布构建写入 `TenoriBuildChannel=release`，用于与旧的本地正式身份产物区分。
 
-主工作区原有 `.local/electron-dev/Electron.app` 使用共享的 `io.github.abreto.palmdesk.dev`，需合入新规则后在主工作区执行 `node scripts/dev.mjs --prepare-only` 重建。其他旧包保留备份时应先压缩归档，再移除原始目录；仅移动目录、改显示名称或改后缀都无法消除身份冲突。
+主工作区原有 `.local/electron-dev/Electron.app` 使用共享的 `io.github.abreto.tenori.dev`，需合入新规则后在主工作区执行 `node scripts/dev.mjs --prepare-only` 重建。其他旧包保留备份时应先压缩归档，再移除原始目录；仅移动目录、改显示名称或改后缀都无法消除身份冲突。
 
 macOS 启动时通过原生辅助程序读取父进程的真实 bundle ID、可执行文件路径和该 ID 的所有有效注册路径。在加载输入模块、获取单实例锁和创建窗口之前完成检查；发现多个副本时显示具体冲突路径并退出，不继续申请权限。别名和符号链接会按真实路径去重。此检查也覆盖 worktree 之外的旧副本；因此同一身份日常只保留一个可启动的安装位置。
 
@@ -298,21 +298,21 @@ macOS 启动时通过原生辅助程序读取父进程的真实 bundle ID、可�
 CSC_NAME='证书名称或 SHA-1 指纹' pnpm build:desktop
 ```
 
-已有权限条目指向错误副本时，先退出相关 PalmDesk 应用，运行 `pnpm doctor:desktop`。归档并移除仍使用正式版 bundle ID 的旧副本，随后针对旧路径取消 LaunchServices 注册，再注册保留的正式版路径：
+已有权限条目指向错误副本时，先退出相关 Tenori 应用，运行 `pnpm doctor:desktop`。归档并移除仍使用正式版 bundle ID 的旧副本，随后针对旧路径取消 LaunchServices 注册，再注册保留的正式版路径：
 
 ```bash
 lsregister_bin=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-"$lsregister_bin" -u '/旧路径/PalmDesk.app'
-"$lsregister_bin" -f '/保留路径/PalmDesk.app'
+"$lsregister_bin" -u '/旧路径/Tenori.app'
+"$lsregister_bin" -f '/保留路径/Tenori.app'
 ```
 
-再次运行 `pnpm doctor:desktop` 应通过。旧分支必须合入身份隔离修复后才能重新构建使用，解压旧备份也会重新引入冲突。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 PalmDesk 条目，再添加保留的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `PalmDesk WT <id>` 条目。不要全局重建 LaunchServices 数据库或重置其他应用的权限。
+再次运行 `pnpm doctor:desktop` 应通过。旧分支必须合入身份隔离修复后才能重新构建使用，解压旧备份也会重新引入冲突。在系统设置的“屏幕录制”和“辅助功能”中移除错误的 Tenori 条目，再添加保留的正式版并重新授权，最后完全退出并重启。隔离后的 worktree 应单独添加其 `Tenori WT <id>` 条目。不要全局重建 LaunchServices 数据库或重置其他应用的权限。
 
 若仍需通过命令清理某个开发版的旧授权，使用其完整 bundle ID，只重置该身份的对应权限，然后重新授权。将以下 `<id>` 替换为实际标识，热开发应用还需加 `.dev`；不要用正式版的 ID 清理开发版权限：
 
 ```bash
-tccutil reset ScreenCapture 'io.github.abreto.palmdesk.local.<id>'
-tccutil reset Accessibility 'io.github.abreto.palmdesk.local.<id>'
+tccutil reset ScreenCapture 'io.github.abreto.tenori.local.<id>'
+tccutil reset Accessibility 'io.github.abreto.tenori.local.<id>'
 ```
 
 代码签名身份的说明见 [Apple TN2206](https://developer.apple.com/library/archive/technotes/tn2206/_index.html)。从旧 Codex Remote 版本迁移同样需要重新授予权限，原有连接设置不自动迁移。

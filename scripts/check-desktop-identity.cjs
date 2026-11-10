@@ -34,15 +34,15 @@ function findLegacyApps(root) {
         const info = readAppInfo(current);
         const actual = info.CFBundleIdentifier;
         if (
-          /^io\.github\.abreto\.palmdesk(?:\.(?:local|worktree)\.[a-f0-9]{10})?(?:\.dev)?$/.test(
+          /^io\.github\.abreto\.tenori(?:\.(?:local|worktree)\.[a-f0-9]{10})?(?:\.dev)?$/.test(
             actual
           )
         ) {
           const expected = getDesktopIdentity(worktree, {
             development: actual.endsWith('.dev'),
             release:
-              actual === 'io.github.abreto.palmdesk' &&
-              info.PalmDeskBuildChannel === 'release',
+              actual === 'io.github.abreto.tenori' &&
+              info.TenoriBuildChannel === 'release',
           });
           if (actual !== expected.appId)
             legacy.push({ bundle: current, actual, expected: expected.appId });

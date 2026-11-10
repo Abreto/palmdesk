@@ -5,7 +5,7 @@
       ref="inviteInfo"
       class="invite-info"
     >
-PalmDesk:
+过目:
 设备代码:{{ cacheStore.deskUserUuid }}
 临时密码:{{ cacheStore.deskUserPassword }}
     </textarea>
